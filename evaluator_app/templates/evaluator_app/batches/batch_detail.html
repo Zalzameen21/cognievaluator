@@ -1,0 +1,373 @@
+{% extends 'evaluator_app/base.html' %}
+
+{% block title %}{{ batch.name }} - Batch Details{% endblock %}
+{% block page_title %}{{ batch.name }}{% endblock %}
+
+{% block content %}
+<!-- Batch Header Bar -->
+<div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-xl); padding: 24px 28px; margin-bottom: 24px; box-shadow: var(--shadow-sm); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+    <div>
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap;">
+            <span class="location-badge"><i class="bi bi-geo-alt-fill"></i> {{ batch.location.name }} Center</span>
+            {% if batch.schedule_type == 'DAILY' %}
+                <span class="badge-schedule badge-daily"><i class="bi bi-calendar-event"></i> Daily ({{ batch.short_days_display }})</span>
+            {% else %}
+                <span class="badge-schedule badge-weekly"><i class="bi bi-calendar-week"></i> Weekly ({{ batch.short_days_display }})</span>
+            {% endif %}
+            <span class="badge-status status-present">{{ batch.status }}</span>
+        </div>
+        <h2 style="font-size: 22px; font-weight: 800; color: var(--text-main);">{{ batch.name }}</h2>
+        <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px; display: flex; gap: 16px; flex-wrap: wrap;">
+            <span><strong>Code:</strong> <code>{{ batch.code }}</code></span>
+            <span><i class="bi bi-calendar3"></i> <strong>Days:</strong> {{ batch.class_days }}</span>
+            <span><i class="bi bi-clock"></i> <strong>Timing:</strong> {{ batch.timing }}</span>
+            <span><i class="bi bi-calendar-check"></i> <strong>Start Date:</strong> {{ batch.start_date|date:"d M, Y" }}</span>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <a href="{% url 'student_add_to_batch' batch.id %}" class="btn btn-primary">
+            <i class="bi bi-person-plus-fill"></i> Add Student
+        </a>
+        <a href="{% url 'batch_student_import' batch.id %}" class="btn btn-secondary" style="font-weight: 600;">
+            <i class="bi bi-file-earmark-excel-fill" style="color: #10B981;"></i> Import Excel / CSV
+        </a>
+        <a href="{% url 'evaluation_hub' %}?batch_id={{ batch.id }}" class="btn btn-primary" style="background: linear-gradient(135deg, #06B6D4, #3B82F6);">
+            <i class="bi bi-award-fill"></i> Evaluate Batch
+        </a>
+        <a href="{% url 'attendance_hub' %}?batch_id={{ batch.id }}" class="btn btn-secondary">
+            <i class="bi bi-calendar-check"></i> Attendance
+        </a>
+        <a href="{% url 'attendance_register' batch.id %}" class="btn btn-secondary" title="Attendance Register Matrix">
+            <i class="bi bi-grid-3x3"></i> Register
+        </a>
+        <a href="{% url 'project_hub' %}?batch={{ batch.id }}" class="btn btn-secondary" title="View Batch Projects">
+            <i class="bi bi-kanban"></i> Projects
+        </a>
+        <a href="{% url 'batch_schedule_view' batch.id %}" class="btn btn-secondary" title="View Syllabus & Task Schedule">
+            <i class="bi bi-calendar2-week"></i> Schedule
+        </a>
+        <a href="{% url 'batch_export_csv' batch.id %}" class="btn btn-secondary" title="Export CSV Report">
+            <i class="bi bi-download"></i> CSV
+        </a>
+        <a href="{% url 'batch_edit' batch.id %}" class="btn btn-secondary" title="Edit Batch">
+            <i class="bi bi-pencil"></i>
+        </a>
+        {% if is_admin_user %}
+        <a href="{% url 'batch_delete' batch.id %}" class="btn btn-secondary" style="color: var(--danger); background: var(--danger-light); border-color: transparent;" title="Delete Batch">
+            <i class="bi bi-trash-fill"></i>
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- KPIs Row -->
+<div class="kpi-grid" style="margin-bottom: 24px;">
+    <div class="kpi-card">
+        <div class="kpi-icon-box kpi-icon-primary">
+            <i class="bi bi-people-fill"></i>
+        </div>
+        <div class="kpi-info">
+            <div class="kpi-title">Enrolled Students</div>
+            <div class="kpi-value">{{ batch.student_count }}</div>
+            <div class="kpi-meta">{{ batch.active_students_count }} active students</div>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon-box kpi-icon-warning">
+            <i class="bi bi-clock-history"></i>
+        </div>
+        <div class="kpi-info">
+            <div class="kpi-title">Today's Evaluation</div>
+            <div class="kpi-value">{{ today_eval_count }} / {{ batch.student_count }}</div>
+            <div class="kpi-meta">{{ pending_eval_count }} pending today</div>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon-box kpi-icon-accent">
+            <i class="bi bi-star-fill"></i>
+        </div>
+        <div class="kpi-info">
+            <div class="kpi-title">Average Score</div>
+            <div class="kpi-value">{{ avg_score }}%</div>
+            <div class="kpi-meta">Batch overall average</div>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon-box kpi-icon-success">
+            <i class="bi bi-check2-circle"></i>
+        </div>
+        <div class="kpi-info">
+            <div class="kpi-title">Attendance Rate</div>
+            <div class="kpi-value">{{ attendance_rate }}%</div>
+            <div class="kpi-meta">Aggregate present rate</div>
+        </div>
+    </div>
+</div>
+
+<!-- Student Roster Table -->
+<div class="card">
+    <div class="card-header" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center;">
+        <div class="card-title" style="margin: 0;">
+            <i class="bi bi-people-fill text-primary"></i> Enrolled Student Roster ({{ students.count }})
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <div style="position: relative;">
+                <i class="bi bi-search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 14px;"></i>
+                <input type="text" id="studentSearchInput" placeholder="Search students..." style="padding: 6px 12px 6px 32px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 13px; width: 220px; background: var(--bg-surface); color: var(--text-main); outline: none;">
+            </div>
+            <a href="{% url 'student_add_to_batch' batch.id %}" class="btn btn-secondary btn-sm">
+                <i class="bi bi-plus"></i> Add Student
+            </a>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Student Name</th>
+                    <th>Roll Number</th>
+                    <th>Contact</th>
+                    <th>Payment</th>
+                    <th>Attendance %</th>
+                    <th>Avg Evaluation</th>
+                    <th>Today's Evaluation</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for stu in students %}
+                <tr>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="width: 36px; height: 36px; border-radius: var(--radius-full); background: {{ stu.avatar_color }}; color: #FFF; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700;">
+                                {{ stu.initials }}
+                            </div>
+                            <div>
+                                <a href="{% url 'student_detail' stu.id %}" style="font-weight: 700; color: var(--text-main);">{{ stu.name }}</a>
+                                <div style="font-size: 11px; color: var(--text-muted);">Joined {{ stu.join_date|date:"d M Y" }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td><code style="font-size: 12px; font-weight: 600;">{{ stu.roll_number }}</code></td>
+                    <td>
+                        <div style="font-size: 12px;">{{ stu.phone|default:"-" }}</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">{{ stu.email|default:"-" }}</div>
+                    </td>
+                    <td>
+                        <select class="form-select payment-status-select" 
+                                data-student-id="{{ stu.id }}" 
+                                style="font-size: 11px; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); width: 85px; 
+                                {% if stu.payment_status == 'PAID' %}background: rgba(16, 185, 129, 0.1); color: #10B981; border-color: rgba(16, 185, 129, 0.3);{% else %}background: rgba(239, 68, 68, 0.1); color: #EF4444; border-color: rgba(239, 68, 68, 0.3);{% endif %}"
+                                {% if stu.payment_status == 'PAID' and not request.user.profile.is_admin and not request.user.is_superuser %}disabled title="Only Admin can modify Paid status"{% endif %}>
+                            <option value="UNPAID" {% if stu.payment_status == 'UNPAID' %}selected{% endif %} style="color: #EF4444;">Unpaid</option>
+                            <option value="PAID" {% if stu.payment_status == 'PAID' %}selected{% endif %} style="color: #10B981;">Paid</option>
+                        </select>
+                    </td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-weight: 700; font-size: 13px;">{{ stu.attendance_percentage }}%</span>
+                            <div style="width: 50px; height: 6px; background: var(--bg-subtle); border-radius: 3px; overflow: hidden;">
+                                <div style="width: {{ stu.attendance_percentage }}%; height: 100%; background: var(--success);"></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span style="font-weight: 700; font-size: 13px;">{{ stu.average_score }}%</span>
+                            {% if stu.latest_evaluation %}
+                                <span class="badge-grade grade-{{ stu.latest_evaluation.grade|lower|slugify }}">{{ stu.latest_evaluation.grade }}</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        {% if stu.id in evaluated_student_ids %}
+                            <span class="badge-status status-present"><i class="bi bi-check-circle-fill"></i> Evaluated</span>
+                        {% else %}
+                            <span class="badge-status status-late"><i class="bi bi-hourglass-split"></i> Pending</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align: right;">
+                        <div style="display: inline-flex; gap: 6px; align-items: center;">
+                            {% if stu.id in evaluated_student_ids and not request.user.profile.is_admin %}
+                            <span class="btn btn-secondary btn-sm" style="opacity: 0.6; cursor: not-allowed;" title="Already Evaluated">
+                                <i class="bi bi-award-fill"></i> Evaluated
+                            </span>
+                            {% else %}
+                            <a href="{% url 'student_evaluate' stu.id %}?date={{ today_date|date:'Y-m-d' }}" class="btn {% if stu.id in evaluated_student_ids %}btn-secondary{% else %}btn-primary{% endif %} btn-sm" title="Evaluate for Today">
+                                <i class="bi bi-award"></i> {% if stu.id in evaluated_student_ids %}Edit{% else %}Evaluate{% endif %}
+                            </a>
+                            {% endif %}
+                            <a href="{% url 'student_detail' stu.id %}" class="btn btn-secondary btn-sm" title="View Scorecard Profile">
+                                <i class="bi bi-person-lines-fill"></i> Scorecard
+                            </a>
+                            <button type="button" class="btn btn-danger btn-sm" title="Remove Student from Batch"
+                                    onclick="openRemoveStudentModal('{{ stu.id }}', '{{ stu.name|escapejs }}', '{{ stu.roll_number|escapejs }}')">
+                                <i class="bi bi-trash"></i> Remove
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" style="text-align: center; color: var(--text-dim); padding: 36px 16px;">
+                        <i class="bi bi-people" style="font-size: 28px; display: block; margin-bottom: 8px; color: var(--text-dim);"></i>
+                        <div style="font-size: 14px; font-weight: 600; color: var(--text-main); margin-bottom: 6px;">No students enrolled in this batch yet.</div>
+                        <div style="display: flex; gap: 8px; justify-content: center; margin-top: 12px; flex-wrap: wrap;">
+                            <a href="{% url 'student_add_to_batch' batch.id %}" class="btn btn-primary btn-sm">
+                                <i class="bi bi-person-plus-fill"></i> Add Student Manually
+                            </a>
+                            <a href="{% url 'batch_student_import' batch.id %}" class="btn btn-secondary btn-sm" style="font-weight: 600;">
+                                <i class="bi bi-file-earmark-excel-fill" style="color: #10B981;"></i> Import Excel / CSV
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal: Remove Student Confirmation -->
+<div class="modal-backdrop" id="removeStudentModal" style="display: none;">
+    <div class="modal-dialog" style="max-width: 480px;">
+        <div class="modal-content">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding: 18px 24px;">
+                <h3 class="modal-title" style="font-size: 18px; font-weight: 800; color: var(--danger); display: flex; align-items: center; gap: 8px; margin: 0;">
+                    <i class="bi bi-person-x-fill"></i> Remove Student from Batch
+                </h3>
+                <button type="button" class="modal-close" onclick="closeRemoveStudentModal()">&times;</button>
+            </div>
+            <form id="removeStudentForm" method="POST" action="">
+                {% csrf_token %}
+                <div class="modal-body" style="padding: 24px;">
+                    <p style="font-size: 14px; color: var(--text-main); margin-bottom: 14px; line-height: 1.5;">
+                        Are you sure you want to remove <strong id="removeStudentName">Student</strong> (<code id="removeStudentRoll">ROLL</code>) from <strong>{{ batch.name }}</strong>?
+                    </p>
+                    <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: var(--radius-md); padding: 12px; font-size: 12px; color: #991B1B; display: flex; align-items: flex-start; gap: 8px;">
+                        <i class="bi bi-exclamation-triangle-fill" style="margin-top: 2px;"></i>
+                        <span>This action will permanently delete this student record along with their attendance logs, evaluation rubrics, and project assignments.</span>
+                    </div>
+                </div>
+                <div class="modal-footer" style="padding: 14px 24px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeRemoveStudentModal()">Cancel</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash-fill me-1"></i> Yes, Remove Student
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Dedicated evaluation page used instead of modal -->
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function openRemoveStudentModal(studentId, name, roll) {
+    const modal = document.getElementById('removeStudentModal');
+    const form = document.getElementById('removeStudentForm');
+    const nameEl = document.getElementById('removeStudentName');
+    const rollEl = document.getElementById('removeStudentRoll');
+    if (!modal || !form) return;
+
+    form.action = `/students/${studentId}/delete/`;
+    if (nameEl) nameEl.textContent = name;
+    if (rollEl) rollEl.textContent = roll;
+
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+}
+
+function closeRemoveStudentModal() {
+    const modal = document.getElementById('removeStudentModal');
+    if (!modal) return;
+    modal.style.display = 'none';
+    modal.classList.remove('active');
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeRemoveStudentModal();
+});
+const removeModalEl = document.getElementById('removeStudentModal');
+if (removeModalEl) {
+    removeModalEl.addEventListener('click', function(e) {
+        if (e.target === this) closeRemoveStudentModal();
+    });
+}
+
+// Student Table Search Filter
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('studentSearchInput');
+    const tableRows = document.querySelectorAll('.data-table tbody tr');
+
+    if (searchInput) {
+        searchInput.addEventListener('keyup', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            
+            tableRows.forEach(row => {
+                // Skip the "No students enrolled" row if it exists
+                if (row.querySelector('td[colspan]')) return;
+                
+                const textContent = row.textContent.toLowerCase();
+                if (textContent.includes(searchTerm)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+    }
+
+    // Payment Status Update
+    const paymentSelects = document.querySelectorAll('.payment-status-select');
+    paymentSelects.forEach(select => {
+        select.addEventListener('change', function(e) {
+            const studentId = this.dataset.studentId;
+            const newStatus = this.value;
+            const originalValue = this.querySelector('option:not(:checked)').value;
+
+            fetch(`/api/students/${studentId}/update-payment-status/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({ payment_status: newStatus })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    if (newStatus === 'PAID') {
+                        this.style.background = 'rgba(16, 185, 129, 0.1)';
+                        this.style.color = '#10B981';
+                        this.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+                    } else {
+                        this.style.background = 'rgba(239, 68, 68, 0.1)';
+                        this.style.color = '#EF4444';
+                        this.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                    }
+                    // Optional: show a quick success toast/message here
+                } else {
+                    alert(data.message || "Failed to update payment status.");
+                    this.value = originalValue; // Revert on failure
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert("An error occurred while updating the payment status.");
+                this.value = originalValue; // Revert on error
+            });
+        });
+    });
+});
+</script>
+{% endblock %}

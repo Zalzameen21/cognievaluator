@@ -1,0 +1,1196 @@
+{% extends 'evaluator_app/base.html' %}
+{% load static %}
+
+{% block title %}Daily Evaluation - Student Evaluator Portal{% endblock %}
+{% block page_title %}Daily Student Evaluation{% endblock %}
+
+{% block content %}
+<style>
+/* ==============================================================================
+   DAILY EVALUATION HUB - MODERN, SIMPLE & PROFESSIONAL STYLES
+   ============================================================================== */
+
+.eval-hub-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Page Header Row */
+.eval-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.eval-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.eval-main-title {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--text-main);
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.eval-subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+/* Top Toolbar Card */
+.eval-toolbar-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    padding: 18px 22px;
+    box-shadow: var(--shadow-sm);
+}
+
+.eval-toolbar-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.eval-toolbar-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.eval-select-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.eval-batch-select {
+    min-width: 250px;
+    max-width: 320px;
+    font-weight: 600;
+    font-size: 13.5px;
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+}
+
+/* Date Navigator Component */
+.eval-date-nav {
+    display: inline-flex;
+    align-items: center;
+    background: var(--bg-subtle);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 2px 4px;
+    gap: 4px;
+}
+
+.date-nav-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    width: 30px;
+    height: 30px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 13px;
+    transition: var(--transition);
+}
+
+.date-nav-btn:hover {
+    background: var(--bg-surface);
+    color: var(--primary);
+}
+
+.eval-date-input {
+    border: none;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-main);
+    padding: 4px 6px;
+    outline: none;
+    cursor: pointer;
+}
+
+.date-today-btn {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    background: var(--bg-surface);
+    color: var(--text-main);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.date-today-btn.active {
+    background: var(--primary);
+    color: #FFF;
+    border-color: var(--primary);
+}
+
+/* Search Box */
+.eval-search-box {
+    position: relative;
+    min-width: 220px;
+    flex: 1;
+    max-width: 300px;
+}
+
+.eval-search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-dim);
+    font-size: 14px;
+    pointer-events: none;
+}
+
+.eval-search-input {
+    width: 100%;
+    padding: 8px 12px 8px 36px;
+    font-size: 13px;
+    border-radius: var(--radius-md);
+    background: var(--bg-subtle);
+    border: 1px solid var(--border-color);
+}
+
+.eval-search-input:focus {
+    background: var(--bg-surface);
+    border-color: var(--primary);
+}
+
+/* Status Filter Tabs */
+.eval-status-tabs {
+    display: inline-flex;
+    background: var(--bg-subtle);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 3px;
+    gap: 4px;
+}
+
+.status-tab-btn {
+    border: none;
+    background: transparent;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: var(--transition);
+}
+
+.status-tab-btn:hover {
+    color: var(--text-main);
+}
+
+.status-tab-btn.active {
+    background: var(--bg-surface);
+    color: var(--text-main);
+    font-weight: 700;
+    box-shadow: var(--shadow-sm);
+}
+
+.status-tab-count {
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: var(--radius-full);
+    background: var(--bg-subtle);
+}
+
+.status-tab-btn.active .status-tab-count {
+    background: rgba(79, 70, 229, 0.1);
+    color: var(--primary);
+}
+
+/* View Mode Switcher */
+.eval-view-toggle {
+    display: inline-flex;
+    background: var(--bg-subtle);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 3px;
+}
+
+.view-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    padding: 6px 10px;
+    font-size: 14px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.view-btn:hover {
+    color: var(--text-main);
+}
+
+.view-btn.active {
+    background: var(--bg-surface);
+    color: var(--primary);
+    box-shadow: var(--shadow-sm);
+}
+
+/* KPI Summary Metric Cards */
+.eval-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+}
+
+@media (max-width: 992px) {
+    .eval-kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 576px) {
+    .eval-kpi-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.eval-kpi-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition);
+}
+
+.eval-kpi-card:hover {
+    box-shadow: var(--shadow-md);
+    border-color: rgba(79, 70, 229, 0.25);
+}
+
+.eval-kpi-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.icon-blue { background: rgba(59, 130, 246, 0.1); color: #3B82F6; }
+.icon-green { background: rgba(16, 185, 129, 0.1); color: #10B981; }
+.icon-amber { background: rgba(245, 158, 11, 0.1); color: #F59E0B; }
+.icon-purple { background: rgba(139, 92, 246, 0.1); color: #8B5CF6; }
+
+.eval-kpi-content {
+    flex: 1;
+}
+
+.eval-kpi-label {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 2px;
+}
+
+.eval-kpi-val {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text-main);
+    line-height: 1.2;
+}
+
+.eval-kpi-meta {
+    font-size: 11.5px;
+    color: var(--text-dim);
+    margin-top: 2px;
+}
+
+.eval-progress-bar-wrap {
+    height: 5px;
+    background: var(--bg-subtle);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 6px;
+}
+
+.eval-progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #10B981, #06B6D4);
+    border-radius: 3px;
+}
+
+/* ==============================================================================
+   TABLE VIEW STYLING
+   ============================================================================== */
+.eval-table-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.eval-table-header {
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-subtle);
+}
+
+.eval-table-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.eval-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.eval-table th {
+    background: var(--bg-surface);
+    color: var(--text-muted);
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border-color);
+    text-align: left;
+    white-space: nowrap;
+}
+
+.eval-table td {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: 13px;
+    vertical-align: middle;
+    background: var(--bg-surface);
+    transition: var(--transition);
+}
+
+.eval-table tr:hover td {
+    background: rgba(79, 70, 229, 0.02);
+}
+
+.eval-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* Student Profile Cell */
+.student-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.student-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 13px;
+    color: #FFF;
+    flex-shrink: 0;
+}
+
+.student-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.student-name {
+    font-weight: 700;
+    color: var(--text-main);
+    text-decoration: none;
+    font-size: 14px;
+    transition: var(--transition);
+}
+
+.student-name:hover {
+    color: var(--primary);
+}
+
+.student-roll {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+/* Compact Rubric Badges */
+.rubric-pill-strip {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.rubric-pill {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-subtle);
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.rubric-pill span.val {
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+/* Table Row Actions */
+.row-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+/* ==============================================================================
+   CARD / GRID VIEW STYLING
+   ============================================================================== */
+.eval-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+    gap: 18px;
+}
+
+.eval-student-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+
+.eval-student-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+    border-color: rgba(79, 70, 229, 0.3);
+}
+
+.card-top-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 14px;
+}
+
+.card-score-box {
+    background: var(--bg-subtle);
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    border: 1px solid var(--border-color);
+}
+
+.card-score-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.card-score-number {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--primary);
+}
+
+.card-rubric-mini {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    text-align: center;
+    font-size: 11px;
+}
+
+.card-rubric-box {
+    background: var(--bg-surface);
+    padding: 5px 2px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+}
+
+.card-rubric-box .r-label {
+    font-size: 9.5px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.card-rubric-box .r-val {
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.card-pending-box {
+    background: var(--bg-subtle);
+    border-radius: var(--radius-md);
+    padding: 18px 14px;
+    text-align: center;
+    margin-bottom: 14px;
+    border: 1px dashed var(--border-color);
+}
+
+.card-footer-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-subtle);
+}
+
+/* Empty State */
+.eval-empty-card {
+    background: var(--bg-surface);
+    border: 1px dashed var(--border-color);
+    border-radius: var(--radius-xl);
+    padding: 48px 24px;
+    text-align: center;
+}
+</style>
+
+<div class="eval-hub-wrapper">
+    <!-- Top Header & Actions -->
+    <div class="eval-header-row">
+        <div class="eval-title-group">
+            <h2 class="eval-main-title">
+                <i class="bi bi-award-fill text-primary"></i> Daily Student Evaluation
+                {% if selected_batch %}
+                    <span class="badge" style="background: rgba(79, 70, 229, 0.1); color: var(--primary); font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: var(--radius-full);">
+                        {{ selected_batch.name }}
+                    </span>
+                {% endif %}
+            </h2>
+            <p class="eval-subtitle">
+                Conduct structured daily assessments, evaluate rubrics, and monitor individual academic progress.
+            </p>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            {% if selected_batch %}
+                <a href="{% url 'batch_bulk_evaluate' selected_batch.id %}?date={{ selected_date }}" class="btn" style="background-color: var(--primary); color: white; border: none; padding: 6px 12px; font-size: 13px; font-weight: 600; border-radius: var(--radius-sm); text-decoration: none;" title="Evaluate entire batch at once">
+                    <i class="bi bi-ui-checks-grid"></i> Evaluate Entire Batch
+                </a>
+                <a href="{% url 'attendance_hub' %}?batch_id={{ selected_batch.id }}&date={{ selected_date }}" class="btn btn-secondary btn-sm" title="View Batch Attendance">
+                    <i class="bi bi-calendar-check"></i> Attendance
+                </a>
+                <a href="{% url 'batch_detail' selected_batch.id %}" class="btn btn-secondary btn-sm" title="View Batch Details">
+                    <i class="bi bi-collection-play"></i> Batch Roster
+                </a>
+            {% endif %}
+            <a href="{% url 'evaluation_history' %}{% if selected_batch %}?batch={{ selected_batch.id }}{% endif %}" class="btn btn-secondary btn-sm" title="View Past Evaluation Logs">
+                <i class="bi bi-clock-history"></i> Evaluation History
+            </a>
+        </div>
+    </div>
+
+    <!-- Toolbar: Batch Selector, Date Navigator, Search & View Modes -->
+    <div class="eval-toolbar-card">
+        <form method="get" id="evalFilterForm" class="eval-toolbar-form">
+            <div class="eval-toolbar-controls">
+                <!-- Batch Selector -->
+                <div class="eval-select-group">
+                    <i class="bi bi-collection-play text-primary" style="font-size: 16px;"></i>
+                    <select name="batch_id" class="form-select eval-batch-select" onchange="this.form.submit()">
+                        {% for b in accessible_batches %}
+                            <option value="{{ b.id }}" {% if selected_batch and selected_batch.id == b.id %}selected{% endif %}>
+                                {{ b.name }} ({{ b.location.code|default:b.location.name }})
+                            </option>
+                        {% empty %}
+                            <option value="">No batches available</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Date Navigator -->
+                <div class="eval-date-nav">
+                    <button type="button" class="date-nav-btn" onclick="stepDate('{{ prev_date }}')" title="Previous Day">
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <input type="date" name="date" id="evalDateInput" value="{{ selected_date }}" class="eval-date-input" onchange="this.form.submit()">
+                    <button type="button" class="date-nav-btn" onclick="stepDate('{{ next_date }}')" title="Next Day">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                    <button type="button" class="date-today-btn {% if is_today %}active{% endif %}" onclick="stepDate('{{ today_str }}')" title="Jump to Today">
+                        Today
+                    </button>
+                </div>
+
+                <!-- Live Search Box -->
+                <div class="eval-search-box">
+                    <i class="bi bi-search eval-search-icon"></i>
+                    <input type="text" name="q" id="studentSearchInput" value="{{ search_query }}" class="eval-search-input" placeholder="Search student name or roll..." autocomplete="off">
+                </div>
+            </div>
+
+            <!-- Right Controls: Status Tabs & View Switcher -->
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <!-- Status Filter Tabs -->
+                <div class="eval-status-tabs" id="statusFilterTabs">
+                    <button type="button" class="status-tab-btn {% if status_filter == 'all' or not status_filter %}active{% endif %}" data-status="all">
+                        All <span class="status-tab-count">{{ total_students }}</span>
+                    </button>
+                    <button type="button" class="status-tab-btn {% if status_filter == 'pending' %}active{% endif %}" data-status="pending">
+                        <i class="bi bi-clock text-warning" style="font-size: 11px;"></i> Pending 
+                        <span class="status-tab-count" style="color: #D97706; font-weight: 700;">{{ pending_count }}</span>
+                    </button>
+                    <button type="button" class="status-tab-btn {% if status_filter == 'evaluated' %}active{% endif %}" data-status="evaluated">
+                        <i class="bi bi-check-circle-fill text-success" style="font-size: 11px;"></i> Evaluated 
+                        <span class="status-tab-count" style="color: #059669; font-weight: 700;">{{ evaluated_count }}</span>
+                    </button>
+                </div>
+                <input type="hidden" name="status" id="statusInput" value="{{ status_filter|default:'all' }}">
+
+                <!-- View Switcher (Table vs Card) -->
+                <div class="eval-view-toggle">
+                    <button type="button" class="view-btn active" id="btnTableView" title="Table View">
+                        <i class="bi bi-list-ul"></i>
+                    </button>
+                    <button type="button" class="view-btn" id="btnCardView" title="Card / Grid View">
+                        <i class="bi bi-grid-fill"></i>
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    {% if selected_batch %}
+    <!-- KPI Summary Metrics Strip -->
+    <div class="eval-kpi-grid">
+        <!-- Metric 1: Total Enrolled -->
+        <div class="eval-kpi-card">
+            <div class="eval-kpi-icon icon-blue">
+                <i class="bi bi-people-fill"></i>
+            </div>
+            <div class="eval-kpi-content">
+                <div class="eval-kpi-label">Batch Students</div>
+                <div class="eval-kpi-val">{{ total_students }}</div>
+                <div class="eval-kpi-meta">{{ selected_batch.name }} ({{ selected_batch.code }})</div>
+            </div>
+        </div>
+
+        <!-- Metric 2: Evaluated Today -->
+        <div class="eval-kpi-card">
+            <div class="eval-kpi-icon icon-green">
+                <i class="bi bi-check-circle-fill"></i>
+            </div>
+            <div class="eval-kpi-content">
+                <div class="eval-kpi-label">Evaluated Today</div>
+                <div class="eval-kpi-val">{{ evaluated_count }} <span style="font-size: 14px; font-weight: 600; color: var(--text-muted);">/ {{ total_students }}</span></div>
+                <div class="eval-progress-bar-wrap">
+                    <div class="eval-progress-bar-fill" style="width: {{ completion_rate }}%;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metric 3: Pending Today -->
+        <div class="eval-kpi-card">
+            <div class="eval-kpi-icon icon-amber">
+                <i class="bi bi-hourglass-split"></i>
+            </div>
+            <div class="eval-kpi-content">
+                <div class="eval-kpi-label">Pending Evaluation</div>
+                <div class="eval-kpi-val" style="color: {% if pending_count > 0 %}#D97706{% else %}var(--success){% endif %};">
+                    {{ pending_count }}
+                </div>
+                <div class="eval-kpi-meta">
+                    {% if pending_count == 0 %}
+                        All completed for {{ selected_date_display }}!
+                    {% else %}
+                        Requires assessment
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Metric 4: Average Score -->
+        <div class="eval-kpi-card">
+            <div class="eval-kpi-icon icon-purple">
+                <i class="bi bi-award-fill"></i>
+            </div>
+            <div class="eval-kpi-content">
+                <div class="eval-kpi-label">Batch Avg Score</div>
+                <div class="eval-kpi-val">
+                    {% if evaluated_count > 0 %}{{ avg_score }}%{% else %}—{% endif %}
+                </div>
+                <div class="eval-kpi-meta">
+                    {% if evaluated_count > 0 %}Session average score{% else %}Awaiting evaluations{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View 1: Table View (Default & Simple/Professional) -->
+    <div class="eval-table-card" id="tableViewContainer">
+        <div class="eval-table-header">
+            <div class="eval-table-title">
+                <i class="bi bi-person-lines-fill text-primary"></i>
+                <span>Student Evaluation Roster</span>
+                <span class="badge" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-muted); font-size: 11px;">
+                    {{ selected_date_display }}
+                </span>
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted);">
+                Showing <strong id="visibleStudentCount">{{ students_data|length }}</strong> students
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="eval-table" id="studentsTable">
+                <thead>
+                    <tr>
+                        <th style="width: 280px;">Student Information</th>
+                        <th style="width: 120px;">Attendance</th>
+                        <th style="width: 140px;">Status</th>
+                        <th style="width: 130px;">Daily Score</th>
+                        <th>Rubric Highlights</th>
+                        <th style="width: 120px;">Tasks</th>
+                        <th style="text-align: right; width: 170px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="studentsTableBody">
+                    {% for item in students_data %}
+                    <tr class="student-row" 
+                        data-name="{{ item.student.name|lower }}" 
+                        data-roll="{{ item.student.roll_number|lower }}" 
+                        data-status="{% if item.is_evaluated %}evaluated{% else %}pending{% endif %}">
+                        <!-- Student Cell -->
+                        <td>
+                            <div class="student-cell">
+                                <div class="student-avatar" style="background-color: {{ item.student.avatar_color|default:'#6366F1' }};">
+                                    {{ item.student.initials }}
+                                </div>
+                                <div class="student-info">
+                                    <a href="{% url 'student_detail' item.student.id %}" class="student-name">
+                                        {{ item.student.name }}
+                                    </a>
+                                    <span class="student-roll">{{ item.student.roll_number }}</span>
+                                </div>
+                            </div>
+                        </td>
+
+                        <!-- Attendance Cell -->
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="width: 8px; height: 8px; border-radius: 50%; background: {% if item.attendance_pct >= 75 %}var(--success){% elif item.attendance_pct >= 50 %}var(--warning){% else %}var(--danger){% endif %};"></span>
+                                <span style="font-weight: 700; font-size: 13px;">{{ item.attendance_pct }}%</span>
+                            </div>
+                        </td>
+
+                        <!-- Evaluation Status Cell -->
+                        <td>
+                            {% if item.is_evaluated %}
+                                <span class="badge-status status-present" style="font-size: 11.5px; padding: 3px 9px;">
+                                    <i class="bi bi-check-circle-fill"></i> Evaluated
+                                </span>
+                            {% else %}
+                                <span class="badge-status status-late" style="font-size: 11.5px; padding: 3px 9px;">
+                                    <i class="bi bi-clock"></i> Pending
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Daily Score Cell -->
+                        <td>
+                            {% if item.is_evaluated %}
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <strong style="font-size: 14px; color: var(--primary);">{{ item.evaluation.total_score }}%</strong>
+                                    <span class="badge-grade grade-{{ item.evaluation.grade|lower|slugify }}" style="font-size: 10.5px; padding: 2px 6px;">
+                                        {{ item.evaluation.grade }}
+                                    </span>
+                                </div>
+                            {% else %}
+                                <span style="color: var(--text-dim); font-size: 12px; font-style: italic;">Not Graded</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Rubric Highlights Cell -->
+                        <td>
+                            {% if item.is_evaluated %}
+                                <div class="rubric-pill-strip">
+                                    <span class="rubric-pill" title="Punctuality Score">P: <span class="val">{{ item.evaluation.punctuality_score|floatformat:0 }}</span></span>
+                                    <span class="rubric-pill" title="Presentation Score">Pres: <span class="val">{{ item.evaluation.presentation_score|floatformat:0 }}</span></span>
+                                    <span class="rubric-pill" title="Problem Solving Score">Log: <span class="val">{{ item.evaluation.problem_solving_score|floatformat:0 }}</span></span>
+                                    <span class="rubric-pill" title="Communication Score">Comm: <span class="val">{{ item.evaluation.communication_score|floatformat:0 }}</span></span>
+                                    <span class="rubric-pill" title="Daily Tasks Completed vs Given">Tasks: <span class="val">{{ item.evaluation.tasks_completed }}/{{ item.evaluation.tasks_given }}</span></span>
+                                </div>
+                                {% if item.evaluation.general_remarks %}
+                                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px;">
+                                        <i class="bi bi-chat-quote me-1"></i>{{ item.evaluation.general_remarks }}
+                                    </div>
+                                {% endif %}
+                            {% else %}
+                                <span style="font-size: 12px; color: var(--text-dim);">Ready for daily assessment rubric</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Tasks Cell -->
+                        <td>
+                            {% if item.pending_tasks_count > 0 %}
+                                <span class="badge" style="background: rgba(245, 158, 11, 0.1); color: #D97706; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: var(--radius-full);">
+                                    <i class="bi bi-list-task me-1"></i>{{ item.pending_tasks_count }} Pending
+                                </span>
+                            {% else %}
+                                <span style="font-size: 12px; color: var(--text-dim);">No pending</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Actions Cell -->
+                        <td style="text-align: right;">
+                            <div class="row-actions">
+                                {% if item.is_evaluated and not request.user.profile.is_admin %}
+                                <span class="btn btn-secondary btn-sm" style="opacity: 0.6; cursor: not-allowed;" title="Already Evaluated. Only Admins can edit.">
+                                    <i class="bi bi-award-fill"></i> Evaluated
+                                </span>
+                                {% else %}
+                                <a href="{% url 'student_evaluate' item.student.id %}?date={{ selected_date }}" 
+                                   class="btn {% if item.is_evaluated %}btn-secondary{% else %}btn-primary{% endif %} btn-sm" 
+                                   title="{% if item.is_evaluated %}Edit Evaluation{% else %}Evaluate Student{% endif %}">
+                                    <i class="bi bi-award{% if item.is_evaluated %}-fill{% endif %}"></i>
+                                    <span>{% if item.is_evaluated %}Edit{% else %}Evaluate{% endif %}</span>
+                                </a>
+                                {% endif %}
+                                <a href="{% url 'student_detail' item.student.id %}" class="btn btn-secondary btn-sm" title="Scorecard Profile">
+                                    <i class="bi bi-person-badge"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" style="text-align: center; padding: 40px 16px; color: var(--text-muted);">
+                            <i class="bi bi-people" style="font-size: 28px; display: block; margin-bottom: 8px; color: var(--text-dim);"></i>
+                            <div>No students match the selected filter.</div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- View 2: Card / Grid View (Clean & Balanced) -->
+    <div class="eval-card-grid" id="cardViewContainer" style="display: none;">
+        {% for item in students_data %}
+        <div class="eval-student-card student-card-item" 
+             data-name="{{ item.student.name|lower }}" 
+             data-roll="{{ item.student.roll_number|lower }}" 
+             data-status="{% if item.is_evaluated %}evaluated{% else %}pending{% endif %}">
+            <div>
+                <!-- Top Card Header -->
+                <div class="card-top-header">
+                    <div class="student-cell">
+                        <div class="student-avatar" style="background-color: {{ item.student.avatar_color|default:'#6366F1' }};">
+                            {{ item.student.initials }}
+                        </div>
+                        <div class="student-info">
+                            <a href="{% url 'student_detail' item.student.id %}" class="student-name">
+                                {{ item.student.name }}
+                            </a>
+                            <span class="student-roll">{{ item.student.roll_number }}</span>
+                        </div>
+                    </div>
+
+                    {% if item.is_evaluated %}
+                        <span class="badge-status status-present" style="font-size: 11px; padding: 3px 8px;">
+                            <i class="bi bi-check-circle-fill"></i> Evaluated
+                        </span>
+                    {% else %}
+                        <span class="badge-status status-late" style="font-size: 11px; padding: 3px 8px;">
+                            <i class="bi bi-clock"></i> Pending
+                        </span>
+                    {% endif %}
+                </div>
+
+                <!-- Middle Content -->
+                {% if item.is_evaluated %}
+                    <div class="card-score-box">
+                        <div class="card-score-header">
+                            <span style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Composite Score</span>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span class="card-score-number">{{ item.evaluation.total_score }}%</span>
+                                <span class="badge-grade grade-{{ item.evaluation.grade|lower|slugify }}" style="font-size: 11px; padding: 2px 7px;">
+                                    {{ item.evaluation.grade }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="card-rubric-mini">
+                            <div class="card-rubric-box">
+                                <div class="r-label">Punct</div>
+                                <div class="r-val">{{ item.evaluation.punctuality_score|floatformat:0 }}</div>
+                            </div>
+                            <div class="card-rubric-box">
+                                <div class="r-label">Pres</div>
+                                <div class="r-val">{{ item.evaluation.presentation_score|floatformat:0 }}</div>
+                            </div>
+                            <div class="card-rubric-box">
+                                <div class="r-label">Logic</div>
+                                <div class="r-val">{{ item.evaluation.problem_solving_score|floatformat:0 }}</div>
+                            </div>
+                            <div class="card-rubric-box">
+                                <div class="r-label">Tasks</div>
+                                <div class="r-val">{{ item.evaluation.tasks_completed }}/{{ item.evaluation.tasks_given }}</div>
+                            </div>
+                        </div>
+
+                        {% if item.evaluation.general_remarks %}
+                            <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 8px; font-style: italic; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                "{{ item.evaluation.general_remarks }}"
+                            </div>
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <div class="card-pending-box">
+                        <i class="bi bi-clipboard-pulse" style="font-size: 26px; color: var(--warning); display: block; margin-bottom: 6px;"></i>
+                        <div style="font-size: 13px; font-weight: 700; color: var(--text-main);">Awaiting Assessment</div>
+                        <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">
+                            Attendance: <strong>{{ item.attendance_pct }}%</strong>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Footer Action Buttons -->
+            <div class="card-footer-actions">
+                {% if item.is_evaluated and not request.user.profile.is_admin %}
+                <span class="btn btn-secondary btn-sm" style="flex: 1; justify-content: center; opacity: 0.6; cursor: not-allowed;" title="Already Evaluated">
+                    <i class="bi bi-award-fill"></i> Evaluated
+                </span>
+                {% else %}
+                <a href="{% url 'student_evaluate' item.student.id %}?date={{ selected_date }}" 
+                   class="btn {% if item.is_evaluated %}btn-secondary{% else %}btn-primary{% endif %} btn-sm" 
+                   style="flex: 1; justify-content: center;">
+                    <i class="bi bi-award{% if item.is_evaluated %}-fill{% endif %}"></i>
+                    <span>{% if item.is_evaluated %}Edit Evaluation{% else %}Evaluate Now{% endif %}</span>
+                </a>
+                {% endif %}
+                <a href="{% url 'student_detail' item.student.id %}" class="btn btn-secondary btn-sm" title="View Full Student Scorecard">
+                    <i class="bi bi-person-lines-fill"></i>
+                </a>
+            </div>
+        </div>
+        {% empty %}
+        <div style="grid-column: 1 / -1;" class="eval-empty-card">
+            <i class="bi bi-people" style="font-size: 36px; color: var(--text-dim); display: block; margin-bottom: 10px;"></i>
+            <h4 style="font-size: 16px; font-weight: 700; color: var(--text-main);">No students match active filters</h4>
+            <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">Try searching for another name or change the status filter.</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Empty State if Batch has 0 Students -->
+    {% if not students_data and not search_query and status_filter == 'all' %}
+    <div class="eval-empty-card">
+        <div style="width: 52px; height: 52px; border-radius: 50%; background: var(--bg-subtle); color: var(--text-dim); display: flex; align-items: center; justify-content: center; font-size: 24px; margin: 0 auto 14px;">
+            <i class="bi bi-people"></i>
+        </div>
+        <h3 style="font-size: 17px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">No Students in this Batch Yet</h3>
+        <p style="font-size: 13px; color: var(--text-muted); max-width: 420px; margin: 0 auto 18px;">
+            Add students or import them via spreadsheet to start conducting daily evaluations.
+        </p>
+        <div style="display: inline-flex; gap: 10px;">
+            <a href="{% url 'student_add_to_batch' selected_batch.id %}" class="btn btn-primary btn-sm">
+                <i class="bi bi-person-plus-fill"></i> Add Student
+            </a>
+            <a href="{% url 'batch_student_import' selected_batch.id %}" class="btn btn-secondary btn-sm">
+                <i class="bi bi-file-earmark-excel"></i> Bulk Import
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Daily Assessment modal removed in favor of dedicated evaluation page -->
+
+    {% else %}
+    <!-- No Accessible Batches -->
+    <div class="eval-empty-card">
+        <div style="width: 54px; height: 54px; border-radius: 50%; background: var(--bg-subtle); color: var(--text-dim); display: flex; align-items: center; justify-content: center; font-size: 26px; margin: 0 auto 16px;">
+            <i class="bi bi-collection-play"></i>
+        </div>
+        <h3 style="font-size: 18px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">No Accessible Batches</h3>
+        <p style="font-size: 13.5px; color: var(--text-muted); max-width: 440px; margin: 0 auto 20px;">
+            You need to create a batch or be assigned to a training location to begin evaluations.
+        </p>
+        <a href="{% url 'batch_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> Create New Batch
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Evaluation Hub Interactive Script -->
+<script>
+function stepDate(targetDate) {
+    const dateInput = document.getElementById('evalDateInput');
+    if (dateInput && targetDate) {
+        dateInput.value = targetDate;
+        document.getElementById('evalFilterForm').submit();
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. View Switcher Logic (Table vs Cards)
+    const btnTable = document.getElementById('btnTableView');
+    const btnCard = document.getElementById('btnCardView');
+    const tableContainer = document.getElementById('tableViewContainer');
+    const cardContainer = document.getElementById('cardViewContainer');
+
+    function setView(mode) {
+        if (!tableContainer || !cardContainer) return;
+        if (mode === 'cards') {
+            tableContainer.style.display = 'none';
+            cardContainer.style.display = 'grid';
+            if (btnCard) btnCard.classList.add('active');
+            if (btnTable) btnTable.classList.remove('active');
+        } else {
+            tableContainer.style.display = 'block';
+            cardContainer.style.display = 'none';
+            if (btnTable) btnTable.classList.add('active');
+            if (btnCard) btnCard.classList.remove('active');
+        }
+        localStorage.setItem('evaluator_eval_view_mode', mode);
+    }
+
+    const savedMode = localStorage.getItem('evaluator_eval_view_mode') || 'table';
+    setView(savedMode);
+
+    if (btnTable) {
+        btnTable.addEventListener('click', (e) => {
+            e.preventDefault();
+            setView('table');
+        });
+    }
+
+    if (btnCard) {
+        btnCard.addEventListener('click', (e) => {
+            e.preventDefault();
+            setView('cards');
+        });
+    }
+
+    // 2. Client-Side Live Filter (Search + Status)
+    const searchInput = document.getElementById('studentSearchInput');
+    const statusTabs = document.querySelectorAll('.status-tab-btn');
+    const statusInput = document.getElementById('statusInput');
+    const tableRows = document.querySelectorAll('.student-row');
+    const cardItems = document.querySelectorAll('.student-card-item');
+    const countDisplay = document.getElementById('visibleStudentCount');
+
+    let currentStatus = statusInput ? statusInput.value : 'all';
+
+    function applyLiveFilter() {
+        const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+        let visibleCount = 0;
+
+        // Filter Table Rows
+        tableRows.forEach(row => {
+            const name = row.getAttribute('data-name') || '';
+            const roll = row.getAttribute('data-roll') || '';
+            const status = row.getAttribute('data-status') || '';
+
+            const matchesQuery = !query || name.includes(query) || roll.includes(query);
+            const matchesStatus = (currentStatus === 'all') || (status === currentStatus);
+
+            if (matchesQuery && matchesStatus) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        // Filter Grid Cards
+        cardItems.forEach(card => {
+            const name = card.getAttribute('data-name') || '';
+            const roll = card.getAttribute('data-roll') || '';
+            const status = card.getAttribute('data-status') || '';
+
+            const matchesQuery = !query || name.includes(query) || roll.includes(query);
+            const matchesStatus = (currentStatus === 'all') || (status === currentStatus);
+
+            if (matchesQuery && matchesStatus) {
+                card.style.display = 'flex';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+
+        if (countDisplay) {
+            countDisplay.textContent = visibleCount;
+        }
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', applyLiveFilter);
+    }
+
+    statusTabs.forEach(tab => {
+        tab.addEventListener('click', (e) => {
+            e.preventDefault();
+            statusTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            currentStatus = tab.getAttribute('data-status');
+            if (statusInput) statusInput.value = currentStatus;
+            applyLiveFilter();
+        });
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,821 @@
+{% extends 'evaluator_app/base.html' %}
+{% load static %}
+
+{% block title %}Batches - Student Evaluator Portal{% endblock %}
+{% block page_title %}Batch Directory{% endblock %}
+
+{% block content %}
+<div class="batches-page-wrapper">
+    <!-- Top Header & Actions -->
+    <div class="batch-header-row">
+        <div>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+                <h2 style="font-size: 24px; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em;">Batches</h2>
+                <span class="badge" style="background: rgba(79, 70, 229, 0.1); color: var(--primary); font-weight: 700; font-size: 12px; padding: 4px 10px; border-radius: var(--radius-full);">
+                    {{ total_count }} Total
+                </span>
+            </div>
+            <p style="font-size: 13px; color: var(--text-muted); margin: 0;">
+                Manage student cohorts, class schedules, and academic evaluations.
+            </p>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <!-- Summary Stats Pill Strip -->
+            <div class="batch-stat-strip">
+                <div class="batch-stat-item">
+                    <span class="batch-stat-label">Daily</span>
+                    <span class="batch-stat-val">{{ daily_count }}</span>
+                </div>
+                <div class="batch-stat-divider"></div>
+                <div class="batch-stat-item">
+                    <span class="batch-stat-label">Weekly</span>
+                    <span class="batch-stat-val">{{ weekly_count }}</span>
+                </div>
+                <div class="batch-stat-divider"></div>
+                <div class="batch-stat-item">
+                    <span class="batch-stat-label">Students</span>
+                    <span class="batch-stat-val" style="color: var(--primary);">{{ total_students_count }}</span>
+                </div>
+            </div>
+
+            <!-- Merged Groups Button -->
+            <a href="{% url 'batch_group_list' %}" class="btn btn-secondary" style="padding: 9px 18px; font-weight: 600; box-shadow: var(--shadow-sm); display: inline-flex; align-items: center; gap: 8px;">
+                <i class="bi bi-collection"></i> Batch Groups
+            </a>
+
+            <!-- Create Batch Button -->
+            <a href="{% url 'batch_create' %}" class="btn btn-primary" style="padding: 9px 18px; font-weight: 600; box-shadow: var(--shadow-sm); display: inline-flex; align-items: center; gap: 8px;">
+                <i class="bi bi-plus-lg"></i> Create Batch
+            </a>
+        </div>
+    </div>
+
+    <!-- Filter & Search Toolbar -->
+    <div class="card batch-toolbar-card">
+        <form method="get" id="batchFilterForm" class="batch-toolbar-form">
+            <!-- Search Input -->
+            <div class="batch-search-box">
+                <i class="bi bi-search batch-search-icon"></i>
+                <input type="text" name="q" value="{{ search_query }}" class="form-input batch-search-input" placeholder="Search batch name or code..." autocomplete="off">
+                {% if search_query %}
+                    <a href="{% url 'batch_list' %}{% if selected_schedule %}?schedule={{ selected_schedule }}{% endif %}" class="batch-search-clear" title="Clear Search">
+                        <i class="bi bi-x-circle-fill"></i>
+                    </a>
+                {% endif %}
+            </div>
+
+            <!-- Schedule Filter Tabs -->
+            <div class="batch-schedule-pills">
+                <a href="{% url 'batch_list' %}?{% if search_query %}q={{ search_query }}&{% endif %}{% if selected_location %}location={{ selected_location }}{% endif %}" 
+                   class="schedule-pill {% if not selected_schedule %}active{% endif %}">
+                    All ({{ total_count }})
+                </a>
+                <a href="{% url 'batch_list' %}?schedule=DAILY{% if search_query %}&q={{ search_query }}{% endif %}{% if selected_location %}&location={{ selected_location }}{% endif %}" 
+                   class="schedule-pill {% if selected_schedule == 'DAILY' %}active{% endif %}">
+                    <i class="bi bi-calendar-event"></i> Daily ({{ daily_count }})
+                </a>
+                <a href="{% url 'batch_list' %}?schedule=WEEKLY{% if search_query %}&q={{ search_query }}{% endif %}{% if selected_location %}&location={{ selected_location }}{% endif %}" 
+                   class="schedule-pill {% if selected_schedule == 'WEEKLY' %}active{% endif %}">
+                    <i class="bi bi-calendar-week"></i> Weekly ({{ weekly_count }})
+                </a>
+                <input type="hidden" name="schedule" id="scheduleInput" value="{{ selected_schedule }}">
+            </div>
+
+            <!-- Center/Location Filter (If Multi-Location / Admin) -->
+            {% if is_admin_user or accessible_locations|length > 1 %}
+            <div style="min-width: 170px;">
+                <select name="location" class="form-select" style="padding: 7px 12px; font-size: 13px;" onchange="document.getElementById('batchFilterForm').submit()">
+                    <option value="">All Locations</option>
+                    {% for loc in accessible_locations %}
+                        <option value="{{ loc.id }}" {% if selected_location == loc.id|stringformat:"s" %}selected{% endif %}>{{ loc.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+
+            {% if search_query or selected_schedule or selected_location %}
+                <a href="{% url 'batch_list' %}" class="btn btn-secondary btn-sm" style="height: 36px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; font-size: 12px;">
+                    <i class="bi bi-arrow-counterclockwise"></i> Reset
+                </a>
+            {% endif %}
+
+            <!-- View Toggle Switcher (Table vs Grid) -->
+            <div class="batch-view-toggle">
+                <button type="button" class="view-toggle-btn active" id="viewToggleTable" title="Table View">
+                    <i class="bi bi-list-ul"></i>
+                </button>
+                <button type="button" class="view-toggle-btn" id="viewToggleCards" title="Card View">
+                    <i class="bi bi-grid-fill"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Empty State -->
+    {% if not batches %}
+    <div class="card" style="text-align: center; padding: 56px 24px; border: 1px dashed var(--border-color); background: var(--bg-surface);">
+        <div style="width: 54px; height: 54px; border-radius: 50%; background: var(--bg-subtle); color: var(--text-dim); display: flex; align-items: center; justify-content: center; font-size: 24px; margin: 0 auto 16px;">
+            <i class="bi bi-collection-play"></i>
+        </div>
+        <h3 style="font-size: 17px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">No batches found</h3>
+        <p style="font-size: 13px; color: var(--text-muted); max-width: 440px; margin: 0 auto 20px;">
+            {% if search_query or selected_schedule or selected_location %}
+                No batches match your active filters. Try clearing your filters or search terms.
+            {% else %}
+                No batches have been created in your assigned training centers yet.
+            {% endif %}
+        </p>
+        <div>
+            {% if search_query or selected_schedule or selected_location %}
+                <a href="{% url 'batch_list' %}" class="btn btn-secondary btn-sm" style="margin-right: 8px;">Clear Filters</a>
+            {% endif %}
+            <a href="{% url 'batch_create' %}" class="btn btn-primary btn-sm">
+                <i class="bi bi-plus-lg"></i> Create Batch
+            </a>
+        </div>
+    </div>
+    {% else %}
+
+    <!-- 1. TABLE VIEW (Default) -->
+    <div id="batchTableView" class="card batch-table-card" style="margin-bottom: 0;">
+        <div class="table-responsive">
+            <table class="batch-modern-table">
+                <thead>
+                    <tr>
+                        <th style="width: 28%;">Batch Details</th>
+                        <th style="width: 16%;">Center</th>
+                        <th style="width: 20%;">Schedule & Days</th>
+                        <th style="width: 10%; text-align: center;">Students</th>
+                        <th style="width: 10%; text-align: center;">Avg Score</th>
+                        <th style="width: 16%; text-align: right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for batch in batches %}
+                    <tr class="batch-table-row {% if today_date|date:'l' in batch.days_list %}batch-today-row{% endif %}">
+                        <!-- Batch Details -->
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div class="batch-avatar-icon {% if batch.schedule_type == 'DAILY' %}daily{% else %}weekly{% endif %}">
+                                    <i class="bi bi-collection-play-fill"></i>
+                                </div>
+                                <div>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <a href="{% url 'batch_detail' batch.id %}" class="batch-title-link">
+                                            {{ batch.name }}
+                                        </a>
+                                        <span class="batch-code-badge">{{ batch.code }}</span>
+                                    </div>
+                                    <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                                        <i class="bi bi-calendar-check" style="font-size: 11px;"></i> Started {{ batch.start_date|date:"d M, Y" }}
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+
+                        <!-- Center -->
+                        <td>
+                            <span class="location-badge" style="font-size: 11px;">
+                                <i class="bi bi-geo-alt-fill"></i> {{ batch.location.name }}
+                            </span>
+                        </td>
+
+                        <!-- Schedule & Days -->
+                        <td>
+                            <div>
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    {% if batch.schedule_type == 'DAILY' %}
+                                        <span class="schedule-chip daily">Daily</span>
+                                    {% else %}
+                                        <span class="schedule-chip weekly">Weekly</span>
+                                    {% endif %}
+                                    <span style="font-size: 12px; font-weight: 600; color: var(--text-main);">
+                                        {{ batch.short_days_display }}
+                                    </span>
+                                </div>
+                                <div style="font-size: 11px; color: var(--text-dim); margin-top: 3px;">
+                                    <i class="bi bi-clock"></i> {{ batch.timing }}
+                                </div>
+                            </div>
+                        </td>
+
+                        <!-- Students Count -->
+                        <td style="text-align: center;">
+                            <a href="{% url 'batch_detail' batch.id %}" class="student-count-pill" title="View Students">
+                                <i class="bi bi-people-fill"></i> {{ batch.student_count }}
+                            </a>
+                        </td>
+
+                        <!-- Avg Score -->
+                        <td style="text-align: center;">
+                            {% if batch.average_score > 0 %}
+                                <span class="score-badge {% if batch.average_score >= 80 %}high{% elif batch.average_score >= 60 %}mid{% else %}low{% endif %}">
+                                    {{ batch.average_score }}%
+                                </span>
+                            {% else %}
+                                <span style="font-size: 12px; color: var(--text-dim);">—</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Actions -->
+                        <td style="text-align: right;">
+                            <div class="batch-actions-group">
+                                <a href="{% url 'batch_detail' batch.id %}" class="btn-action-view" title="Open Batch Overview">
+                                    Open &rarr;
+                                </a>
+                                <a href="{% url 'evaluation_hub' %}?batch_id={{ batch.id }}" class="btn-action-icon primary" title="Evaluate Batch">
+                                    <i class="bi bi-award-fill"></i>
+                                </a>
+                                <a href="{% url 'attendance_hub' %}?batch_id={{ batch.id }}" class="btn-action-icon secondary" title="Batch Attendance">
+                                    <i class="bi bi-calendar-check-fill"></i>
+                                </a>
+                                <a href="{% url 'batch_edit' batch.id %}" class="btn-action-icon neutral" title="Edit Batch Settings">
+                                    <i class="bi bi-pencil-fill"></i>
+                                </a>
+                                {% if is_admin_user %}
+                                <a href="{% url 'batch_delete' batch.id %}" class="btn-action-icon" style="color: var(--danger); background: var(--danger-light);" title="Delete Batch">
+                                    <i class="bi bi-trash-fill"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 2. CARD VIEW (Alternative) -->
+    <div id="batchCardView" class="batch-cards-grid" style="display: none;">
+        {% for batch in batches %}
+        <div class="card batch-pro-card {% if today_date|date:'l' in batch.days_list %}batch-today-card{% endif %}">
+            <!-- Card Header -->
+            <div class="batch-card-header">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    {% if batch.schedule_type == 'DAILY' %}
+                        <span class="schedule-chip daily">Daily</span>
+                    {% else %}
+                        <span class="schedule-chip weekly">Weekly</span>
+                    {% endif %}
+                    <span class="location-badge" style="font-size: 11px;">
+                        <i class="bi bi-geo-alt-fill"></i> {{ batch.location.name }}
+                    </span>
+                </div>
+                <span class="batch-code-badge">{{ batch.code }}</span>
+            </div>
+
+            <!-- Batch Title & Timing -->
+            <div style="margin-bottom: 14px;">
+                <h3 style="font-size: 16px; font-weight: 800; margin-bottom: 6px;">
+                    <a href="{% url 'batch_detail' batch.id %}" class="batch-title-link">{{ batch.name }}</a>
+                </h3>
+                <div style="font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <span><i class="bi bi-calendar-week"></i> {{ batch.short_days_display }}</span>
+                    <span>•</span>
+                    <span><i class="bi bi-clock"></i> {{ batch.timing }}</span>
+                </div>
+            </div>
+
+            <!-- Mini Metrics Row -->
+            <div class="batch-card-stats-row">
+                <div class="card-stat-box">
+                    <span class="stat-box-label">Students</span>
+                    <span class="stat-box-num">{{ batch.student_count }}</span>
+                </div>
+                <div class="card-stat-box">
+                    <span class="stat-box-label">Avg Score</span>
+                    <span class="stat-box-num" style="color: var(--primary);">
+                        {% if batch.average_score > 0 %}{{ batch.average_score }}%{% else %}—{% endif %}
+                    </span>
+                </div>
+                <div class="card-stat-box">
+                    <span class="stat-box-label">Attendance</span>
+                    <span class="stat-box-num" style="color: var(--success);">
+                        {% if batch.attendance_percentage > 0 %}{{ batch.attendance_percentage }}%{% else %}—{% endif %}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card Actions -->
+            <div class="batch-card-footer">
+                <a href="{% url 'batch_detail' batch.id %}" class="btn btn-secondary btn-sm" style="flex: 1; justify-content: center; font-weight: 600;">
+                    View Batch
+                </a>
+                <a href="{% url 'evaluation_hub' %}?batch_id={{ batch.id }}" class="btn btn-primary btn-sm" style="padding: 6px 12px;" title="Evaluate">
+                    <i class="bi bi-award-fill"></i>
+                </a>
+                <a href="{% url 'attendance_hub' %}?batch_id={{ batch.id }}" class="btn btn-secondary btn-sm" style="padding: 6px 12px;" title="Attendance">
+                    <i class="bi bi-calendar-check-fill"></i>
+                </a>
+                {% if is_admin_user %}
+                <a href="{% url 'batch_delete' batch.id %}" class="btn btn-secondary btn-sm" style="padding: 6px 12px; color: var(--danger); background: var(--danger-light); border-color: transparent;" title="Delete Batch">
+                    <i class="bi bi-trash-fill"></i>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% endif %}
+</div>
+
+<style>
+/* ==============================================================================
+   PROFESSIONAL BATCH DIRECTORY STYLING
+   ============================================================================== */
+.batches-page-wrapper {
+    max-width: 1280px;
+    margin: 0 auto;
+}
+
+/* Header Row */
+.batch-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.batch-stat-strip {
+    display: inline-flex;
+    align-items: center;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 6px 14px;
+    gap: 12px;
+    box-shadow: var(--shadow-sm);
+}
+
+.batch-stat-item {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+
+.batch-stat-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+}
+
+.batch-stat-val {
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--text-main);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.batch-stat-divider {
+    width: 1px;
+    height: 16px;
+    background: var(--border-color);
+}
+
+/* Toolbar Card */
+.batch-toolbar-card {
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-sm);
+}
+
+.batch-toolbar-form {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+/* Search Box */
+.batch-search-box {
+    position: relative;
+    flex: 1;
+    min-width: 240px;
+}
+
+.batch-search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-dim);
+    font-size: 13px;
+    pointer-events: none;
+}
+
+.batch-search-input {
+    padding-left: 34px !important;
+    padding-right: 32px !important;
+    height: 38px;
+    font-size: 13px;
+    border-radius: var(--radius-md);
+}
+
+.batch-search-clear {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-dim);
+    font-size: 14px;
+    text-decoration: none;
+}
+.batch-search-clear:hover {
+    color: var(--text-main);
+}
+
+/* Schedule Pills */
+.batch-schedule-pills {
+    display: flex;
+    background: var(--bg-subtle);
+    padding: 3px;
+    border-radius: var(--radius-md);
+    gap: 2px;
+}
+
+.schedule-pill {
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.schedule-pill:hover {
+    color: var(--text-main);
+}
+
+.schedule-pill.active {
+    background: var(--bg-surface);
+    color: var(--primary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* View Toggle */
+.batch-view-toggle {
+    display: flex;
+    background: var(--bg-subtle);
+    padding: 3px;
+    border-radius: var(--radius-md);
+    gap: 2px;
+    margin-left: auto;
+}
+
+.view-toggle-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    transition: var(--transition);
+}
+
+.view-toggle-btn:hover {
+    color: var(--text-main);
+}
+
+.view-toggle-btn.active {
+    background: var(--bg-surface);
+    color: var(--text-main);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* ==============================================================================
+   TABLE DESIGN
+   ============================================================================== */
+.batch-table-card {
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+}
+
+.batch-modern-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    text-align: left;
+}
+
+.batch-modern-table thead th {
+    background: var(--bg-subtle);
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.batch-modern-table tbody tr {
+    border-bottom: 1px solid var(--border-color);
+    transition: background 0.15s ease;
+}
+
+.batch-modern-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.batch-modern-table tbody tr:hover {
+    background: rgba(79, 70, 229, 0.02);
+}
+
+.batch-modern-table tbody td {
+    padding: 14px 18px;
+    vertical-align: middle;
+}
+
+/* Table Elements */
+.batch-avatar-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.batch-avatar-icon.daily {
+    background: rgba(6, 182, 212, 0.12);
+    color: #0891B2;
+}
+
+.batch-avatar-icon.weekly {
+    background: rgba(79, 70, 229, 0.12);
+    color: var(--primary);
+}
+
+.batch-title-link {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text-main);
+    text-decoration: none;
+}
+.batch-title-link:hover {
+    color: var(--primary);
+}
+
+.batch-code-badge {
+    background: var(--bg-subtle);
+    border: 1px solid var(--border-color);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.schedule-chip {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    display: inline-block;
+}
+
+.schedule-chip.daily {
+    background: rgba(16, 185, 129, 0.12);
+    color: #059669;
+}
+
+.schedule-chip.weekly {
+    background: rgba(99, 102, 241, 0.12);
+    color: #4F46E5;
+}
+
+.student-count-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--bg-subtle);
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+    font-weight: 700;
+    font-size: 12px;
+    color: var(--text-main);
+    text-decoration: none;
+    transition: var(--transition);
+}
+.student-count-pill:hover {
+    background: rgba(79, 70, 229, 0.1);
+    color: var(--primary);
+}
+
+.score-badge {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: var(--radius-full);
+    font-weight: 800;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+}
+.score-badge.high { background: rgba(16, 185, 129, 0.12); color: #059669; }
+.score-badge.mid { background: rgba(79, 70, 229, 0.12); color: #4F46E5; }
+.score-badge.low { background: rgba(245, 158, 11, 0.12); color: #D97706; }
+
+/* Actions Group */
+.batch-actions-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-action-view {
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    color: var(--primary);
+    background: var(--primary-light);
+    text-decoration: none;
+    transition: var(--transition);
+}
+.btn-action-view:hover {
+    background: var(--primary);
+    color: #FFF;
+}
+
+.btn-action-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: var(--radius-sm);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    text-decoration: none;
+    transition: var(--transition);
+    border: 1px solid var(--border-color);
+}
+.btn-action-icon.primary {
+    background: var(--bg-surface);
+    color: var(--primary);
+}
+.btn-action-icon.primary:hover {
+    background: var(--primary);
+    color: #FFF;
+    border-color: var(--primary);
+}
+.btn-action-icon.secondary {
+    background: var(--bg-surface);
+    color: #0891B2;
+}
+.btn-action-icon.secondary:hover {
+    background: #0891B2;
+    color: #FFF;
+    border-color: #0891B2;
+}
+.btn-action-icon.neutral {
+    background: var(--bg-surface);
+    color: var(--text-dim);
+}
+.btn-action-icon.neutral:hover {
+    background: var(--bg-subtle);
+    color: var(--text-main);
+}
+
+/* ==============================================================================
+   CARD VIEW DESIGN
+   ============================================================================== */
+.batch-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+}
+
+.batch-pro-card {
+    margin-bottom: 0;
+    padding: 20px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.batch-pro-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.batch-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.batch-card-stats-row {
+    background: var(--bg-subtle);
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    text-align: center;
+    margin-bottom: 18px;
+}
+
+.card-stat-box {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.stat-box-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+}
+
+.stat-box-num {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--text-main);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.batch-card-footer {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Today's Batch Highlights */
+.batch-today-row {
+    background-color: rgba(59, 130, 246, 0.05) !important;
+}
+.batch-today-row td:first-child {
+    border-left: 4px solid var(--primary) !important;
+}
+.batch-today-card {
+    border-color: var(--primary) !important;
+    box-shadow: 0 4px 14px rgba(59, 130, 246, 0.15) !important;
+}
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const tableBtn = document.getElementById('viewToggleTable');
+    const cardsBtn = document.getElementById('viewToggleCards');
+    const tableView = document.getElementById('batchTableView');
+    const cardView = document.getElementById('batchCardView');
+
+    function setViewMode(mode) {
+        if (!tableView || !cardView) return;
+        if (mode === 'cards') {
+            tableView.style.display = 'none';
+            cardView.style.display = 'grid';
+            cardsBtn.classList.add('active');
+            tableBtn.classList.remove('active');
+        } else {
+            tableView.style.display = 'block';
+            cardView.style.display = 'none';
+            tableBtn.classList.add('active');
+            cardsBtn.classList.remove('active');
+        }
+        localStorage.setItem('batch_directory_view', mode);
+    }
+
+    if (tableBtn && cardsBtn) {
+        tableBtn.addEventListener('click', () => setViewMode('table'));
+        cardsBtn.addEventListener('click', () => setViewMode('cards'));
+
+        // Restore user preference if saved
+        const savedView = localStorage.getItem('batch_directory_view');
+        if (savedView === 'cards') {
+            setViewMode('cards');
+        }
+    }
+});
+</script>
+{% endblock %}

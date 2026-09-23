@@ -1,0 +1,114 @@
+{% extends 'evaluator_app/base.html' %}
+
+{% block title %}Locations & Centers - Admin Panel{% endblock %}
+{% block page_title %}Training Centers & Locations{% endblock %}
+
+{% block content %}
+<div style="display: grid; grid-template-columns: 1fr 340px; gap: 24px;">
+    <!-- Locations List -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">
+                <i class="bi bi-geo-alt-fill text-primary"></i> Active Training Centers ({{ locations.count }})
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Center Name</th>
+                        <th>Code</th>
+                        <th>Address</th>
+                        <th>Batches</th>
+                        <th>Assigned Evaluators</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for loc in locations %}
+                    <tr>
+                        <td>
+                            <strong style="font-size: 15px; color: var(--text-main);">{{ loc.name }}</strong>
+                            {% if loc.description %}
+                                <div style="font-size: 11px; color: var(--text-muted);">{{ loc.description }}</div>
+                            {% endif %}
+                        </td>
+                        <td><code>{{ loc.code }}</code></td>
+                        <td style="font-size: 12px; color: var(--text-muted); max-width: 180px;">{{ loc.address|default:"-" }}</td>
+                        <td>
+                            <span class="location-badge">{{ loc.total_batches }} batches</span>
+                        </td>
+                        <td>
+                            <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                                {% for ev in loc.evaluators.all %}
+                                    <span style="font-size: 11px; background: var(--bg-subtle); padding: 2px 6px; border-radius: 4px;">
+                                        {{ ev.user.username }}
+                                    </span>
+                                {% empty %}
+                                    <span style="font-size: 11px; color: var(--text-dim);">None</span>
+                                {% endfor %}
+                            </div>
+                        </td>
+                        <td>
+                            {% if loc.is_active %}
+                                <span class="badge-status status-present">Active</span>
+                            {% else %}
+                                <span class="badge-status status-absent">Inactive</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: var(--text-dim); padding: 32px;">No locations configured yet.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Create Location Form -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">
+                <i class="bi bi-plus-circle-fill text-primary"></i> Add Location
+            </div>
+        </div>
+
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label class="form-label">Location / City Name *</label>
+                {{ form.name }}
+                {% if form.name.errors %}<div style="color: var(--danger); font-size: 12px; margin-top: 4px;">{{ form.name.errors }}</div>{% endif %}
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Location Code *</label>
+                {{ form.code }}
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">e.g. CLT, COK, WND, TVM</div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Campus Address</label>
+                {{ form.address }}
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                {{ form.description }}
+            </div>
+
+            <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
+                {{ form.is_active }}
+                <label class="form-label" style="margin-bottom: 0;">Active Location</label>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 14px;">
+                <i class="bi bi-plus-lg"></i> Add Center
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

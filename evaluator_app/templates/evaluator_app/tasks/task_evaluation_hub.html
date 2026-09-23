@@ -1,0 +1,1038 @@
+{% extends 'evaluator_app/base.html' %}
+{% load static %}
+
+{% block title %}Task Evaluation Hub - Evaluator Portal{% endblock %}
+{% block page_title %}Task Evaluation Hub{% endblock %}
+
+{% block extra_head %}
+<style>
+/* Task Evaluation Hub Specific Styles */
+.eval-hero-banner {
+    background: linear-gradient(135deg, #0F172A 0%, #1E1B4B 50%, #1E293B 100%);
+    border-radius: var(--radius-xl);
+    padding: 26px 32px;
+    color: #FFFFFF;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 20px;
+    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.eval-hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(99, 102, 241, 0.22);
+    color: #C7D2FE;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(99, 102, 241, 0.35);
+}
+
+/* Latest Tasks Feed */
+.latest-feed-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.latest-tasks-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+}
+
+.latest-task-card {
+    background: var(--bg-surface);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-color);
+    padding: 18px 20px;
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+}
+
+.latest-task-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--primary);
+}
+
+.latest-task-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--border-focus);
+}
+
+.latest-task-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.latest-task-meta {
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.latest-task-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-main);
+    line-height: 1.35;
+    margin-bottom: 8px;
+}
+
+.latest-task-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-bottom: 14px;
+    line-height: 1.4;
+}
+
+/* Rubric Range Sliders */
+.rubric-row {
+    display: grid;
+    grid-template-columns: 1fr 120px;
+    gap: 16px;
+    align-items: center;
+    background: var(--bg-subtle);
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    margin-bottom: 12px;
+}
+
+.rubric-label-box {
+    display: flex;
+    flex-direction: column;
+}
+
+.rubric-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.rubric-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.rubric-slider {
+    width: 100%;
+    height: 6px;
+    accent-color: var(--primary);
+    cursor: pointer;
+    margin-top: 8px;
+}
+
+.rubric-val-input {
+    width: 80px;
+    font-weight: 700;
+    font-size: 14px;
+    text-align: center;
+}
+
+/* Live Score Preview Box */
+.score-preview-hero {
+    background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+    border-radius: var(--radius-lg);
+    padding: 18px 24px;
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 15px rgba(79, 70, 229, 0.3);
+}
+
+.grade-pill-badge {
+    font-size: 24px;
+    font-weight: 800;
+    padding: 4px 16px;
+    border-radius: var(--radius-full);
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    letter-spacing: 0.05em;
+}
+
+/* Status Chips */
+.eval-status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+}
+
+.eval-chip-unevaluated {
+    background: rgba(245, 158, 11, 0.12);
+    color: #D97706;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.eval-chip-passed {
+    background: rgba(16, 185, 129, 0.12);
+    color: #059669;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.eval-chip-excellent {
+    background: rgba(79, 70, 229, 0.12);
+    color: #4F46E5;
+    border: 1px solid rgba(79, 70, 229, 0.3);
+}
+
+.eval-chip-revision {
+    background: rgba(239, 68, 68, 0.12);
+    color: #DC2626;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.score-badge-table {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-subtle);
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header & Action Hero -->
+<div class="eval-hero-banner">
+    <div>
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+            <span class="eval-hero-badge">
+                <i class="bi bi-patch-check-fill"></i> Task Evaluation Center
+            </span>
+            <span style="font-size: 12px; color: #94A3B8;">Batch-wise Task Review, Code Scoring & Real-time Feedback</span>
+        </div>
+        <h2 style="font-size: 24px; font-weight: 800; letter-spacing: -0.01em;">Student Task Evaluation</h2>
+        <p style="font-size: 13px; color: #CBD5E1; margin-top: 4px; max-width: 680px;">
+            Assess student deliverables, score code quality, problem solving & presentation, track completion deadlines, and review newest tasks assigned across your active batches.
+        </p>
+    </div>
+
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+        <a href="{% url 'task_hub' %}" class="btn btn-secondary" style="background: rgba(255, 255, 255, 0.1); color: #FFFFFF; border-color: rgba(255, 255, 255, 0.2);">
+            <i class="bi bi-list-check"></i> Manage Task Queue
+        </a>
+    </div>
+</div>
+
+<!-- KPI Metrics Overview Cards -->
+<div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 26px;">
+    <a href="{% url 'task_evaluation_hub' %}{% if selected_batch %}?batch={{ selected_batch }}{% endif %}" style="text-decoration: none; color: inherit;">
+        <div class="kpi-card" style="border: 2px solid {% if eval_status_filter == 'ALL' %}var(--primary){% else %}transparent{% endif %};">
+            <div class="kpi-icon-box kpi-icon-primary">
+                <i class="bi bi-stack"></i>
+            </div>
+            <div class="kpi-info">
+                <div class="kpi-title">Total Tasks</div>
+                <div class="kpi-value">{{ total_count }}</div>
+                <div class="kpi-meta">Assigned across batches</div>
+            </div>
+        </div>
+    </a>
+
+    <a href="{% url 'task_evaluation_hub' %}?eval_status=UNEVALUATED{% if selected_batch %}&batch={{ selected_batch }}{% endif %}" style="text-decoration: none; color: inherit;">
+        <div class="kpi-card" style="border: 2px solid {% if eval_status_filter == 'UNEVALUATED' %}var(--warning){% else %}transparent{% endif %};">
+            <div class="kpi-icon-box kpi-icon-warning">
+                <i class="bi bi-hourglass-top"></i>
+            </div>
+            <div class="kpi-info">
+                <div class="kpi-title">Awaiting Evaluation</div>
+                <div class="kpi-value" style="color: var(--warning);">{{ pending_eval_count }}</div>
+                <div class="kpi-meta">Needs evaluator review</div>
+            </div>
+        </div>
+    </a>
+
+    <a href="{% url 'task_evaluation_hub' %}?eval_status=EVALUATED{% if selected_batch %}&batch={{ selected_batch }}{% endif %}" style="text-decoration: none; color: inherit;">
+        <div class="kpi-card" style="border: 2px solid {% if eval_status_filter == 'EVALUATED' %}var(--success){% else %}transparent{% endif %};">
+            <div class="kpi-icon-box kpi-icon-success">
+                <i class="bi bi-patch-check-fill"></i>
+            </div>
+            <div class="kpi-info">
+                <div class="kpi-title">Evaluated Tasks</div>
+                <div class="kpi-value" style="color: var(--success);">{{ evaluated_count }}</div>
+                <div class="kpi-meta">{{ eval_rate }}% evaluated</div>
+            </div>
+        </div>
+    </a>
+
+    <a href="{% url 'task_evaluation_hub' %}?eval_status=NEEDS_REVISION{% if selected_batch %}&batch={{ selected_batch }}{% endif %}" style="text-decoration: none; color: inherit;">
+        <div class="kpi-card" style="border: 2px solid {% if eval_status_filter == 'NEEDS_REVISION' %}var(--danger){% else %}transparent{% endif %};">
+            <div class="kpi-icon-box" style="background: rgba(239, 68, 68, 0.15); color: var(--danger);">
+                <i class="bi bi-arrow-repeat"></i>
+            </div>
+            <div class="kpi-info">
+                <div class="kpi-title">Needs Revision</div>
+                <div class="kpi-value" style="color: var(--danger);">{{ needs_revision_count }}</div>
+                <div class="kpi-meta">Tasks flagged for redo</div>
+            </div>
+        </div>
+    </a>
+
+    <div class="kpi-card">
+        <div class="kpi-icon-box" style="background: rgba(139, 92, 246, 0.15); color: var(--accent);">
+            <i class="bi bi-stars"></i>
+        </div>
+        <div class="kpi-info">
+            <div class="kpi-title">Average Task Score</div>
+            <div class="kpi-value" style="color: var(--accent);">
+                {% if avg_score %}{{ avg_score }}%{% else %}—{% endif %}
+            </div>
+            <div class="kpi-meta">Across evaluated tasks</div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================================== -->
+<!-- SECTION: LATEST TASKS ASSIGNED SPOTLIGHT -->
+<!-- ============================================================================== -->
+<div style="margin-bottom: 28px;">
+    <div class="latest-feed-header">
+        <div>
+            <h3 style="font-size: 16px; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                <i class="bi bi-fire text-warning"></i> Latest Tasks Assigned
+                <span class="badge" style="background: var(--bg-subtle); color: var(--text-muted); font-size: 11px;">
+                    Most Recent Submissions
+                </span>
+            </h3>
+            <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                Recently dispatched assignments across your active batches — review submission readiness and evaluate on demand.
+            </p>
+        </div>
+    </div>
+
+    {% if latest_assigned_tasks %}
+    <div class="latest-tasks-grid">
+        {% for task in latest_assigned_tasks %}
+        <div class="latest-task-card">
+            <div>
+                <div class="latest-task-top">
+                    <!-- Student Info -->
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div class="student-cell-avatar" style="background-color: {{ task.student.avatar_color }}; width: 30px; height: 30px; font-size: 11px;">
+                            {{ task.student.initials }}
+                        </div>
+                        <div>
+                            <a href="{% url 'student_detail' task.student.id %}" style="font-weight: 700; font-size: 13px; color: var(--text-main); text-decoration: none;">
+                                {{ task.student.name }}
+                            </a>
+                            <div style="font-size: 10px; color: var(--text-dim);">
+                                {{ task.student.roll_number }} &bull; <span class="batch-chip" style="font-size: 9px; padding: 1px 6px;">{{ task.batch.code }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Priority Badge -->
+                    {% if task.priority == 'URGENT' %}
+                        <span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #EF4444; font-size: 10px;">Urgent</span>
+                    {% elif task.priority == 'HIGH' %}
+                        <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #F59E0B; font-size: 10px;">High</span>
+                    {% endif %}
+                </div>
+
+                <div class="latest-task-title" title="{{ task.title }}">
+                    {{ task.title }}
+                </div>
+
+                {% if task.description %}
+                    <div class="latest-task-desc">
+                        {{ task.description }}
+                    </div>
+                {% endif %}
+
+                <div class="latest-task-meta" style="margin-bottom: 14px;">
+                    <span><i class="bi bi-calendar-event"></i> Given: {{ task.assigned_date|date:"M d, Y" }}</span>
+                    {% if task.due_date %}
+                        <span>&bull;</span>
+                        <span class="{% if task.is_overdue %}text-danger font-bold{% endif %}">
+                            <i class="bi bi-alarm"></i> Due: {{ task.due_date|date:"M d" }}
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div style="border-top: 1px solid var(--border-color); padding-top: 12px; display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                    {% if task.is_evaluated %}
+                        <span class="eval-status-chip {% if task.evaluation_status == 'EXCELLENT' %}eval-chip-excellent{% elif task.evaluation_status == 'NEEDS_REVISION' %}eval-chip-revision{% else %}eval-chip-passed{% endif %}">
+                            <i class="bi bi-check-circle-fill"></i> {{ task.score }}% ({{ task.grade }})
+                        </span>
+                    {% else %}
+                        <span class="eval-status-chip eval-chip-unevaluated">
+                            <i class="bi bi-clock"></i> Awaiting Review
+                        </span>
+                    {% endif %}
+                </div>
+
+                <button type="button" class="btn-action-primary btn-open-task-eval"
+                        data-task-id="{{ task.id }}"
+                        data-task-title="{{ task.title }}"
+                        data-student-name="{{ task.student.name }}"
+                        title="Evaluate this student task">
+                    <i class="bi bi-patch-check"></i> {% if task.is_evaluated %}Re-Evaluate{% else %}Evaluate Now{% endif %}
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card" style="padding: 24px; text-align: center; color: var(--text-muted); margin-bottom: 24px;">
+        <i class="bi bi-inbox" style="font-size: 28px; color: var(--text-dim);"></i>
+        <div style="font-weight: 600; margin-top: 6px;">No recent tasks assigned yet.</div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ============================================================================== -->
+<!-- MAIN SEARCH, FILTER & TASK EVALUATION TABLE -->
+<!-- ============================================================================== -->
+<div class="card">
+    <div class="card-header" style="flex-wrap: wrap; gap: 14px;">
+        <div class="card-title">
+            <i class="bi bi-card-checklist text-primary"></i> All Assigned Tasks for Evaluation
+            <span class="badge badge-grade" style="font-size: 11px; margin-left: 6px;">{{ tasks.count }} tasks found</span>
+        </div>
+
+        <!-- Filter & Search Controls Form (Batch-wise and Student Name search) -->
+        <form method="GET" action="{% url 'task_evaluation_hub' %}" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <input type="hidden" name="eval_status" value="{{ eval_status_filter }}">
+            <input type="hidden" name="status" value="{{ completion_filter }}">
+            
+            <!-- Student Name or Task Search -->
+            <div style="position: relative; min-width: 240px;">
+                <i class="bi bi-search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-dim); font-size: 13px;"></i>
+                <input type="text" name="q" value="{{ search_query }}" placeholder="Search by student name, roll, task..." class="form-input" style="padding-left: 32px; height: 36px; font-size: 13px;">
+            </div>
+
+            <!-- Batch-wise Selection Filter -->
+            <select name="batch" class="form-select" style="height: 36px; font-size: 13px; width: auto;" onchange="this.form.submit()">
+                <option value="">All Batches (Batch-wise)</option>
+                {% for b in accessible_batches %}
+                    <option value="{{ b.id }}" {% if selected_batch == b.id|stringformat:"s" %}selected{% endif %}>
+                        {{ b.name }} ({{ b.location.code }})
+                    </option>
+                {% endfor %}
+            </select>
+
+            <!-- Sorting Select -->
+            <select name="sort" class="form-select" style="height: 36px; font-size: 13px; width: auto;" onchange="this.form.submit()">
+                <option value="latest_assigned" {% if sort_by == 'latest_assigned' %}selected{% endif %}>Latest Assigned</option>
+                <option value="oldest_assigned" {% if sort_by == 'oldest_assigned' %}selected{% endif %}>Oldest Assigned</option>
+                <option value="highest_score" {% if sort_by == 'highest_score' %}selected{% endif %}>Highest Score</option>
+                <option value="lowest_score" {% if sort_by == 'lowest_score' %}selected{% endif %}>Lowest Score</option>
+                <option value="due_soon" {% if sort_by == 'due_soon' %}selected{% endif %}>Due Date</option>
+            </select>
+
+            <button type="submit" class="btn btn-secondary btn-sm" style="height: 36px;">
+                <i class="bi bi-funnel-fill"></i> Filter
+            </button>
+            
+            {% if search_query or selected_batch or eval_status_filter != 'ALL' or completion_filter != 'ALL' or sort_by != 'latest_assigned' %}
+                <a href="{% url 'task_evaluation_hub' %}" class="btn btn-secondary btn-sm" style="height: 36px;" title="Reset filters">
+                    <i class="bi bi-x-circle"></i> Reset
+                </a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Evaluation Status Filter Tabs -->
+    <div class="task-filter-tabs">
+        <a href="{% url 'task_evaluation_hub' %}?eval_status=ALL{% if selected_batch %}&batch={{ selected_batch }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}" class="task-filter-tab {% if eval_status_filter == 'ALL' %}active{% endif %}">
+            All Tasks <span class="tab-badge">{{ total_count }}</span>
+        </a>
+        <a href="{% url 'task_evaluation_hub' %}?eval_status=UNEVALUATED{% if selected_batch %}&batch={{ selected_batch }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}" class="task-filter-tab {% if eval_status_filter == 'UNEVALUATED' %}active{% endif %}">
+            <i class="bi bi-hourglass-top text-warning"></i> Awaiting Evaluation <span class="tab-badge">{{ pending_eval_count }}</span>
+        </a>
+        <a href="{% url 'task_evaluation_hub' %}?eval_status=EVALUATED{% if selected_batch %}&batch={{ selected_batch }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}" class="task-filter-tab {% if eval_status_filter == 'EVALUATED' %}active{% endif %}">
+            <i class="bi bi-patch-check-fill text-success"></i> Evaluated <span class="tab-badge">{{ evaluated_count }}</span>
+        </a>
+        <a href="{% url 'task_evaluation_hub' %}?eval_status=NEEDS_REVISION{% if selected_batch %}&batch={{ selected_batch }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}" class="task-filter-tab {% if eval_status_filter == 'NEEDS_REVISION' %}active{% endif %}">
+            <i class="bi bi-arrow-repeat text-danger"></i> Needs Revision <span class="tab-badge">{{ needs_revision_count }}</span>
+        </a>
+        <a href="{% url 'task_evaluation_hub' %}?eval_status=EXCELLENT{% if selected_batch %}&batch={{ selected_batch }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}" class="task-filter-tab {% if eval_status_filter == 'EXCELLENT' %}active{% endif %}">
+            <i class="bi bi-stars" style="color: #8B5CF6;"></i> Exceeded (A/A+)
+        </a>
+    </div>
+
+    <!-- Main Table -->
+    <div class="table-responsive" style="overflow-x: auto;">
+        <table class="task-table">
+            <thead>
+                <tr>
+                    <th style="min-width: 190px;">Student</th>
+                    <th style="min-width: 110px;">Batch</th>
+                    <th style="min-width: 250px;">Task Title & Topic</th>
+                    <th style="min-width: 120px;">Assigned Date</th>
+                    <th style="min-width: 120px;">Due Deadline</th>
+                    <th style="min-width: 130px;">Task Status</th>
+                    <th style="min-width: 180px;">Evaluation Result</th>
+                    <th style="min-width: 160px;">Evaluator Review</th>
+                    <th style="text-align: right; min-width: 130px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for task in tasks %}
+                <tr id="task-row-{{ task.id }}">
+                    <!-- Student Column -->
+                    <td>
+                        <div class="student-cell">
+                            <div class="student-cell-avatar" style="background-color: {{ task.student.avatar_color }};">
+                                {{ task.student.initials }}
+                            </div>
+                            <div>
+                                <a href="{% url 'student_detail' task.student.id %}" class="student-cell-name">
+                                    {{ task.student.name }}
+                                </a>
+                                <span class="student-cell-roll">{{ task.student.roll_number }}</span>
+                            </div>
+                        </div>
+                    </td>
+
+                    <!-- Batch Column (Batch-wise indicator) -->
+                    <td>
+                        <span class="batch-chip">
+                            {{ task.batch.code }}
+                        </span>
+                        <div style="font-size: 10px; color: var(--text-dim); margin-top: 2px;">{{ task.batch.location.name }}</div>
+                    </td>
+
+                    <!-- Task Title & Description -->
+                    <td>
+                        <div style="font-weight: 700; color: var(--text-main); font-size: 13px; line-height: 1.35;">
+                            {{ task.title }}
+                        </div>
+                        {% if task.description %}
+                            <div style="font-size: 11px; color: var(--text-dim); margin-top: 3px; max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ task.description }}">
+                                {{ task.description }}
+                            </div>
+                        {% endif %}
+                        {% if task.submission_url %}
+                            <div style="margin-top: 4px;">
+                                <a href="{{ task.submission_url }}" target="_blank" rel="noopener noreferrer" style="font-size: 11px; color: var(--primary); text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+                                    <i class="bi bi-link-45deg"></i> Submission Link
+                                </a>
+                            </div>
+                        {% endif %}
+                    </td>
+
+                    <!-- Date Given -->
+                    <td>
+                        <span class="date-chip">
+                            <i class="bi bi-calendar-event"></i> {{ task.assigned_date|date:"M d, Y" }}
+                        </span>
+                    </td>
+
+                    <!-- Due Date -->
+                    <td>
+                        {% if task.due_date %}
+                            <span class="date-chip {% if task.is_overdue %}date-overdue{% endif %}">
+                                <i class="bi bi-calendar2-check"></i> {{ task.due_date|date:"M d, Y" }}
+                            </span>
+                        {% else %}
+                            <span style="color: var(--text-dim); font-size: 12px;">—</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Completion Status -->
+                    <td>
+                        {% if task.status == 'COMPLETED' %}
+                            <span class="status-chip chip-completed">
+                                <i class="bi bi-check-circle-fill"></i> Completed
+                            </span>
+                        {% elif task.status == 'LATE' %}
+                            <span class="status-chip chip-late">
+                                <i class="bi bi-alarm-fill"></i> Completed Late
+                            </span>
+                        {% elif task.is_overdue %}
+                            <span class="status-chip chip-overdue">
+                                <i class="bi bi-exclamation-triangle-fill"></i> Overdue
+                            </span>
+                        {% else %}
+                            <span class="status-chip chip-pending">
+                                <i class="bi bi-hourglass-split"></i> Pending
+                            </span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Evaluation Result -->
+                    <td id="eval-result-cell-{{ task.id }}">
+                        {% if task.is_evaluated %}
+                            <div style="display: flex; flex-direction: column; gap: 4px;">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <span class="score-badge-table">
+                                        <i class="bi bi-award-fill text-primary"></i> {{ task.score }}%
+                                    </span>
+                                    {% if task.grade %}
+                                        <span class="badge badge-grade" style="font-size: 11px; font-weight: 800;">
+                                            Grade {{ task.grade }}
+                                        </span>
+                                    {% endif %}
+                                </div>
+                                <span class="eval-status-chip {% if task.evaluation_status == 'EXCELLENT' %}eval-chip-excellent{% elif task.evaluation_status == 'NEEDS_REVISION' %}eval-chip-revision{% else %}eval-chip-passed{% endif %}" style="font-size: 10px; padding: 2px 8px; width: fit-content;">
+                                    {{ task.get_evaluation_status_display }}
+                                </span>
+                            </div>
+                        {% else %}
+                            <span class="eval-status-chip eval-chip-unevaluated">
+                                <i class="bi bi-hourglass-split"></i> Awaiting Review
+                            </span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Evaluator Feedback / Evaluated By -->
+                    <td id="eval-meta-cell-{{ task.id }}">
+                        {% if task.is_evaluated %}
+                            <div style="font-size: 11px; color: var(--text-muted);">
+                                {% if task.evaluator_feedback %}
+                                    <div style="font-style: italic; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main);" title="{{ task.evaluator_feedback }}">
+                                        "{{ task.evaluator_feedback }}"
+                                    </div>
+                                {% endif %}
+                                <div style="font-size: 10px; color: var(--text-dim); margin-top: 2px;">
+                                    By: {{ task.evaluated_by.get_full_name|default:task.evaluated_by.username|default:"Evaluator" }}
+                                    {% if task.evaluated_at %}&bull; {{ task.evaluated_at|date:"M d" }}{% endif %}
+                                </div>
+                            </div>
+                        {% else %}
+                            <span style="font-size: 11px; color: var(--text-dim);">Not evaluated yet</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Actions -->
+                    <td style="text-align: right; white-space: nowrap;">
+                        <button type="button" class="btn-action-primary btn-open-task-eval"
+                                data-task-id="{{ task.id }}"
+                                data-task-title="{{ task.title }}"
+                                data-student-name="{{ task.student.name }}"
+                                title="Open Evaluation Panel">
+                            <i class="bi bi-patch-check-fill"></i> {% if task.is_evaluated %}Edit Evaluation{% else %}Evaluate{% endif %}
+                        </button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 48px 20px;">
+                        <i class="bi bi-patch-question" style="font-size: 40px; color: var(--text-dim); display: block; margin-bottom: 12px;"></i>
+                        <h4 style="font-size: 16px; font-weight: 700; color: var(--text-main);">No tasks found for evaluation</h4>
+                        <p style="font-size: 13px; color: var(--text-muted); max-width: 400px; margin: 4px auto 16px;">
+                            No assigned tasks matching your search or batch criteria. Try clearing filters or assigning new tasks.
+                        </p>
+                        <a href="{% url 'task_evaluation_hub' %}" class="btn btn-secondary btn-sm">
+                            <i class="bi bi-x-circle"></i> Clear Filters
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ============================================================================== -->
+<!-- MODAL: INTERACTIVE TASK EVALUATION MODAL -->
+<!-- ============================================================================== -->
+<div class="modal-backdrop" id="taskEvaluationModal">
+    <div class="modal-content" style="max-width: 680px; max-height: 90vh; overflow-y: auto;">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="bi bi-patch-check-fill text-primary"></i> Evaluate Student Task
+            </h3>
+            <button type="button" class="modal-close" data-close-modal="taskEvaluationModal">&times;</button>
+        </div>
+
+        <form method="POST" id="taskEvaluationForm" action="" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{% url 'task_evaluation_hub' %}">
+            
+            <div class="modal-body" style="padding: 24px;">
+                <!-- Student & Task Context Box -->
+                <div style="background: var(--bg-subtle); border-radius: var(--radius-md); padding: 14px 18px; margin-bottom: 20px; border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                    <div>
+                        <div style="font-size: 10px; text-transform: uppercase; color: var(--text-dim); font-weight: 800; letter-spacing: 0.05em;">ASSIGNMENT CONTEXT</div>
+                        <div id="eval_modal_task_title" style="font-size: 15px; font-weight: 800; color: var(--text-main); margin-top: 2px;"></div>
+                        <div id="eval_modal_student_info" style="font-size: 12px; color: var(--primary); font-weight: 600; margin-top: 2px;"></div>
+                    </div>
+                    <div id="eval_modal_dates" style="text-align: right; font-size: 11px; color: var(--text-muted);"></div>
+                </div>
+
+                <!-- Live Composite Score & Grade Indicator -->
+                <div class="score-preview-hero">
+                    <div>
+                        <div style="font-size: 11px; text-transform: uppercase; opacity: 0.85; font-weight: 700; letter-spacing: 0.05em;">Overall Task Score</div>
+                        <div style="display: flex; align-items: baseline; gap: 6px; margin-top: 2px;">
+                            <span id="live_total_score_display" style="font-size: 32px; font-weight: 800; font-family: 'JetBrains Mono', monospace;">80.0</span>
+                            <span style="font-size: 18px; opacity: 0.8;">%</span>
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 11px; text-transform: uppercase; opacity: 0.85; font-weight: 700; margin-bottom: 4px;">Grade</div>
+                        <span id="live_grade_display" class="grade-pill-badge">A</span>
+                    </div>
+                </div>
+
+                <!-- Rubric Criteria Sliders & Scores -->
+                <div style="margin-bottom: 20px;">
+                    <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: var(--text-muted); margin-bottom: 12px; letter-spacing: 0.05em;">
+                        Assessment Rubric (0 - 100)
+                    </div>
+
+                    <!-- 1. Code Quality -->
+                    <div class="rubric-row">
+                        <div class="rubric-label-box">
+                            <div class="rubric-title">
+                                <span>1. Code Quality & Modularity</span>
+                                <span style="color: var(--primary); font-size: 11px;">Weight: 35%</span>
+                            </div>
+                            <div class="rubric-desc">Adherence to clean code, architecture, naming & best practices</div>
+                            <input type="range" min="0" max="100" step="1" id="slider_code_quality" class="rubric-slider" oninput="syncRubricScore('code_quality', this.value)">
+                        </div>
+                        <div>
+                            <input type="number" name="code_quality_score" id="id_code_quality_score" class="form-input rubric-val-input" min="0" max="100" step="1" oninput="syncRubricSlider('code_quality', this.value)">
+                        </div>
+                    </div>
+
+                    <!-- 2. Problem Solving & Logic -->
+                    <div class="rubric-row">
+                        <div class="rubric-label-box">
+                            <div class="rubric-title">
+                                <span>2. Logic & Problem Solving</span>
+                                <span style="color: var(--primary); font-size: 11px;">Weight: 35%</span>
+                            </div>
+                            <div class="rubric-desc">Functional correctness, edge case handling, and algorithm design</div>
+                            <input type="range" min="0" max="100" step="1" id="slider_problem_solving" class="rubric-slider" oninput="syncRubricScore('problem_solving', this.value)">
+                        </div>
+                        <div>
+                            <input type="number" name="problem_solving_score" id="id_problem_solving_score" class="form-input rubric-val-input" min="0" max="100" step="1" oninput="syncRubricSlider('problem_solving', this.value)">
+                        </div>
+                    </div>
+
+                    <!-- 3. Timeliness & Submission -->
+                    <div class="rubric-row">
+                        <div class="rubric-label-box">
+                            <div class="rubric-title">
+                                <span>3. Timeliness & Discipline</span>
+                                <span style="color: var(--primary); font-size: 11px;">Weight: 15%</span>
+                            </div>
+                            <div class="rubric-desc">Submission before deadline, commitment, and responsiveness</div>
+                            <input type="range" min="0" max="100" step="1" id="slider_timeliness" class="rubric-slider" oninput="syncRubricScore('timeliness', this.value)">
+                        </div>
+                        <div>
+                            <input type="number" name="timeliness_score" id="id_timeliness_score" class="form-input rubric-val-input" min="0" max="100" step="1" oninput="syncRubricSlider('timeliness', this.value)">
+                        </div>
+                    </div>
+
+                    <!-- 4. Presentation & Documentation -->
+                    <div class="rubric-row">
+                        <div class="rubric-label-box">
+                            <div class="rubric-title">
+                                <span>4. Presentation & Clarity</span>
+                                <span style="color: var(--primary); font-size: 11px;">Weight: 15%</span>
+                            </div>
+                            <div class="rubric-desc">Code readability, explanatory comments, documentation or live demo</div>
+                            <input type="range" min="0" max="100" step="1" id="slider_presentation" class="rubric-slider" oninput="syncRubricScore('presentation', this.value)">
+                        </div>
+                        <div>
+                            <input type="number" name="presentation_score" id="id_presentation_score" class="form-input rubric-val-input" min="0" max="100" step="1" oninput="syncRubricSlider('presentation', this.value)">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hidden overall score input to be submitted -->
+                <input type="hidden" name="score" id="id_task_score" value="80.0">
+
+                <!-- Evaluation Outcome & Task Status Row -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight: 700;">Evaluation Outcome *</label>
+                        <select name="evaluation_status" id="id_evaluation_status" class="form-select" required>
+                            <option value="PASSED">Passed / Accepted</option>
+                            <option value="EXCELLENT">Exceeded Expectations (A/A+)</option>
+                            <option value="NEEDS_REVISION">Needs Revision / Resubmit</option>
+                            <option value="FAILED">Unsatisfactory / Re-do</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight: 700;">Task Completion Status</label>
+                        <select name="status" id="id_task_completion_status" class="form-select">
+                            <option value="COMPLETED">Mark as Completed</option>
+                            <option value="LATE">Completed Late</option>
+                            <option value="PENDING">Still Pending</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Submission Link -->
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label">Submission Link (GitHub / PR / Demo)</label>
+                    <input type="url" name="submission_url" id="id_submission_url" class="form-input" placeholder="https://github.com/student/task-repo or PR link">
+                </div>
+
+                <!-- Document Upload -->
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label">Upload Document (PPT / PDF / Image) - Optional</label>
+                    <input type="file" name="document_upload" id="id_document_upload" class="form-input">
+                </div>
+
+                <!-- Evaluator Feedback / Code Review -->
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="font-weight: 700;">Evaluator Code Review & Feedback *</label>
+                    <textarea name="evaluator_feedback" id="id_evaluator_feedback" class="form-textarea" rows="3" placeholder="Detailed feedback on logic, design patterns, security considerations, and mentor guidance..." required></textarea>
+                </div>
+
+                <!-- Strengths & Areas of Improvement -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 12px;">
+                    <div class="form-group">
+                        <label class="form-label">Key Strengths</label>
+                        <textarea name="strengths" id="id_strengths" class="form-textarea" rows="2" placeholder="e.g. Clean variable names, modular functions..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Areas to Improve</label>
+                        <textarea name="areas_for_improvement" id="id_areas_for_improvement" class="form-textarea" rows="2" placeholder="e.g. Add unit test coverage, refine exception handling..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer" style="padding: 16px 24px; background: var(--bg-subtle); display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-secondary" data-close-modal="taskEvaluationModal">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="btn_save_task_eval">
+                    <i class="bi bi-check2-circle"></i> Save Task Evaluation
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// Rubric Live Calculation Engine
+function syncRubricScore(criterion, val) {
+    document.getElementById(`id_${criterion}_score`).value = val;
+    computeLiveScore();
+}
+
+function syncRubricSlider(criterion, val) {
+    const clamped = Math.max(0, Math.min(100, parseFloat(val) || 0));
+    document.getElementById(`slider_${criterion}`).value = clamped;
+    computeLiveScore();
+}
+
+function computeLiveScore() {
+    const codeQ = parseFloat(document.getElementById('id_code_quality_score').value) || 0;
+    const probS = parseFloat(document.getElementById('id_problem_solving_score').value) || 0;
+    const timeS = parseFloat(document.getElementById('id_timeliness_score').value) || 0;
+    const presS = parseFloat(document.getElementById('id_presentation_score').value) || 0;
+
+    // Weights: Code Quality 35%, Problem Solving 35%, Timeliness 15%, Presentation 15%
+    const total = (codeQ * 0.35) + (probS * 0.35) + (timeS * 0.15) + (presS * 0.15);
+    const rounded = Math.round(total * 10) / 10;
+
+    document.getElementById('live_total_score_display').textContent = rounded.toFixed(1);
+    document.getElementById('id_task_score').value = rounded.toFixed(1);
+
+    // Calculate Grade
+    let grade = 'NI';
+    if (rounded >= 90) grade = 'A+';
+    else if (rounded >= 80) grade = 'A';
+    else if (rounded >= 70) grade = 'B+';
+    else if (rounded >= 60) grade = 'B';
+    else if (rounded >= 50) grade = 'C';
+
+    document.getElementById('live_grade_display').textContent = grade;
+
+    // Auto sync outcome selector if not manually locked
+    const outcomeSelect = document.getElementById('id_evaluation_status');
+    if (rounded >= 85) {
+        outcomeSelect.value = 'EXCELLENT';
+    } else if (rounded >= 60) {
+        outcomeSelect.value = 'PASSED';
+    } else {
+        outcomeSelect.value = 'NEEDS_REVISION';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Open Task Evaluation Modal
+    document.querySelectorAll('.btn-open-task-eval').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const taskId = this.dataset.taskId;
+            const form = document.getElementById('taskEvaluationForm');
+            form.action = `/tasks/${taskId}/evaluate/`;
+
+            // Fetch current task evaluation data via API
+            fetch(`/tasks/${taskId}/evaluate/`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (!data.success) return;
+
+                document.getElementById('eval_modal_task_title').textContent = data.title;
+                document.getElementById('eval_modal_student_info').textContent = `${data.student_name} (${data.student_roll}) • Batch: ${data.batch_name} (${data.batch_code})`;
+                document.getElementById('eval_modal_dates').innerHTML = `
+                    <div><strong>Given:</strong> ${data.assigned_date_display}</div>
+                    <div><strong>Due:</strong> ${data.due_date_display}</div>
+                `;
+
+                // Set Rubric Values
+                const codeQ = data.code_quality_score || 80;
+                const probS = data.problem_solving_score || 80;
+                const timeS = data.timeliness_score || 80;
+                const presS = data.presentation_score || 75;
+
+                document.getElementById('id_code_quality_score').value = codeQ;
+                document.getElementById('slider_code_quality').value = codeQ;
+
+                document.getElementById('id_problem_solving_score').value = probS;
+                document.getElementById('slider_problem_solving').value = probS;
+
+                document.getElementById('id_timeliness_score').value = timeS;
+                document.getElementById('slider_timeliness').value = timeS;
+
+                document.getElementById('id_presentation_score').value = presS;
+                document.getElementById('slider_presentation').value = presS;
+
+                document.getElementById('id_evaluation_status').value = data.evaluation_status || 'PASSED';
+                document.getElementById('id_task_completion_status').value = data.status === 'PENDING' ? 'COMPLETED' : data.status;
+                document.getElementById('id_submission_url').value = data.submission_url || '';
+                document.getElementById('id_evaluator_feedback').value = data.evaluator_feedback || '';
+                document.getElementById('id_strengths').value = data.strengths || '';
+                document.getElementById('id_areas_for_improvement').value = data.areas_for_improvement || '';
+
+                computeLiveScore();
+
+                const modal = document.getElementById('taskEvaluationModal');
+                if (modal) modal.classList.add('active');
+            })
+            .catch(err => {
+                console.error("Could not load task data:", err);
+            });
+        });
+    });
+
+    // Handle AJAX form submission for smooth user experience
+    const form = document.getElementById('taskEvaluationForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const submitBtn = document.getElementById('btn_save_task_eval');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+
+            const formData = new FormData(form);
+            fetch(form.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Save Task Evaluation';
+
+                if (data.success) {
+                    // Close modal
+                    const modal = document.getElementById('taskEvaluationModal');
+                    if (modal) modal.classList.remove('active');
+
+                    // Update corresponding row in DOM if present
+                    const resultCell = document.getElementById(`eval-result-cell-${data.task_id}`);
+                    if (resultCell) {
+                        let statusChipClass = 'eval-chip-passed';
+                        if (data.evaluation_status === 'EXCELLENT') statusChipClass = 'eval-chip-excellent';
+                        else if (data.evaluation_status === 'NEEDS_REVISION') statusChipClass = 'eval-chip-revision';
+
+                        resultCell.innerHTML = `
+                            <div style="display: flex; flex-direction: column; gap: 4px;">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <span class="score-badge-table">
+                                        <i class="bi bi-award-fill text-primary"></i> ${data.score}%
+                                    </span>
+                                    <span class="badge badge-grade" style="font-size: 11px; font-weight: 800;">
+                                        Grade ${data.grade}
+                                    </span>
+                                </div>
+                                <span class="eval-status-chip ${statusChipClass}" style="font-size: 10px; padding: 2px 8px; width: fit-content;">
+                                    ${data.evaluation_status_display}
+                                </span>
+                            </div>
+                        `;
+                    }
+
+                    const metaCell = document.getElementById(`eval-meta-cell-${data.task_id}`);
+                    if (metaCell) {
+                        metaCell.innerHTML = `
+                            <div style="font-size: 11px; color: var(--text-muted);">
+                                <div style="font-size: 10px; color: var(--text-dim);">
+                                    By: ${data.evaluated_by} &bull; Just now
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    // Reload page after a brief moment to update all KPI counters accurately
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 500);
+                } else {
+                    alert('Error saving evaluation. Please check required fields.');
+                }
+            })
+            .catch(err => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Save Task Evaluation';
+                console.error(err);
+                // Fallback standard submit
+                form.submit();
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,1186 @@
+{% extends 'evaluator_app/base.html' %}
+{% load static %}
+
+{% block title %}Student Projects & Capstones | CogniLearn Evaluator{% endblock %}
+{% block page_title %}Student Projects{% endblock %}
+
+{% block extra_head %}
+<style>
+/* ==============================================================================
+   PROJECT HUB - SIMPLE & PROFESSIONAL REDESIGN
+   ============================================================================== */
+.project-hub-shell {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding-bottom: 48px;
+}
+
+/* Header Row */
+.hub-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.hub-title-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.hub-icon-badge {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-md);
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.12), rgba(6, 182, 212, 0.12));
+    border: 1px solid rgba(79, 70, 229, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    color: var(--primary);
+    flex-shrink: 0;
+}
+
+.hub-heading {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--text-main);
+    letter-spacing: -0.02em;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.hub-subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 3px;
+}
+
+/* Stat Pill Strip */
+.hub-stat-strip {
+    display: inline-flex;
+    align-items: center;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-full);
+    padding: 4px 14px;
+    box-shadow: var(--shadow-sm);
+    gap: 12px;
+}
+
+.hub-stat-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+}
+
+.hub-stat-label {
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.hub-stat-val {
+    font-weight: 800;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-main);
+}
+
+.hub-stat-divider {
+    width: 1px;
+    height: 14px;
+    background-color: var(--border-color);
+}
+
+/* Tech Filter Bar */
+.tech-quickbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+    padding: 10px 14px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+}
+
+.tech-quickbar-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-right: 4px;
+}
+
+.tech-quick-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    background: var(--bg-subtle);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-full);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-main);
+    text-decoration: none;
+    transition: var(--transition);
+}
+
+.tech-quick-pill:hover {
+    background: var(--primary-light);
+    color: var(--primary);
+    border-color: rgba(79, 70, 229, 0.3);
+    transform: translateY(-1px);
+}
+
+.tech-quick-pill.active {
+    background: var(--primary);
+    color: #FFFFFF;
+    border-color: var(--primary);
+}
+
+.tech-quick-count {
+    background: rgba(0, 0, 0, 0.08);
+    font-size: 10px;
+    padding: 1px 5px;
+    border-radius: var(--radius-full);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* Toolbar Card */
+.hub-toolbar-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 14px 18px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-sm);
+}
+
+/* Status Filter Tabs */
+.status-pill-tabs {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.status-pill-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: var(--radius-full);
+    background: var(--bg-subtle);
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: var(--transition);
+}
+
+.status-pill-tab:hover {
+    color: var(--text-main);
+    background: var(--border-color);
+}
+
+.status-pill-tab.active {
+    background: var(--primary);
+    color: #FFFFFF;
+    box-shadow: 0 2px 6px rgba(79, 70, 229, 0.3);
+}
+
+.tab-pill-badge {
+    background: rgba(0, 0, 0, 0.08);
+    padding: 1px 6px;
+    border-radius: var(--radius-full);
+    font-size: 11px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.status-pill-tab.active .tab-pill-badge {
+    background: rgba(255, 255, 255, 0.25);
+    color: #FFFFFF;
+}
+
+/* Controls Row */
+.toolbar-controls-grid {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.search-input-box {
+    position: relative;
+    flex: 1;
+    min-width: 240px;
+}
+
+.search-input-box i {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-dim);
+    font-size: 14px;
+}
+
+.search-input-box input {
+    width: 100%;
+    padding: 8px 12px 8px 34px;
+    font-size: 13px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-subtle);
+    color: var(--text-main);
+    outline: none;
+    transition: var(--transition);
+}
+
+.search-input-box input:focus {
+    border-color: var(--primary);
+    background: var(--bg-surface);
+    box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.view-toggle-group {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-subtle);
+    padding: 2px;
+}
+
+.view-toggle-btn {
+    border: none;
+    background: transparent;
+    padding: 6px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+}
+
+.view-toggle-btn.active {
+    background: var(--bg-surface);
+    color: var(--primary);
+    font-weight: 700;
+    box-shadow: var(--shadow-sm);
+}
+
+/* Projects Cards Grid */
+.projects-grid-shell {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+}
+
+.project-card-item {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.project-card-item:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+    border-color: rgba(79, 70, 229, 0.35);
+}
+
+.project-card-topbar {
+    padding: 16px 18px 12px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-surface);
+}
+
+.project-card-badges-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.project-type-chip {
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+}
+
+.project-type-chip.type-main { background: #EEF2FF; color: #4338CA; border: 1px solid #C7D2FE; }
+.project-type-chip.type-mini { background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; }
+.project-type-chip.type-assignment { background: #FFFBEB; color: #B45309; border: 1px solid #FDE68A; }
+.project-type-chip.type-practice { background: #F3E8FF; color: #7E22CE; border: 1px solid #E9D5FF; }
+.project-type-chip.type-client { background: #E0F2FE; color: #0369A1; border: 1px solid #BAE6FD; }
+
+.project-status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: var(--radius-full);
+}
+
+.status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.project-status-chip.status-in_progress { background: #FEF3C7; color: #B45309; }
+.project-status-chip.status-in_progress .status-dot { background: #D97706; }
+
+.project-status-chip.status-completed { background: #D1FAE5; color: #065F46; }
+.project-status-chip.status-completed .status-dot { background: #10B981; }
+
+.project-status-chip.status-under_review { background: #EDE9FE; color: #5B21B6; }
+.project-status-chip.status-under_review .status-dot { background: #8B5CF6; }
+
+.project-status-chip.status-planning { background: #F1F5F9; color: #475569; }
+.project-status-chip.status-planning .status-dot { background: #64748B; }
+
+.project-status-chip.status-on_hold { background: #FEE2E2; color: #991B1B; }
+.project-status-chip.status-on_hold .status-dot { background: #EF4444; }
+
+.project-card-heading {
+    font-size: 16px;
+    font-weight: 800;
+    line-height: 1.35;
+    margin: 0 0 6px 0;
+}
+
+.project-card-heading a {
+    color: var(--text-main);
+    text-decoration: none;
+    transition: var(--transition);
+}
+
+.project-card-heading a:hover {
+    color: var(--primary);
+}
+
+.project-card-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.project-card-main-body {
+    padding: 16px 18px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* Team Section */
+.team-avatars-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.team-avatar-badge {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #4F46E5, #06B6D4);
+    color: #FFF;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    text-decoration: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+.team-student-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+/* Tech Chips */
+.card-tech-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.card-tech-pill {
+    font-size: 11px;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 2px 7px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-subtle);
+    border: 1px solid var(--border-color);
+    color: #334155;
+}
+
+/* Progress Section */
+.card-progress-section {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.progress-header-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+}
+
+.progress-label-text {
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.progress-value-text {
+    font-weight: 800;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.progress-bar-slot {
+    width: 100%;
+    height: 6px;
+    background: rgba(148, 163, 184, 0.2);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+}
+
+.progress-bar-fill-bar {
+    height: 100%;
+    border-radius: var(--radius-full);
+    transition: width 0.3s ease;
+}
+
+/* Deliverables & Grade */
+.card-footer-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color);
+}
+
+.deliverables-icons-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.deliverable-link-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-subtle);
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    text-decoration: none;
+    transition: var(--transition);
+}
+
+.deliverable-link-icon:hover {
+    background: var(--primary-light);
+    color: var(--primary);
+    border-color: rgba(79, 70, 229, 0.3);
+}
+
+.eval-score-chip {
+    font-size: 11px;
+    font-weight: 800;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    background: #ECFDF5;
+    color: #047857;
+    border: 1px solid #A7F3D0;
+}
+
+.eval-pending-chip {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-style: italic;
+}
+
+/* Card Action Footer */
+.project-card-action-bar {
+    padding: 12px 18px;
+    background: var(--bg-subtle);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Table View Container */
+.projects-table-shell {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+}
+
+/* Empty State */
+.projects-empty-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 56px 20px;
+    text-align: center;
+}
+
+.empty-icon-wrap {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--bg-subtle);
+    color: var(--text-dim);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    margin-bottom: 16px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="project-hub-shell">
+
+    <!-- Top Executive Header -->
+    <div class="hub-header-row">
+        <div class="hub-title-group">
+            <div class="hub-icon-badge">
+                <i class="bi bi-kanban-fill"></i>
+            </div>
+            <div>
+                <h1 class="hub-heading">
+                    Student Projects
+                    <span class="badge" style="background: var(--primary-light); color: var(--primary); font-size: 12px; font-weight: 700; border-radius: var(--radius-full); padding: 4px 10px;">
+                        {{ total_projects }} Total
+                    </span>
+                </h1>
+                <div class="hub-subtitle">
+                    Track student cohorts, capstone progress, tech stacks, and deliverable repositories.
+                </div>
+            </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <!-- KPI Summary Stat Pill Strip -->
+            <div class="hub-stat-strip">
+                <div class="hub-stat-item" title="Projects actively in development">
+                    <span class="hub-stat-label">In Progress</span>
+                    <span class="hub-stat-val" style="color: #D97706;">{{ in_progress_count }}</span>
+                </div>
+                <div class="hub-stat-divider"></div>
+                <div class="hub-stat-item" title="Ready for evaluation">
+                    <span class="hub-stat-label">Review</span>
+                    <span class="hub-stat-val" style="color: #7C3AED;">{{ under_review_count }}</span>
+                </div>
+                <div class="hub-stat-divider"></div>
+                <div class="hub-stat-item" title="Completed projects">
+                    <span class="hub-stat-label">Completed</span>
+                    <span class="hub-stat-val" style="color: #059669;">{{ completed_count }}</span>
+                </div>
+                <div class="hub-stat-divider"></div>
+                <div class="hub-stat-item" title="Average cohort completion">
+                    <span class="hub-stat-label">Avg. Progress</span>
+                    <span class="hub-stat-val" style="color: var(--primary);">{{ avg_progress }}%</span>
+                </div>
+            </div>
+
+            <!-- Create Project Action -->
+            <a href="{% url 'project_create' %}" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 8px;">
+                <i class="bi bi-plus-lg"></i>
+                <span>New Project</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Quick Tech Filter Bar (If technologies present) -->
+    {% if top_technologies %}
+    <div class="tech-quickbar">
+        <span class="tech-quickbar-label">
+            <i class="bi bi-cpu-fill text-primary"></i> Popular Stacks:
+        </span>
+        {% for tech_name, count in top_technologies %}
+        <a href="?q={{ tech_name }}{% if selected_batch %}&batch={{ selected_batch }}{% endif %}{% if selected_status != 'ALL' %}&status={{ selected_status }}{% endif %}" 
+           class="tech-quick-pill {% if search_query == tech_name %}active{% endif %}" 
+           title="Filter projects by {{ tech_name }}">
+            {{ tech_name }} <span class="tech-quick-count">{{ count }}</span>
+        </a>
+        {% endfor %}
+        {% if search_query %}
+        <a href="?{% if selected_batch %}batch={{ selected_batch }}&{% endif %}{% if selected_status != 'ALL' %}status={{ selected_status }}{% endif %}" 
+           class="tech-quick-pill" style="color: var(--text-muted);" title="Clear Tech Filter">
+            <i class="bi bi-x"></i> Clear
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Filter & Search Toolbar -->
+    <div class="hub-toolbar-card">
+        <!-- Status Tabs Row -->
+        <div class="status-pill-tabs">
+            <a href="?status=ALL{% if selected_batch %}&batch={{ selected_batch }}{% endif %}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+               class="status-pill-tab {% if selected_status == 'ALL' %}active{% endif %}">
+                All Projects <span class="tab-pill-badge">{{ total_projects }}</span>
+            </a>
+            <a href="?status=IN_PROGRESS{% if selected_batch %}&batch={{ selected_batch }}{% endif %}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+               class="status-pill-tab {% if selected_status == 'IN_PROGRESS' %}active{% endif %}">
+                <i class="bi bi-gear-wide-connected"></i> In Progress <span class="tab-pill-badge">{{ in_progress_count }}</span>
+            </a>
+            <a href="?status=UNDER_REVIEW{% if selected_batch %}&batch={{ selected_batch }}{% endif %}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+               class="status-pill-tab {% if selected_status == 'UNDER_REVIEW' %}active{% endif %}">
+                <i class="bi bi-search"></i> Under Review <span class="tab-pill-badge">{{ under_review_count }}</span>
+            </a>
+            <a href="?status=COMPLETED{% if selected_batch %}&batch={{ selected_batch }}{% endif %}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+               class="status-pill-tab {% if selected_status == 'COMPLETED' %}active{% endif %}">
+                <i class="bi bi-check2-circle"></i> Completed <span class="tab-pill-badge">{{ completed_count }}</span>
+            </a>
+            <a href="?status=PLANNING{% if selected_batch %}&batch={{ selected_batch }}{% endif %}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+               class="status-pill-tab {% if selected_status == 'PLANNING' %}active{% endif %}">
+                <i class="bi bi-calendar-event"></i> Planning <span class="tab-pill-badge">{{ planning_count }}</span>
+            </a>
+            {% if on_hold_count > 0 %}
+            <a href="?status=ON_HOLD{% if selected_batch %}&batch={{ selected_batch }}{% endif %}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+               class="status-pill-tab {% if selected_status == 'ON_HOLD' %}active{% endif %}">
+                <i class="bi bi-pause-circle"></i> On Hold <span class="tab-pill-badge">{{ on_hold_count }}</span>
+            </a>
+            {% endif %}
+        </div>
+
+        <!-- Filter Controls Form -->
+        <form method="GET" action="{% url 'project_hub' %}" class="toolbar-controls-grid" id="projectFilterForm">
+            <input type="hidden" name="status" value="{{ selected_status }}">
+
+            <!-- Search Input -->
+            <div class="search-input-box">
+                <i class="bi bi-search"></i>
+                <input type="text" name="q" value="{{ search_query }}" placeholder="Search by title, technologies, or student name..." autocomplete="off">
+            </div>
+
+            <!-- Batch Dropdown -->
+            <div style="min-width: 190px;">
+                <select name="batch" class="form-select" style="padding: 7px 12px; font-size: 13px;" onchange="document.getElementById('projectFilterForm').submit()">
+                    <option value="">All Batches ({{ accessible_batches.count }})</option>
+                    {% for b in accessible_batches %}
+                    <option value="{{ b.id }}" {% if selected_batch == b.id|stringformat:"s" %}selected{% endif %}>
+                        {{ b.name }} ({{ b.location.name }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Project Type Dropdown -->
+            <div style="min-width: 170px;">
+                <select name="type" class="form-select" style="padding: 7px 12px; font-size: 13px;" onchange="document.getElementById('projectFilterForm').submit()">
+                    <option value="">All Project Types</option>
+                    <option value="MAIN" {% if selected_type == 'MAIN' %}selected{% endif %}>Main / Capstone</option>
+                    <option value="MINI" {% if selected_type == 'MINI' %}selected{% endif %}>Mini Project</option>
+                    <option value="ASSIGNMENT" {% if selected_type == 'ASSIGNMENT' %}selected{% endif %}>Project Assignment</option>
+                    <option value="PRACTICE" {% if selected_type == 'PRACTICE' %}selected{% endif %}>Practice Project</option>
+                    <option value="CLIENT" {% if selected_type == 'CLIENT' %}selected{% endif %}>Live / Client Project</option>
+                </select>
+            </div>
+
+            <!-- Filter / Reset Actions -->
+            <button type="submit" class="btn btn-secondary btn-sm" style="height: 36px; padding: 0 14px; font-weight: 600;">
+                <i class="bi bi-funnel me-1"></i> Filter
+            </button>
+
+            {% if search_query or selected_batch or selected_type or selected_status != 'ALL' %}
+            <a href="{% url 'project_hub' %}" class="btn btn-secondary btn-sm" style="height: 36px; padding: 0 12px; display: inline-flex; align-items: center; gap: 4px;" title="Reset all filters">
+                <i class="bi bi-arrow-counterclockwise"></i> Reset
+            </a>
+            {% endif %}
+
+            <!-- View Switcher (Grid vs Table) -->
+            <div class="view-toggle-group" style="margin-left: auto;">
+                <button type="button" class="view-toggle-btn active" id="viewToggleGrid" title="Card Grid View">
+                    <i class="bi bi-grid-fill"></i> Grid
+                </button>
+                <button type="button" class="view-toggle-btn" id="viewToggleTable" title="Table View">
+                    <i class="bi bi-table"></i> Table
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- MAIN VIEW CONTAINER -->
+    {% if projects %}
+        <!-- 1. GRID VIEW -->
+        <div class="projects-grid-shell" id="projectsGridView">
+            {% for project in projects %}
+            <div class="project-card-item">
+                <!-- Card Header -->
+                <div class="project-card-topbar">
+                    <div class="project-card-badges-row">
+                        <span class="project-type-chip type-{{ project.project_type|lower }}">
+                            {{ project.get_project_type_display }}
+                        </span>
+                        <span class="project-status-chip status-{{ project.status|lower }}">
+                            <span class="status-dot"></span>
+                            {{ project.get_status_display }}
+                        </span>
+                    </div>
+
+                    <h3 class="project-card-heading">
+                        <a href="{% url 'project_detail' project.id %}">{{ project.title }}</a>
+                    </h3>
+
+                    <div class="project-card-meta">
+                        <i class="bi bi-collection text-primary"></i>
+                        <span>{{ project.batch.name }}</span>
+                        <span style="color: var(--text-dim);">•</span>
+                        <span>{{ project.batch.location.name }}</span>
+                    </div>
+                </div>
+
+                <!-- Card Body -->
+                <div class="project-card-main-body">
+                    <!-- Assigned Students -->
+                    <div>
+                        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 6px;">
+                            Assigned Team ({{ project.students.count }})
+                        </div>
+                        <div class="team-avatars-wrap">
+                            {% for stu in project.students.all %}
+                            <a href="{% url 'student_detail' stu.id %}" class="team-avatar-badge" title="{{ stu.name }} ({{ stu.roll_number }})">
+                                {{ stu.name|slice:":1"|upper }}
+                            </a>
+                            <span class="team-student-name">{{ stu.name }}</span>
+                            {% empty %}
+                            <span style="font-size: 12px; color: var(--text-dim); font-style: italic;">No students assigned</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Tech Stack -->
+                    {% if project.tech_list %}
+                    <div>
+                        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 6px;">
+                            Technologies
+                        </div>
+                        <div class="card-tech-chips">
+                            {% for tech in project.tech_list|slice:":5" %}
+                            <span class="card-tech-pill">{{ tech }}</span>
+                            {% endfor %}
+                            {% if project.tech_list|length > 5 %}
+                            <span class="card-tech-pill" style="color: var(--text-muted); background: transparent;">+{{ project.tech_list|length|add:"-5" }} more</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Progress Indicator -->
+                    <div class="card-progress-section">
+                        <div class="progress-header-line">
+                            <span class="progress-label-text">Milestone Progress</span>
+                            <span class="progress-value-text" style="color: {% if project.progress_percentage >= 80 %}#059669{% elif project.progress_percentage >= 35 %}var(--primary){% else %}#D97706{% endif %};">
+                                {{ project.progress_percentage }}%
+                            </span>
+                        </div>
+                        <div class="progress-bar-slot">
+                            <div class="progress-bar-fill-bar" 
+                                 style="width: {{ project.progress_percentage }}%; background: {% if project.progress_percentage >= 80 %}#10B981{% elif project.progress_percentage >= 35 %}var(--primary){% else %}#F59E0B{% endif %};">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Deliverable Links & Evaluation Score -->
+                    <div class="card-footer-info-row">
+                        <div class="deliverables-icons-group">
+                            {% if project.github_repo_url %}
+                            <a href="{{ project.github_repo_url }}" target="_blank" rel="noopener" class="deliverable-link-icon" title="View GitHub / GitLab Repository">
+                                <i class="bi bi-github"></i>
+                            </a>
+                            {% endif %}
+                            {% if project.live_demo_url %}
+                            <a href="{{ project.live_demo_url }}" target="_blank" rel="noopener" class="deliverable-link-icon" title="View Live Deployed Demo">
+                                <i class="bi bi-globe"></i>
+                            </a>
+                            {% endif %}
+                            {% if project.documentation_url %}
+                            <a href="{{ project.documentation_url }}" target="_blank" rel="noopener" class="deliverable-link-icon" title="View Documentation / Slides">
+                                <i class="bi bi-file-earmark-text"></i>
+                            </a>
+                            {% endif %}
+                        </div>
+
+                        <div>
+                            {% if project.is_evaluated %}
+                            <span class="eval-score-chip" title="Evaluated Score: {{ project.total_score }}%">
+                                <i class="bi bi-star-fill" style="color: #F59E0B; margin-right: 3px;"></i>{{ project.total_score }}% ({{ project.grade }})
+                            </span>
+                            {% else %}
+                            <span class="eval-pending-chip">Not Evaluated</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card Actions -->
+                <div class="project-card-action-bar">
+                    <a href="{% url 'project_detail' project.id %}" class="btn btn-secondary btn-sm" style="flex: 1;">
+                        <i class="bi bi-eye me-1"></i> Details
+                    </a>
+                    <button type="button" class="btn btn-primary btn-sm" style="flex: 1;"
+                            onclick="openProgressModal('{{ project.id }}', '{{ project.title|escapejs }}', '{{ project.progress_percentage }}', '{{ project.status }}', '{{ project.github_repo_url|escapejs }}', '{{ project.live_demo_url|escapejs }}')">
+                        <i class="bi bi-sliders me-1"></i> Update
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- 2. HIGH-DENSITY TABLE VIEW (Toggled by user) -->
+        <div class="projects-table-shell" id="projectsTableView" style="display: none;">
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Project Details</th>
+                            <th>Batch & Location</th>
+                            <th>Assigned Team</th>
+                            <th>Technologies</th>
+                            <th>Progress</th>
+                            <th>Status</th>
+                            <th>Grade / Score</th>
+                            <th style="text-align: right;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for project in projects %}
+                        <tr>
+                            <td>
+                                <div style="font-weight: 700; color: var(--text-main);">
+                                    <a href="{% url 'project_detail' project.id %}">{{ project.title }}</a>
+                                </div>
+                                <span class="project-type-chip type-{{ project.project_type|lower }}" style="font-size: 10px; margin-top: 4px; display: inline-block;">
+                                    {{ project.get_project_type_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <div style="font-weight: 600; font-size: 13px;">{{ project.batch.name }}</div>
+                                <div style="font-size: 11px; color: var(--text-muted);">{{ project.batch.location.name }}</div>
+                            </td>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap;">
+                                    {% for stu in project.students.all %}
+                                    <span class="badge" style="background: var(--bg-subtle); color: var(--text-main); font-weight: 600; font-size: 11px; border: 1px solid var(--border-color);">
+                                        {{ stu.name }}
+                                    </span>
+                                    {% empty %}
+                                    <span style="font-size: 12px; color: var(--text-dim);">-</span>
+                                    {% endfor %}
+                                </div>
+                            </td>
+                            <td>
+                                <div style="display: flex; gap: 4px; flex-wrap: wrap; max-width: 200px;">
+                                    {% for tech in project.tech_list|slice:":3" %}
+                                    <span class="card-tech-pill" style="font-size: 10px;">{{ tech }}</span>
+                                    {% endfor %}
+                                    {% if project.tech_list|length > 3 %}
+                                    <span style="font-size: 10px; color: var(--text-muted);">+{{ project.tech_list|length|add:"-3" }}</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td style="min-width: 110px;">
+                                <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; font-family: 'JetBrains Mono', monospace; margin-bottom: 3px;">
+                                    <span>{{ project.progress_percentage }}%</span>
+                                </div>
+                                <div class="progress-bar-slot" style="height: 5px;">
+                                    <div class="progress-bar-fill-bar" style="width: {{ project.progress_percentage }}%; background: {% if project.progress_percentage >= 80 %}#10B981{% elif project.progress_percentage >= 35 %}var(--primary){% else %}#F59E0B{% endif %};"></div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="project-status-chip status-{{ project.status|lower }}">
+                                    <span class="status-dot"></span>
+                                    {{ project.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if project.is_evaluated %}
+                                <span class="eval-score-chip">
+                                    {{ project.total_score }}% ({{ project.grade }})
+                                </span>
+                                {% else %}
+                                <span style="font-size: 11px; color: var(--text-dim);">Pending</span>
+                                {% endif %}
+                            </td>
+                            <td style="text-align: right;">
+                                <div style="display: inline-flex; gap: 6px;">
+                                    <a href="{% url 'project_detail' project.id %}" class="btn btn-secondary btn-sm" title="View Full Details">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <button type="button" class="btn btn-primary btn-sm" title="Quick Update Progress"
+                                            onclick="openProgressModal('{{ project.id }}', '{{ project.title|escapejs }}', '{{ project.progress_percentage }}', '{{ project.status }}', '{{ project.github_repo_url|escapejs }}', '{{ project.live_demo_url|escapejs }}')">
+                                        <i class="bi bi-sliders"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% else %}
+        <!-- Empty State -->
+        <div class="projects-empty-card">
+            <div class="empty-icon-wrap">
+                <i class="bi bi-kanban"></i>
+            </div>
+            <h3 style="font-size: 18px; font-weight: 800; color: var(--text-main); margin-bottom: 6px;">
+                No Projects Found
+            </h3>
+            <p style="font-size: 13px; color: var(--text-muted); max-width: 440px; margin: 0 auto 20px auto;">
+                {% if search_query or selected_batch or selected_type or selected_status != 'ALL' %}
+                    No student projects match your current filter criteria. Try clearing search filters or changing the status tab.
+                {% else %}
+                    No student projects have been created yet for your assigned batches. Start tracking a new capstone or mini project.
+                {% endif %}
+            </p>
+            <div style="display: flex; justify-content: center; gap: 10px;">
+                {% if search_query or selected_batch or selected_type or selected_status != 'ALL' %}
+                <a href="{% url 'project_hub' %}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i> Reset Filters
+                </a>
+                {% endif %}
+                <a href="{% url 'project_create' %}" class="btn btn-primary">
+                    <i class="bi bi-plus-lg me-1"></i> Create Project
+                </a>
+            </div>
+        </div>
+    {% endif %}
+
+</div>
+
+<!-- Modal: Quick Update Project Progress -->
+<div class="modal-backdrop" id="progressModal">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="progressModalTitle">
+                    <i class="bi bi-sliders text-primary me-2"></i>Update Progress
+                </h3>
+                <button type="button" class="modal-close" onclick="closeProgressModal()">&times;</button>
+            </div>
+            <form id="progressModalForm" method="POST" action="">
+                {% csrf_token %}
+                <div class="modal-body" style="padding: 22px;">
+                    <!-- Milestone Progress Slider -->
+                    <div class="form-group" style="margin-bottom: 18px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <label class="form-label" style="margin-bottom: 0;">Progress Milestone</label>
+                            <span class="font-mono fw-bold" id="modalRangeValDisplay" style="font-size: 16px; color: var(--primary); font-family: 'JetBrains Mono', monospace;">
+                                0%
+                            </span>
+                        </div>
+                        <input type="range" class="form-range" id="modalProgressRange" min="0" max="100" step="5" value="0" style="width: 100%; accent-color: var(--primary); cursor: pointer;" oninput="updateRangeVal(this.value)">
+                        <input type="hidden" name="progress_percentage" id="modalProgressInput" value="0">
+                    </div>
+
+                    <!-- Status -->
+                    <div class="form-group" style="margin-bottom: 18px;">
+                        <label class="form-label">Project Status</label>
+                        <select name="status" id="modalStatusSelect" class="form-select">
+                            <option value="PLANNING">Planning & Design</option>
+                            <option value="IN_PROGRESS">In Progress / Development</option>
+                            <option value="UNDER_REVIEW">Under Evaluator Review</option>
+                            <option value="COMPLETED">Completed</option>
+                            <option value="ON_HOLD">On Hold / Needs Revision</option>
+                        </select>
+                    </div>
+
+                    <!-- Milestone Notes -->
+                    <div class="form-group" style="margin-bottom: 18px;">
+                        <label class="form-label">Milestone Log Notes (Optional)</label>
+                        <textarea name="milestone_notes" class="form-textarea" rows="2" placeholder="e.g. Completed authentication module and core database schemas..."></textarea>
+                    </div>
+
+                    <!-- Deliverable Links -->
+                    <div class="form-row">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label" style="font-size: 12px; color: var(--text-muted);">GitHub Repository URL</label>
+                            <input type="url" name="github_repo_url" id="modalGithubInput" class="form-input" placeholder="https://github.com/...">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label" style="font-size: 12px; color: var(--text-muted);">Live Deployed URL</label>
+                            <input type="url" name="live_demo_url" id="modalDemoInput" class="form-input" placeholder="https://...">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer" style="padding: 14px 22px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeProgressModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check2-circle me-1"></i> Save Progress
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // View Switcher (Grid vs Table)
+    const gridBtn = document.getElementById('viewToggleGrid');
+    const tableBtn = document.getElementById('viewToggleTable');
+    const gridView = document.getElementById('projectsGridView');
+    const tableView = document.getElementById('projectsTableView');
+
+    function setViewMode(mode) {
+        if (mode === 'table') {
+            if (tableBtn) tableBtn.classList.add('active');
+            if (gridBtn) gridBtn.classList.remove('active');
+            if (tableView) tableView.style.display = 'block';
+            if (gridView) gridView.style.display = 'none';
+        } else {
+            if (gridBtn) gridBtn.classList.add('active');
+            if (tableBtn) tableBtn.classList.remove('active');
+            if (gridView) gridView.style.display = 'grid';
+            if (tableView) tableView.style.display = 'none';
+        }
+        try {
+            localStorage.setItem('evaluator_projects_view', mode);
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    if (gridBtn) {
+        gridBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            setViewMode('grid');
+        });
+    }
+
+    if (tableBtn) {
+        tableBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            setViewMode('table');
+        });
+    }
+
+    // Restore saved view preference
+    try {
+        const savedView = localStorage.getItem('evaluator_projects_view') || 'grid';
+        setViewMode(savedView);
+    } catch (e) {
+        setViewMode('grid');
+    }
+});
+
+// Modal Logic
+function openProgressModal(projectId, title, progress, status, githubUrl, demoUrl) {
+    const modal = document.getElementById('progressModal');
+    const form = document.getElementById('progressModalForm');
+    const titleEl = document.getElementById('progressModalTitle');
+    const rangeEl = document.getElementById('modalProgressRange');
+    const inputEl = document.getElementById('modalProgressInput');
+    const statusSelect = document.getElementById('modalStatusSelect');
+    const githubInput = document.getElementById('modalGithubInput');
+    const demoInput = document.getElementById('modalDemoInput');
+
+    form.action = `/projects/${projectId}/update-progress/`;
+    titleEl.innerHTML = `<i class="bi bi-sliders text-primary me-2"></i>Update: ${title}`;
+    
+    rangeEl.value = progress || 0;
+    inputEl.value = progress || 0;
+    document.getElementById('modalRangeValDisplay').textContent = `${progress || 0}%`;
+    
+    if (status) statusSelect.value = status;
+    if (githubInput) githubInput.value = githubUrl || '';
+    if (demoInput) demoInput.value = demoUrl || '';
+
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+}
+
+function closeProgressModal() {
+    const modal = document.getElementById('progressModal');
+    modal.style.display = 'none';
+    modal.classList.remove('active');
+}
+
+function updateRangeVal(val) {
+    document.getElementById('modalRangeValDisplay').textContent = `${val}%`;
+    document.getElementById('modalProgressInput').value = val;
+    
+    // Auto-update status dropdown on 100%
+    const statusSelect = document.getElementById('modalStatusSelect');
+    if (parseInt(val) === 100 && statusSelect.value !== 'COMPLETED') {
+        statusSelect.value = 'COMPLETED';
+    } else if (parseInt(val) < 100 && statusSelect.value === 'COMPLETED') {
+        statusSelect.value = 'IN_PROGRESS';
+    }
+}
+
+// Close on backdrop click or Escape
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeProgressModal();
+});
+const progressModalEl = document.getElementById('progressModal');
+if (progressModalEl) {
+    progressModalEl.addEventListener('click', function(e) {
+        if (e.target === this) closeProgressModal();
+    });
+}
+</script>
+{% endblock %}

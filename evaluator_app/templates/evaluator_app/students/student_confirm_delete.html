@@ -1,0 +1,26 @@
+{% extends 'evaluator_app/base.html' %}
+
+{% block title %}Delete Student - Student Evaluator Portal{% endblock %}
+{% block page_title %}Delete Student Record{% endblock %}
+
+{% block content %}
+<div style="max-width: 520px; margin: 40px auto;">
+    <div class="card" style="border-top: 4px solid var(--danger);">
+        <div style="text-align: center; margin-bottom: 20px;">
+            <i class="bi bi-person-x-fill" style="font-size: 48px; color: var(--danger);"></i>
+            <h3 style="font-size: 20px; font-weight: 800; color: var(--text-main); margin-top: 12px;">Delete Student Record</h3>
+            <p style="font-size: 14px; color: var(--text-muted); margin-top: 6px;">
+                Are you sure you want to delete student <strong>"{{ student.name }}"</strong> (<code>{{ student.roll_number }}</code>) from batch "{{ student.batch.name }}"? This action cannot be undone.
+            </p>
+        </div>
+
+        <form method="post" style="display: flex; gap: 12px; justify-content: center; margin-top: 24px;">
+            {% csrf_token %}
+            <a href="{% url 'batch_detail' student.batch.id %}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-danger">
+                <i class="bi bi-trash-fill me-1"></i> Yes, Remove Student
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

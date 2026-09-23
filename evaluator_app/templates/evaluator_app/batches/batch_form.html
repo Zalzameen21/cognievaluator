@@ -1,0 +1,253 @@
+{% extends 'evaluator_app/base.html' %}
+
+{% block title %}{{ title }} - Student Evaluator Portal{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+    <!-- Page Header -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <div>
+            <h2 style="font-size: 24px; font-weight: 800; color: var(--text-main); margin: 0; display: flex; align-items: center; gap: 12px; letter-spacing: -0.02em;">
+                <div style="width: 40px; height: 40px; border-radius: var(--radius-md); background: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 18px;">
+                    <i class="bi bi-collection-play-fill"></i>
+                </div>
+                {{ title }}
+            </h2>
+            <p style="margin: 4px 0 0 52px; font-size: 13px; color: var(--text-muted);">
+                Fill in the details below to configure a batch.
+            </p>
+        </div>
+        <div>
+            <a href="{% url 'batch_list' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Batches
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Form Card -->
+    <div class="card" style="box-shadow: var(--shadow-md); border-color: rgba(79, 70, 229, 0.1);">
+
+        <form method="post" id="batchCreateForm">
+            {% csrf_token %}
+            
+            <!-- Basic Details -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Batch Name *</label>
+                    {{ form.name }}
+                    {% if form.name.errors %}<div style="color: var(--danger); font-size: 12px; margin-top: 4px;">{{ form.name.errors }}</div>{% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Batch Code *</label>
+                    {{ form.code }}
+                    {% if form.code.errors %}<div style="color: var(--danger); font-size: 12px; margin-top: 4px;">{{ form.code.errors }}</div>{% endif %}
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Training Center / Location *</label>
+                    {{ form.location }}
+                    {% if not is_admin_user %}
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                            <i class="bi bi-info-circle"></i> Showing centers assigned to you.
+                        </div>
+                    {% endif %}
+                    {% if form.location.errors %}<div style="color: var(--danger); font-size: 12px; margin-top: 4px;">{{ form.location.errors }}</div>{% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Schedule Mode *</label>
+                    {{ form.schedule_type }}
+                </div>
+            </div>
+
+            <!-- Class Schedule Days Selection -->
+            <div class="form-group" style="background: var(--bg-subtle); padding: 18px; border-radius: var(--radius-lg); border: 1px solid var(--border-color); margin-bottom: 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                        <label class="form-label" style="margin-bottom: 2px; font-size: 14px; font-weight: 800;">
+                            <i class="bi bi-calendar3-week text-primary"></i> Class Schedule Days *
+                        </label>
+                        <div style="font-size: 12px; color: var(--text-muted);">
+                            Select the day(s) on which this batch will have sessions (Mon, Tue, Wed, Thu, Fri, Sat, Sun)
+                        </div>
+                    </div>
+
+                    <!-- Quick Preset Selectors -->
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-secondary btn-sm" id="presetMonFri" style="font-size: 11px; padding: 4px 10px;">
+                            Mon - Fri
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm" id="presetMonSat" style="font-size: 11px; padding: 4px 10px;">
+                            Mon - Sat
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm" id="presetWeekend" style="font-size: 11px; padding: 4px 10px;">
+                            Weekend (Sat & Sun)
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm" id="presetAll" style="font-size: 11px; padding: 4px 10px;">
+                            All 7 Days
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Custom Days Checkbox Pills -->
+                <div class="days-checkbox-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(95px, 1fr)); gap: 10px; margin-top: 10px;">
+                    {% for day_val, day_label in form.fields.selected_days.choices %}
+                    <label class="day-select-card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px 8px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-surface); cursor: pointer; transition: var(--transition); user-select: none;">
+                        <input type="checkbox" name="selected_days" value="{{ day_val }}" class="day-checkbox-input" {% if day_val in form.selected_days.value %}checked{% endif %} style="accent-color: var(--primary); width: 18px; height: 18px; margin-bottom: 6px;">
+                        <span style="font-weight: 700; font-size: 13px; color: var(--text-main);">{{ day_val|slice:":3" }}</span>
+                        <span style="font-size: 10px; color: var(--text-muted);">{{ day_label }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+                {% if form.selected_days.errors %}
+                    <div style="color: var(--danger); font-size: 12px; margin-top: 8px;">{{ form.selected_days.errors }}</div>
+                {% endif %}
+            </div>
+
+            <!-- Class Timing: Starting Time and Ending Time -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">
+                        <i class="bi bi-clock text-primary"></i> Class Starting Time *
+                    </label>
+                    {{ form.start_time }}
+                    {% if form.start_time.errors %}<div style="color: var(--danger); font-size: 12px; margin-top: 4px;">{{ form.start_time.errors }}</div>{% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        <i class="bi bi-clock-history text-primary"></i> Class Ending Time *
+                    </label>
+                    {{ form.end_time }}
+                    {% if form.end_time.errors %}<div style="color: var(--danger); font-size: 12px; margin-top: 4px;">{{ form.end_time.errors }}</div>{% endif %}
+                </div>
+            </div>
+
+            <!-- Starting Date & End Date -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">
+                        <i class="bi bi-calendar-check text-primary"></i> Starting Date *
+                    </label>
+                    {{ form.start_date }}
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                        <i class="bi bi-lock-fill"></i> Only current or upcoming dates can be selected (past dates disabled).
+                    </div>
+                    {% if form.start_date.errors %}<div style="color: var(--danger); font-size: 12px; margin-top: 4px; font-weight: 600;">{{ form.start_date.errors }}</div>{% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        <i class="bi bi-calendar-x text-muted"></i> Completion Date (Optional)
+                    </label>
+                    {{ form.end_date }}
+                    {% if form.end_date.errors %}<div style="color: var(--danger); font-size: 12px; margin-top: 4px;">{{ form.end_date.errors }}</div>{% endif %}
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Batch Status</label>
+                {{ form.status }}
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Batch Description & Objectives</label>
+                {{ form.description }}
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-color);">
+                <a href="{% url 'batch_list' %}" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="bi bi-check2-circle"></i> Save Batch Details
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Highlighting selected day cards
+    function updateDayCardStyles() {
+        document.querySelectorAll('.day-select-card').forEach(card => {
+            const cb = card.querySelector('.day-checkbox-input');
+            if (cb && cb.checked) {
+                card.style.borderColor = 'var(--primary)';
+                card.style.background = 'var(--primary-light)';
+            } else {
+                card.style.borderColor = 'var(--border-color)';
+                card.style.background = 'var(--bg-surface)';
+            }
+        });
+    }
+
+    document.querySelectorAll('.day-select-card').forEach(card => {
+        const cb = card.querySelector('.day-checkbox-input');
+        card.addEventListener('click', (e) => {
+            if (e.target !== cb) {
+                cb.checked = !cb.checked;
+            }
+            updateDayCardStyles();
+        });
+    });
+
+    updateDayCardStyles();
+
+    // Presets
+    const setDays = (daysArray) => {
+        document.querySelectorAll('.day-checkbox-input').forEach(cb => {
+            cb.checked = daysArray.includes(cb.value);
+        });
+        updateDayCardStyles();
+    };
+
+    document.getElementById('presetMonFri')?.addEventListener('click', () => {
+        setDays(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']);
+    });
+
+    document.getElementById('presetMonSat')?.addEventListener('click', () => {
+        setDays(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']);
+    });
+
+    document.getElementById('presetWeekend')?.addEventListener('click', () => {
+        setDays(['Saturday', 'Sunday']);
+    });
+
+    document.getElementById('presetAll')?.addEventListener('click', () => {
+        setDays(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']);
+    });
+
+    // Auto-fill Batch Code based on Batch Name
+    const nameInput = document.getElementById('id_name');
+    const codeInput = document.getElementById('id_code');
+    
+    // We only want to auto-fill if the code input hasn't been manually heavily edited, 
+    // but the simplest approach is to always update it if it's a new batch.
+    // Check if we are on the create page (code might be empty initially)
+    if (nameInput && codeInput) {
+        let codeManuallyEdited = codeInput.value.trim() !== "";
+        
+        codeInput.addEventListener('input', () => {
+            codeManuallyEdited = true;
+        });
+
+        nameInput.addEventListener('input', (e) => {
+            if (!codeManuallyEdited) {
+                const nameVal = e.target.value.trim();
+                // Create a clean code: uppercase, replace spaces/special chars with hyphens
+                let generatedCode = nameVal.toUpperCase()
+                                           .replace(/[^A-Z0-9]+/g, '-')
+                                           .replace(/^-+|-+$/g, '');
+                codeInput.value = generatedCode;
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,858 @@
+{% extends 'evaluator_app/base.html' %}
+{% load static %}
+
+{% block title %}Student Tasks & Deliverables - Evaluator Portal{% endblock %}
+{% block page_title %}Student Tasks & Deliverables{% endblock %}
+
+{% block content %}
+<!-- Page Header & Action Bar -->
+<div style="background: linear-gradient(135deg, #0F172A, #1E293B); border-radius: var(--radius-xl); padding: 24px 30px; color: #FFFFFF; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; box-shadow: var(--shadow-md);">
+    <div>
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+            <span class="badge" style="background: rgba(99, 102, 241, 0.25); color: #A5B4FC; font-size: 11px; text-transform: uppercase;">
+                Deliverable Tracking
+            </span>
+            <span style="font-size: 12px; color: #94A3B8;">Track Date Given, Completion Date & Time, and Pending Status</span>
+        </div>
+        <h2 style="font-size: 22px; font-weight: 800;">Assignments & Task Workflow</h2>
+        <p style="font-size: 13px; color: #CBD5E1; margin-top: 2px;">
+            Assign practical programming challenges, track completion timestamps, and identify students needing follow-up.
+        </p>
+    </div>
+
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <a href="{% url 'task_evaluation_hub' %}" class="btn btn-secondary" style="background: rgba(99, 102, 241, 0.2); color: #FFFFFF; border-color: rgba(99, 102, 241, 0.4);">
+            <i class="bi bi-patch-check-fill"></i> Task Evaluation Section
+        </a>
+        <button type="button" class="btn btn-primary" data-modal="assignTaskModal" style="box-shadow: 0 4px 15px rgba(99, 102, 241, 0.35);">
+            <i class="bi bi-plus-circle-fill"></i> Assign New Task
+        </button>
+    </div>
+</div>
+
+<!-- Task Metric Counter Cards -->
+<div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 24px;">
+    <a href="{% url 'task_hub' %}{% if selected_batch %}?batch={{ selected_batch }}{% endif %}" style="text-decoration: none; color: inherit;">
+        <div class="kpi-card" style="border: 2px solid {% if selected_status == 'ALL' %}var(--primary){% else %}transparent{% endif %};">
+            <div class="kpi-icon-box kpi-icon-primary">
+                <i class="bi bi-journal-text"></i>
+            </div>
+            <div class="kpi-info">
+                <div class="kpi-title">Total Tasks</div>
+                <div class="kpi-value">{{ total_count }}</div>
+                <div class="kpi-meta">All assigned tasks</div>
+            </div>
+        </div>
+    </a>
+
+    <a href="{% url 'task_hub' %}?status=PENDING{% if selected_batch %}&batch={{ selected_batch }}{% endif %}" style="text-decoration: none; color: inherit;">
+        <div class="kpi-card" style="border: 2px solid {% if selected_status == 'PENDING' %}var(--warning){% else %}transparent{% endif %};">
+            <div class="kpi-icon-box kpi-icon-warning">
+                <i class="bi bi-hourglass-split"></i>
+            </div>
+            <div class="kpi-info">
+                <div class="kpi-title">Pending Tasks</div>
+                <div class="kpi-value" style="color: var(--warning);">{{ pending_count }}</div>
+                <div class="kpi-meta">Awaiting completion</div>
+            </div>
+        </div>
+    </a>
+
+    <a href="{% url 'task_hub' %}?status=COMPLETED{% if selected_batch %}&batch={{ selected_batch }}{% endif %}" style="text-decoration: none; color: inherit;">
+        <div class="kpi-card" style="border: 2px solid {% if selected_status == 'COMPLETED' %}var(--success){% else %}transparent{% endif %};">
+            <div class="kpi-icon-box kpi-icon-success">
+                <i class="bi bi-check2-circle"></i>
+            </div>
+            <div class="kpi-info">
+                <div class="kpi-title">Completed On Time</div>
+                <div class="kpi-value" style="color: var(--success);">{{ completed_count }}</div>
+                <div class="kpi-meta">Finished before deadline</div>
+            </div>
+        </div>
+    </a>
+
+    <a href="{% url 'task_hub' %}?status=LATE{% if selected_batch %}&batch={{ selected_batch }}{% endif %}" style="text-decoration: none; color: inherit;">
+        <div class="kpi-card" style="border: 2px solid {% if selected_status == 'LATE' %}#8B5CF6{% else %}transparent{% endif %};">
+            <div class="kpi-icon-box" style="background: rgba(139, 92, 246, 0.15); color: #8B5CF6;">
+                <i class="bi bi-alarm-fill"></i>
+            </div>
+            <div class="kpi-info">
+                <div class="kpi-title">Completed Late</div>
+                <div class="kpi-value" style="color: #8B5CF6;">{{ late_count }}</div>
+                <div class="kpi-meta">Delivered past due date</div>
+            </div>
+        </div>
+    </a>
+
+    <a href="{% url 'task_hub' %}?status=OVERDUE{% if selected_batch %}&batch={{ selected_batch }}{% endif %}" style="text-decoration: none; color: inherit;">
+        <div class="kpi-card" style="border: 2px solid {% if selected_status == 'OVERDUE' %}var(--danger){% else %}transparent{% endif %};">
+            <div class="kpi-icon-box" style="background: rgba(239, 68, 68, 0.15); color: var(--danger);">
+                <i class="bi bi-exclamation-octagon-fill"></i>
+            </div>
+            <div class="kpi-info">
+                <div class="kpi-title">Overdue Pending</div>
+                <div class="kpi-value" style="color: var(--danger);">{{ overdue_count }}</div>
+                <div class="kpi-meta">Past deadline & unfinished</div>
+            </div>
+        </div>
+    </a>
+</div>
+
+<!-- Main Table Card with Search & Filters -->
+<div class="card">
+    <div class="card-header" style="flex-wrap: wrap; gap: 14px;">
+        <div class="card-title">
+            <i class="bi bi-list-task text-primary"></i> All Task Records
+            <span class="badge badge-grade" style="font-size: 11px; margin-left: 6px;">{{ tasks.count }} items</span>
+            <button type="button" id="bulkDeleteBtn" class="btn btn-danger btn-sm" style="display:none; margin-left: 12px; height: 32px;" onclick="submitBulkDelete()">
+                <i class="bi bi-trash-fill"></i> Delete Selected (<span id="selectedCount">0</span>)
+            </button>
+        </div>
+
+        <!-- Filter & Search Controls -->
+        <form method="GET" action="{% url 'task_hub' %}" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <input type="hidden" name="status" value="{{ selected_status }}">
+            
+            <div style="position: relative; min-width: 220px;">
+                <i class="bi bi-search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-dim); font-size: 13px;"></i>
+                <input type="text" name="q" value="{{ search_query }}" placeholder="Search student or task..." class="form-input" style="padding-left: 32px; height: 36px; font-size: 13px;">
+            </div>
+
+            <select name="batch" class="form-select" style="height: 36px; font-size: 13px; width: auto;" onchange="this.form.submit()">
+                <option value="">All Batches</option>
+                {% for b in accessible_batches %}
+                    <option value="{{ b.id }}" {% if selected_batch == b.id|stringformat:"s" %}selected{% endif %}>{{ b.name }} ({{ b.location.code }})</option>
+                {% endfor %}
+            </select>
+
+            <button type="submit" class="btn btn-secondary btn-sm" style="height: 36px;">
+                <i class="bi bi-funnel-fill"></i> Filter
+            </button>
+            
+            {% if search_query or selected_batch or selected_status != 'ALL' %}
+                <a href="{% url 'task_hub' %}" class="btn btn-secondary btn-sm" style="height: 36px;" title="Reset filters">
+                    <i class="bi bi-x-circle"></i> Reset
+                </a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Filter Status Tabs -->
+    <div class="task-filter-tabs">
+        <a href="{% url 'task_hub' %}?status=ALL{% if selected_batch %}&batch={{ selected_batch }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}" class="task-filter-tab {% if selected_status == 'ALL' %}active{% endif %}">
+            All Tasks <span class="tab-badge">{{ total_count }}</span>
+        </a>
+        <a href="{% url 'task_hub' %}?status=PENDING{% if selected_batch %}&batch={{ selected_batch }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}" class="task-filter-tab {% if selected_status == 'PENDING' %}active{% endif %}">
+            <i class="bi bi-hourglass-split text-warning"></i> Pending <span class="tab-badge">{{ pending_count }}</span>
+        </a>
+        <a href="{% url 'task_hub' %}?status=COMPLETED{% if selected_batch %}&batch={{ selected_batch }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}" class="task-filter-tab {% if selected_status == 'COMPLETED' %}active{% endif %}">
+            <i class="bi bi-check2-circle text-success"></i> Completed <span class="tab-badge">{{ completed_count }}</span>
+        </a>
+        <a href="{% url 'task_hub' %}?status=LATE{% if selected_batch %}&batch={{ selected_batch }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}" class="task-filter-tab {% if selected_status == 'LATE' %}active{% endif %}">
+            <i class="bi bi-alarm-fill" style="color: #8B5CF6;"></i> Completed Late <span class="tab-badge">{{ late_count }}</span>
+        </a>
+        <a href="{% url 'task_hub' %}?status=OVERDUE{% if selected_batch %}&batch={{ selected_batch }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}" class="task-filter-tab {% if selected_status == 'OVERDUE' %}active{% endif %}">
+            <i class="bi bi-exclamation-octagon-fill text-danger"></i> Overdue <span class="tab-badge">{{ overdue_count }}</span>
+        </a>
+    </div>
+
+    <!-- Table -->
+    <div class="table-responsive" style="overflow-x: auto;">
+        <table class="task-table">
+            <thead>
+                <tr>
+                    <th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAllTasks"></th>
+                    <th style="min-width: 180px;">Student</th>
+                    <th style="min-width: 100px;">Batch</th>
+                    <th style="min-width: 250px;">Task Given</th>
+                    <th style="min-width: 130px;">Date Given</th>
+                    <th style="min-width: 130px;">Due Date</th>
+                    <th style="min-width: 140px;">Status</th>
+                    <th style="min-width: 160px;">Completed Date & Time</th>
+                    <th style="min-width: 180px;">Remarks</th>
+                    <th style="text-align: right; min-width: 150px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for task in tasks %}
+                <tr>
+                    <td style="text-align: center;">
+                        <input type="checkbox" class="task-checkbox" value="{{ task.id }}">
+                    </td>
+                    <!-- Student -->
+                    <td>
+                        <div class="student-cell">
+                            <div class="student-cell-avatar" style="background-color: {{ task.student.avatar_color }};">
+                                {{ task.student.initials }}
+                            </div>
+                            <div>
+                                <a href="{% url 'student_detail' task.student.id %}" class="student-cell-name">
+                                    {{ task.student.name }}
+                                </a>
+                                <span class="student-cell-roll">{{ task.student.roll_number }}</span>
+                            </div>
+                        </div>
+                    </td>
+
+                    <!-- Batch -->
+                    <td>
+                        <span class="batch-chip">
+                            {{ task.batch.code }}
+                        </span>
+                    </td>
+
+                    <!-- Task Title & Description -->
+                    <td>
+                        <div style="font-weight: 700; color: var(--text-main); font-size: 13px; line-height: 1.35;">
+                            {{ task.title }}
+                        </div>
+                        {% if task.description %}
+                            <div style="font-size: 11px; color: var(--text-dim); margin-top: 3px; max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ task.description }}">
+                                {{ task.description }}
+                            </div>
+                        {% endif %}
+                    </td>
+
+                    <!-- Date Given -->
+                    <td>
+                        <span class="date-chip">
+                            <i class="bi bi-calendar-event"></i> {{ task.assigned_date|date:"M d, Y" }}
+                        </span>
+                    </td>
+
+                    <!-- Due Date -->
+                    <td>
+                        {% if task.due_date %}
+                            <span class="date-chip {% if task.is_overdue %}date-overdue{% endif %}">
+                                <i class="bi bi-calendar2-check"></i> {{ task.due_date|date:"M d, Y" }}
+                            </span>
+                        {% else %}
+                            <span style="color: var(--text-dim); font-size: 12px;">—</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Status Badge -->
+                    <td>
+                        {% if task.status == 'COMPLETED' %}
+                            <span class="status-chip chip-completed">
+                                <i class="bi bi-check-circle-fill"></i> Completed
+                            </span>
+                        {% elif task.status == 'LATE' %}
+                            <span class="status-chip chip-late">
+                                <i class="bi bi-alarm-fill"></i> Completed Late
+                            </span>
+                        {% elif task.is_overdue %}
+                            <span class="status-chip chip-overdue">
+                                <i class="bi bi-exclamation-triangle-fill"></i> Overdue
+                            </span>
+                        {% else %}
+                            <span class="status-chip chip-pending">
+                                <i class="bi bi-hourglass-split"></i> Pending
+                            </span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Completed Date & Time -->
+                    <td>
+                        {% if task.completed_at %}
+                            <div class="completion-stamp">
+                                <span class="comp-date">
+                                    <i class="bi bi-calendar-check text-success"></i> {{ task.completed_at|date:"M d, Y" }}
+                                </span>
+                                <span class="comp-time">
+                                    <i class="bi bi-clock"></i> {{ task.completed_at|date:"h:i A" }}
+                                </span>
+                            </div>
+                        {% else %}
+                            <span class="awaiting-chip">
+                                <i class="bi bi-dash-circle"></i> Not completed yet
+                            </span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Remarks -->
+                    <td>
+                        {% if task.evaluator_remarks %}
+                            <div style="font-size: 11px; color: var(--text-muted); font-style: italic; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ task.evaluator_remarks }}">
+                                "{{ task.evaluator_remarks }}"
+                            </div>
+                        {% else %}
+                            <span style="color: var(--text-dim); font-size: 12px;">—</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Action Buttons -->
+                    <td style="text-align: right; white-space: nowrap;">
+                        <div style="display: flex; gap: 6px; justify-content: flex-end; align-items: center;">
+                            <a href="{% url 'task_evaluation_hub' %}?q={{ task.student.name|urlencode }}" class="btn-action-primary" style="background: rgba(99, 102, 241, 0.15); color: var(--primary); border: 1px solid rgba(99, 102, 241, 0.3); text-decoration: none;" title="Evaluate Task in Evaluation Hub">
+                                <i class="bi bi-patch-check-fill"></i> {% if task.is_evaluated %}{{ task.score }}%{% else %}Evaluate{% endif %}
+                            </a>
+                            <button type="button" class="btn-action-primary btn-open-task-update"
+                                    data-task-id="{{ task.id }}"
+                                    data-task-title="{{ task.title }}"
+                                    data-student-name="{{ task.student.name }}"
+                                    data-status="{{ task.status }}"
+                                    data-completed-at="{{ task.completed_at|date:'Y-m-d\TH:i' }}"
+                                    data-remarks="{{ task.evaluator_remarks }}"
+                                    title="Update Status / Completion Date-Time">
+                                <i class="bi bi-pencil-square"></i> {% if task.status == 'PENDING' %}Complete{% else %}Edit{% endif %}
+                            </button>
+                            <form method="POST" action="{% url 'task_delete' task.id %}" onsubmit="return confirm('Delete this task?');" style="display: inline; margin: 0;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn-action-danger" title="Delete Task">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 48px 20px;">
+                        <i class="bi bi-clipboard-check" style="font-size: 40px; color: var(--text-dim); display: block; margin-bottom: 12px;"></i>
+                        <h4 style="font-size: 16px; font-weight: 700; color: var(--text-main);">No tasks found</h4>
+                        <p style="font-size: 13px; color: var(--text-muted); max-width: 400px; margin: 4px auto 16px;">
+                            No tasks matching the selected filter criteria. Click below to assign a new deliverable task.
+                        </p>
+                        <button type="button" class="btn btn-primary btn-sm" data-modal="assignTaskModal">
+                            <i class="bi bi-plus-circle-fill"></i> Assign Task
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ============================================================================== -->
+<!-- MODAL: ASSIGN NEW TASK -->
+<!-- ============================================================================== -->
+<div class="modal-backdrop" id="assignTaskModal">
+    <div class="modal-content" style="max-width: 620px;">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="bi bi-plus-circle-fill text-primary"></i> Assign Student Task
+            </h3>
+            <button type="button" class="modal-close" data-close-modal="assignTaskModal">&times;</button>
+        </div>
+
+        <form method="POST" action="{% url 'task_create' %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{% url 'task_hub' %}">
+            
+            <div class="modal-body" style="padding: 24px;">
+                <!-- Assignment Target Radio -->
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="font-weight: 700;">Assign Target *</label>
+                    <div style="display: flex; gap: 20px; background: var(--bg-subtle); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 600;">
+                            <input type="radio" name="target_type" value="STUDENT" checked onchange="toggleTaskTarget(this.value)">
+                            Single Student
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 600;">
+                            <input type="radio" name="target_type" value="BATCH" onchange="toggleTaskTarget(this.value)">
+                            Entire Batch (All Students)
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Batch Selection -->
+                <div class="form-group" style="margin-bottom: 16px; position:relative;" id="taskBatchDropdownContainer">
+                    <label class="form-label" style="font-weight: 700;">Select Batch(es) *</label>
+                    <button type="button" id="taskBatchDropdownBtn" class="form-input" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;background:var(--bg-surface);cursor:pointer;color:var(--text-main);">
+                        <span id="taskBatchDropdownText">-- Choose Batch(es) --</span>
+                        <i class="bi bi-chevron-down text-muted"></i>
+                    </button>
+                    <div id="taskBatchDropdownMenu" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:250px;overflow-y:auto;border:1px solid var(--border-color);border-radius:var(--radius-md);padding:8px;background:var(--bg-surface);z-index:1000;box-shadow:var(--shadow-md);margin-top:4px;">
+                        <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid var(--border-color); cursor:pointer; font-size:13px; font-weight:700; color:var(--primary);">
+                            <input type="checkbox" id="selectAllTaskBatches" style="cursor:pointer;">
+                            Select All Batches
+                        </label>
+
+                        {% if accessible_groups %}
+                        <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase;">Batch Groups</div>
+                        {% for g in accessible_groups %}
+                        <label style="display:flex; align-items:center; gap:8px; margin-bottom:6px; cursor:pointer; font-size:13px; color:var(--text-main); font-weight: 600;">
+                            <input type="checkbox" class="task-group-checkbox" data-batches="{% for b in g.batches.all %}{{ b.id }}{% if not forloop.last %},{% endif %}{% endfor %}" style="cursor:pointer;">
+                            [GROUP] {{ g.name }}
+                        </label>
+                        {% endfor %}
+                        <div style="height: 1px; background: var(--border-color); margin: 8px 0;"></div>
+                        {% endif %}
+
+                        <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase;">Individual Batches</div>
+                        {% for b in accessible_batches %}
+                        <label style="display:flex; align-items:center; gap:8px; margin-bottom:6px; cursor:pointer; font-size:13px; color:var(--text-main);">
+                            <input type="checkbox" name="batch_ids" value="{{ b.id }}" class="task-batch-checkbox" style="cursor:pointer;">
+                            {{ b.name }} ({{ b.location.name }})
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Student Selection (conditional) -->
+                <div class="form-group" id="student_select_group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="font-weight: 700;">Select Student *</label>
+                    <select name="student" id="id_task_student" class="form-select">
+                        <option value="">-- Choose Student --</option>
+                        {% for b in accessible_batches %}
+                            {% for s in b.students.all %}
+                                <option value="{{ s.id }}" data-batch="{{ b.id }}">{{ s.name }} ({{ s.roll_number }}) - {{ b.code }}</option>
+                            {% endfor %}
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Task Source Type -->
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="font-weight: 700;">Task Source</label>
+                    <div style="display: flex; gap: 20px; background: var(--bg-subtle); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 600;">
+                            <input type="radio" name="task_source" value="CUSTOM" checked onchange="toggleTaskSource(this.value)">
+                            Custom Task
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 600;">
+                            <input type="radio" name="task_source" value="SYLLABUS" onchange="toggleTaskSource(this.value)">
+                            From Syllabus Module
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Syllabus Module Dropdown (Hidden by default) -->
+                <div class="form-group" id="syllabus_module_group" style="margin-bottom: 16px; display: none;">
+                    <label class="form-label" style="font-weight: 700;">Select Scheduled Module *</label>
+                    <select name="module_id" id="id_syllabus_module" class="form-select">
+                        <option value="">-- Choose Module --</option>
+                    </select>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                        Select a module from the batch's syllabus schedule. Title and description will be auto-filled.
+                    </div>
+                </div>
+
+                <!-- Task Title -->
+                <div class="form-group" id="custom_title_group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="font-weight: 700;">Task Title / Deliverable *</label>
+                    <input type="text" name="title" id="id_custom_title" class="form-input" placeholder="e.g. Build User Authentication API with Django Tokens" required>
+                </div>
+
+                <!-- Task Description -->
+                <div class="form-group" id="custom_desc_group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="font-weight: 700; display: flex; justify-content: space-between; align-items: center;">
+                        <span><i class="bi bi-card-text text-primary me-1"></i> Task Description</span>
+                        <span style="font-size: 11px; font-weight: 500; color: var(--text-muted);">(Optional)</span>
+                    </label>
+                    <textarea name="description" class="form-textarea" rows="3" placeholder="Enter task description, requirements, instructions, or specific criteria for the student..." style="font-size: 13px; line-height: 1.5;"></textarea>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                        Evaluators can add detailed specifications, instructions, or expected outcomes.
+                    </div>
+                </div>
+
+                <!-- Dates Row -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight: 700;">Date Given *</label>
+                        <input type="date" name="assigned_date" id="id_assigned_date" class="form-input" value="{% now 'Y-m-d' %}" data-is-admin="{{ request.user.profile.is_admin|yesno:'true,false' }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Due Date Deadline</label>
+                        <input type="date" name="due_date" class="form-input">
+                    </div>
+                </div>
+
+                <!-- Priority -->
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label">Priority</label>
+                    <select name="priority" class="form-select">
+                        <option value="NORMAL" selected>Normal Priority</option>
+                        <option value="HIGH">High Priority</option>
+                        <option value="URGENT">Urgent</option>
+                    </select>
+                </div>
+
+                <!-- Remarks -->
+                <div class="form-group" style="margin-bottom: 8px;">
+                    <label class="form-label">Remarks</label>
+                    <input type="text" name="evaluator_remarks" class="form-input" placeholder="Optional remarks or context...">
+                </div>
+            </div>
+
+            <div class="modal-footer" style="padding: 16px 24px; background: var(--bg-subtle); display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-secondary" data-close-modal="assignTaskModal">Cancel</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-send-check-fill"></i> Assign Task
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ============================================================================== -->
+<!-- MODAL: UPDATE TASK STATUS & COMPLETION TIME -->
+<!-- ============================================================================== -->
+<div class="modal-backdrop" id="updateTaskStatusModal">
+    <div class="modal-content" style="max-width: 520px;">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="bi bi-clock-history text-primary"></i> Update Task Completion
+            </h3>
+            <button type="button" class="modal-close" data-close-modal="updateTaskStatusModal">&times;</button>
+        </div>
+
+        <form method="POST" id="updateTaskForm" action="">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{% url 'task_hub' %}">
+            
+            <div class="modal-body" style="padding: 24px;">
+                <div style="background: var(--bg-subtle); border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 18px; border: 1px solid var(--border-color);">
+                    <div style="font-size: 11px; text-transform: uppercase; color: var(--text-dim); font-weight: 700;">Task</div>
+                    <div id="modal_task_title" style="font-size: 14px; font-weight: 800; color: var(--text-main);"></div>
+                    <div id="modal_student_name" style="font-size: 12px; color: var(--primary); margin-top: 2px;"></div>
+                </div>
+
+                <!-- Status Select -->
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="font-weight: 700;">Task Status *</label>
+                    <select name="status" id="modal_task_status" class="form-select" required onchange="toggleCompletionTimeField(this.value)">
+                        <option value="COMPLETED">Completed (On Time)</option>
+                        <option value="LATE">Completed Late</option>
+                        <option value="PENDING">Pending (Still in Progress)</option>
+                    </select>
+                </div>
+
+                <!-- Completed Date & Time -->
+                <div class="form-group" id="completion_time_group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="font-weight: 700;">Date & Time Completed *</label>
+                    <input type="datetime-local" name="completed_at" id="modal_completed_at" class="form-input">
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                        Record the exact completion date and time.
+                    </div>
+                </div>
+
+                <!-- Remarks -->
+                <div class="form-group" style="margin-bottom: 8px;">
+                    <label class="form-label">Evaluator Remarks / Feedback</label>
+                    <input type="text" name="evaluator_remarks" id="modal_evaluator_remarks" class="form-input" placeholder="e.g. Code reviewed and approved with all unit tests passing.">
+                </div>
+            </div>
+
+            <div class="modal-footer" style="padding: 16px 24px; background: var(--bg-subtle); display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-secondary" data-close-modal="updateTaskStatusModal">Cancel</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg"></i> Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function toggleTaskTarget(val) {
+    const studentGroup = document.getElementById('student_select_group');
+    const studentSelect = document.getElementById('id_task_student');
+    if (val === 'BATCH') {
+        studentGroup.style.display = 'none';
+        studentSelect.removeAttribute('required');
+        studentSelect.value = '';
+    } else {
+        studentGroup.style.display = 'block';
+        studentSelect.setAttribute('required', 'required');
+    }
+}
+
+function toggleTaskSource(val) {
+    const customTitleGroup = document.getElementById('custom_title_group');
+    const customDescGroup = document.getElementById('custom_desc_group');
+    const syllabusModuleGroup = document.getElementById('syllabus_module_group');
+    const titleInput = document.getElementById('id_custom_title');
+    const moduleSelect = document.getElementById('id_syllabus_module');
+
+    if (val === 'SYLLABUS') {
+        customTitleGroup.style.display = 'none';
+        customDescGroup.style.display = 'none';
+        syllabusModuleGroup.style.display = 'block';
+        titleInput.removeAttribute('required');
+        moduleSelect.setAttribute('required', 'required');
+        
+        // Fetch modules if a batch is already selected
+        const selectedIds = getSelectedBatchIds();
+        if (selectedIds.length > 0) {
+            fetchSyllabusModules(selectedIds[0]);
+        }
+    } else {
+        customTitleGroup.style.display = 'block';
+        customDescGroup.style.display = 'block';
+        syllabusModuleGroup.style.display = 'none';
+        titleInput.setAttribute('required', 'required');
+        moduleSelect.removeAttribute('required');
+        
+        // Make date editable again for custom tasks
+        document.getElementById('id_assigned_date').removeAttribute('readonly');
+    }
+}
+
+document.getElementById('id_syllabus_module').addEventListener('change', function() {
+    const selectedOption = this.options[this.selectedIndex];
+    if (selectedOption && selectedOption.value) {
+        const moduleDate = selectedOption.getAttribute('data-date');
+        const dateInput = document.getElementById('id_assigned_date');
+        if (moduleDate) {
+            dateInput.value = moduleDate;
+            const isAdmin = dateInput.getAttribute('data-is-admin') === 'true';
+            if (!isAdmin) {
+                dateInput.setAttribute('readonly', 'readonly');
+            }
+        }
+    }
+});
+
+function fetchSyllabusModules(batchId) {
+    const moduleSelect = document.getElementById('id_syllabus_module');
+    if (!batchId) {
+        moduleSelect.innerHTML = '<option value="">-- Choose Module --</option>';
+        return;
+    }
+    
+    // Check if task source is SYLLABUS
+    const sourceInputs = document.getElementsByName('task_source');
+    let isSyllabus = false;
+    for (let i = 0; i < sourceInputs.length; i++) {
+        if (sourceInputs[i].checked && sourceInputs[i].value === 'SYLLABUS') {
+            isSyllabus = true;
+            break;
+        }
+    }
+    if (!isSyllabus) return;
+
+    moduleSelect.innerHTML = '<option value="">Loading modules...</option>';
+    
+    fetch(`/ajax/batch-syllabus-modules/?batch_id=${batchId}`)
+        .then(response => response.json())
+        .then(data => {
+            moduleSelect.innerHTML = '<option value="">-- Choose Module --</option>';
+            if (data.modules && data.modules.length > 0) {
+                data.modules.forEach(mod => {
+                    const option = document.createElement('option');
+                    option.value = mod.module_id;
+                    option.setAttribute('data-date', mod.date);
+                    option.textContent = `[${mod.date}] Module ${mod.order}: ${mod.title}`;
+                    moduleSelect.appendChild(option);
+                });
+            } else {
+                moduleSelect.innerHTML = '<option value="">No scheduled modules found for this batch</option>';
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching modules:', error);
+            moduleSelect.innerHTML = '<option value="">Error loading modules</option>';
+        });
+}
+
+function updateStudentOptions(batchIds) {
+    const studentSelect = document.getElementById('id_task_student');
+    if (!studentSelect) return;
+    const options = studentSelect.querySelectorAll('option');
+    options.forEach(opt => {
+        if (!opt.value) return;
+        const optBatch = opt.getAttribute('data-batch');
+        if (!batchIds || batchIds.length === 0 || batchIds.includes(optBatch)) {
+            opt.style.display = '';
+        } else {
+            opt.style.display = 'none';
+        }
+    });
+}
+
+// Dropdown toggle logic
+var dropdownBtn = document.getElementById('taskBatchDropdownBtn');
+var dropdownMenu = document.getElementById('taskBatchDropdownMenu');
+var dropdownText = document.getElementById('taskBatchDropdownText');
+var dropdownContainer = document.getElementById('taskBatchDropdownContainer');
+
+if (dropdownBtn) {
+    dropdownBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        dropdownMenu.style.display = dropdownMenu.style.display === 'none' ? 'block' : 'none';
+    });
+}
+
+document.addEventListener('click', function(e) {
+    if (dropdownContainer && !dropdownContainer.contains(e.target)) {
+        dropdownMenu.style.display = 'none';
+    }
+});
+
+function getSelectedBatchIds() {
+    var checkboxes = document.querySelectorAll('.task-batch-checkbox');
+    return Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+}
+
+function updateBatchSelection() {
+    var checkboxes = document.querySelectorAll('.task-batch-checkbox');
+    var checkedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+    var selectAll = document.getElementById('selectAllTaskBatches');
+    
+    if (selectAll) {
+        selectAll.checked = (checkedCount > 0 && checkedCount === checkboxes.length);
+    }
+    
+    if (checkedCount === 0) {
+        dropdownText.textContent = "-- Choose Batch(es) --";
+    } else if (checkedCount === checkboxes.length) {
+        dropdownText.textContent = "All Batches Selected";
+    } else {
+        dropdownText.textContent = checkedCount + " Batch(es) Selected";
+    }
+    
+    var selectedIds = getSelectedBatchIds();
+    updateStudentOptions(selectedIds);
+    // Fetch modules for the first selected batch (if any)
+    if (selectedIds.length > 0) {
+        fetchSyllabusModules(selectedIds[0]);
+    } else {
+        fetchSyllabusModules(null);
+    }
+}
+
+document.querySelectorAll('.task-batch-checkbox').forEach(function(cb) {
+    cb.addEventListener('change', updateBatchSelection);
+});
+
+var selectAllBtn = document.getElementById('selectAllTaskBatches');
+if (selectAllBtn) {
+    selectAllBtn.addEventListener('change', function(e) {
+        var checkboxes = document.querySelectorAll('.task-batch-checkbox');
+        checkboxes.forEach(function(cb) {
+            cb.checked = e.target.checked;
+        });
+        
+        var groupCheckboxes = document.querySelectorAll('.task-group-checkbox');
+        groupCheckboxes.forEach(function(cb) {
+            cb.checked = e.target.checked;
+        });
+        
+        updateBatchSelection();
+    });
+}
+
+document.querySelectorAll('.task-group-checkbox').forEach(function(groupCb) {
+    groupCb.addEventListener('change', function(e) {
+        var batchIds = e.target.dataset.batches.split(',');
+        var checkboxes = document.querySelectorAll('.task-batch-checkbox');
+        checkboxes.forEach(function(cb) {
+            if (batchIds.includes(cb.value)) {
+                cb.checked = e.target.checked;
+            }
+        });
+        updateBatchSelection();
+    });
+});
+
+function toggleCompletionTimeField(status) {
+    const group = document.getElementById('completion_time_group');
+    const input = document.getElementById('modal_completed_at');
+    if (status === 'PENDING') {
+        group.style.display = 'none';
+        input.value = '';
+    } else {
+        group.style.display = 'block';
+        if (!input.value) {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            input.value = `${year}-${month}-${day}T${hours}:${minutes}`;
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Open update status modal
+    document.querySelectorAll('.btn-open-task-update').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const taskId = this.dataset.taskId;
+            const taskTitle = this.dataset.taskTitle;
+            const studentName = this.dataset.studentName;
+            const status = this.dataset.status;
+            let completedAt = this.dataset.completedAt;
+            const remarks = this.dataset.remarks || '';
+
+            document.getElementById('updateTaskForm').action = `/tasks/${taskId}/update-status/`;
+            document.getElementById('modal_task_title').textContent = taskTitle;
+            document.getElementById('modal_student_name').textContent = 'Assigned to: ' + studentName;
+            document.getElementById('modal_task_status').value = status;
+            document.getElementById('modal_evaluator_remarks').value = remarks;
+
+            if (!completedAt && status !== 'PENDING') {
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                completedAt = `${year}-${month}-${day}T${hours}:${minutes}`;
+            }
+            document.getElementById('modal_completed_at').value = completedAt || '';
+            toggleCompletionTimeField(status);
+
+            const modal = document.getElementById('updateTaskStatusModal');
+            if (modal) modal.classList.add('active');
+        });
+    });
+    
+    // Bulk Delete UI Logic
+    const selectAll = document.getElementById('selectAllTasks');
+    const taskCheckboxes = document.querySelectorAll('.task-checkbox');
+    const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+    const selectedCountSpan = document.getElementById('selectedCount');
+
+    function updateBulkDeleteBtn() {
+        const checkedCount = document.querySelectorAll('.task-checkbox:checked').length;
+        if (checkedCount > 0) {
+            bulkDeleteBtn.style.display = 'inline-flex';
+            if (selectedCountSpan) selectedCountSpan.textContent = checkedCount;
+        } else {
+            bulkDeleteBtn.style.display = 'none';
+        }
+    }
+
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            taskCheckboxes.forEach(cb => cb.checked = this.checked);
+            updateBulkDeleteBtn();
+        });
+    }
+
+    taskCheckboxes.forEach(cb => {
+        cb.addEventListener('change', function() {
+            updateBulkDeleteBtn();
+            if (!this.checked && selectAll) selectAll.checked = false;
+        });
+    });
+});
+
+function submitBulkDelete() {
+    const selected = document.querySelectorAll('.task-checkbox:checked');
+    if (selected.length === 0) return;
+    
+    if (confirm(`Are you sure you want to delete ${selected.length} task(s)? This action cannot be undone.`)) {
+        const form = document.getElementById('bulkDeleteForm');
+        selected.forEach(cb => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'task_ids';
+            input.value = cb.value;
+            form.appendChild(input);
+        });
+        form.submit();
+    }
+}
+</script>
+
+<!-- Bulk Delete Form -->
+<form id="bulkDeleteForm" method="POST" action="{% url 'bulk_task_delete' %}" style="display:none;">
+    {% csrf_token %}
+</form>
+{% endblock %}

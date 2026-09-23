@@ -1,0 +1,73 @@
+{% extends 'evaluator_app/base.html' %}
+{% block title %}Syllabus — Student Evaluator Portal{% endblock %}
+{% block page_title %}Syllabus{% endblock %}
+
+{% block content %}
+<div style="max-width:1100px;margin:0 auto;">
+
+  <!-- Header -->
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:24px;">
+    <div>
+      <h2 style="font-size:22px;font-weight:800;color:var(--text-main);margin:0;display:flex;align-items:center;gap:10px;">
+        <i class="bi bi-journal-text text-primary"></i> Syllabus Library
+      </h2>
+      <p style="font-size:13px;color:var(--text-muted);margin:4px 0 0;">Manage course syllabi and view task schedules for batches.</p>
+    </div>
+    {% if is_admin_user %}
+    <a href="{% url 'syllabus_create' %}" class="btn btn-primary">
+      <i class="bi bi-plus-lg"></i> New Syllabus
+    </a>
+    {% endif %}
+  </div>
+
+  {% if syllabi %}
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px;">
+    {% for s in syllabi %}
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div style="padding:20px 22px 14px;border-bottom:1px solid var(--border-color);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+          <div>
+            <div style="font-size:16px;font-weight:800;color:var(--text-main);">{{ s.name }}</div>
+            {% if s.target_course %}
+            <div style="font-size:12px;color:var(--primary);font-weight:600;margin-top:2px;">{{ s.target_course }}</div>
+            {% endif %}
+          </div>
+          <span style="background:rgba(79,70,229,0.1);color:var(--primary);font-size:11px;font-weight:700;padding:3px 10px;border-radius:50px;white-space:nowrap;">
+            {{ s.tasks.count }} Task{{ s.tasks.count|pluralize }}
+          </span>
+        </div>
+        {% if s.description %}
+        <p style="font-size:13px;color:var(--text-muted);margin:10px 0 0;line-height:1.5;">{{ s.description|truncatechars:120 }}</p>
+        {% endif %}
+      </div>
+      <div style="padding:12px 22px;background:var(--bg-subtle);">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">
+          <i class="bi bi-collection-play"></i>
+          Assigned to {{ s.batch_assignments.count }} batch{{ s.batch_assignments.count|pluralize:"es" }}
+        </div>
+        <div style="display:flex;gap:8px;">
+          <a href="{% url 'syllabus_detail' s.id %}" class="btn btn-primary btn-sm" style="flex:1;text-align:center;">
+            <i class="bi bi-eye"></i> View & Manage
+          </a>
+          {% if is_admin_user %}
+          <a href="{% url 'syllabus_delete' s.id %}" class="btn btn-secondary btn-sm" style="color:var(--danger);">
+            <i class="bi bi-trash"></i>
+          </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="text-align:center;padding:60px 24px;background:var(--bg-surface);border:1px dashed var(--border-color);border-radius:var(--radius-xl);">
+    <i class="bi bi-journal-x" style="font-size:48px;color:var(--text-muted);"></i>
+    <div style="font-size:18px;font-weight:700;color:var(--text-main);margin-top:16px;">No Syllabi Yet</div>
+    <p style="color:var(--text-muted);margin:8px 0 24px;">Create your first syllabus to get started with structured batch scheduling.</p>
+    {% if is_admin_user %}
+    <a href="{% url 'syllabus_create' %}" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Create Syllabus</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

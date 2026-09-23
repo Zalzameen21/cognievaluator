@@ -1,0 +1,94 @@
+{% extends 'evaluator_app/base.html' %}
+
+{% block title %}Manage Evaluators - Admin Panel{% endblock %}
+{% block page_title %}Evaluator Management & Assignments{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+    <div>
+        <p style="font-size: 14px; color: var(--text-muted);">
+            Manage evaluator accounts and configure location access permissions (e.g. Kozhikode, Kochi, Wayanad).
+        </p>
+    </div>
+    <a href="{% url 'admin_create_evaluator' %}" class="btn btn-primary">
+        <i class="bi bi-person-plus-fill"></i> Add New Evaluator
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">
+            <i class="bi bi-people-fill text-primary"></i> Registered Evaluators & Roles ({{ evaluators.count }})
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Evaluator</th>
+                    <th>Role</th>
+                    <th>Designation</th>
+                    <th>Assigned Location(s)</th>
+                    <th>Phone / Contact</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for prof in evaluators %}
+                <tr>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="width: 36px; height: 36px; border-radius: var(--radius-full); background: {{ prof.avatar_color|default:'#4F46E5' }}; color: #FFF; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700;">
+                                {{ prof.user.username|slice:":2"|upper }}
+                            </div>
+                            <div>
+                                <strong style="color: var(--text-main); font-size: 14px;">{{ prof.user.get_full_name|default:prof.user.username }}</strong>
+                                <div style="font-size: 11px; color: var(--text-muted);">@{{ prof.user.username }} • {{ prof.user.email|default:"no email" }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        {% if prof.is_admin %}
+                            <span class="role-badge admin"><i class="bi bi-shield-shaded"></i> Administrator</span>
+                        {% else %}
+                            <span class="role-badge evaluator"><i class="bi bi-check-circle"></i> Evaluator</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-size: 13px;">{{ prof.designation }}</td>
+                    <td>
+                        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                            {% if prof.is_admin %}
+                                <span class="location-badge" style="background: #F3E8FF; color: #7C3AED; border-color: rgba(124, 58, 237, 0.3);">
+                                    <i class="bi bi-globe"></i> All Locations (Global)
+                                </span>
+                            {% else %}
+                                {% for loc in prof.assigned_locations.all %}
+                                    <span class="location-badge">
+                                        <i class="bi bi-geo-alt-fill"></i> {{ loc.name }}
+                                    </span>
+                                {% empty %}
+                                    <span style="font-size: 11px; color: var(--danger); font-weight: 600;">
+                                        <i class="bi bi-exclamation-triangle"></i> Unassigned
+                                    </span>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td style="font-size: 13px; color: var(--text-muted);">{{ prof.phone|default:"-" }}</td>
+                    <td style="text-align: right;">
+                        <a href="{% url 'admin_assign_evaluator' prof.id %}" class="btn btn-secondary btn-sm">
+                            <i class="bi bi-sliders"></i> Edit Assignment
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" style="text-align: center; color: var(--text-dim); padding: 32px;">No evaluators found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

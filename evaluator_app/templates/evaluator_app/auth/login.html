@@ -1,0 +1,46 @@
+{% extends 'evaluator_app/base.html' %}
+{% load static %}
+
+{% block title %}Sign In - Student Evaluator Portal{% endblock %}
+
+{% block page_title %}Student Evaluator Portal{% endblock %}
+
+{% block content %}
+<div style="min-height: 80vh; display: flex; align-items: center; justify-content: center; padding: 20px;">
+    <div style="width: 100%; max-width: 460px;">
+        <!-- Brand Header -->
+        <div style="text-align: center; margin-bottom: 28px;">
+            <div style="width: 58px; height: 58px; border-radius: 16px; background: linear-gradient(135deg, #4F46E5, #06B6D4); display: inline-flex; align-items: center; justify-content: center; color: white; font-size: 28px; box-shadow: 0 8px 20px rgba(79, 70, 229, 0.35); margin-bottom: 16px;">
+                <i class="bi bi-mortarboard-fill"></i>
+            </div>
+            <h2 style="font-size: 24px; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em;">Welcome Back</h2>
+            <p style="font-size: 14px; color: var(--text-muted); margin-top: 4px;">Sign in to access your assigned batches & evaluations</p>
+        </div>
+
+        <!-- Login Form Card -->
+        <div class="card" style="padding: 32px; box-shadow: var(--shadow-lg); border-radius: var(--radius-xl);">
+            <form method="post" action="{% url 'login' %}">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label class="form-label" for="id_username">
+                        <i class="bi bi-person-fill" style="color: var(--primary);"></i> Username
+                    </label>
+                    <input type="text" name="username" id="id_username" class="form-input" placeholder="e.g. admin or eva" required autofocus>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 24px;">
+                    <label class="form-label" for="id_password">
+                        <i class="bi bi-key-fill" style="color: var(--primary);"></i> Password
+                    </label>
+                    <input type="password" name="password" id="id_password" class="form-input" placeholder="••••••••" required>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-size: 15px;">
+                    <i class="bi bi-box-arrow-in-right"></i> Sign In to Portal
+                </button>
+            </form>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

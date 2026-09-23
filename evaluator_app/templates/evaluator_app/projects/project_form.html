@@ -1,0 +1,1252 @@
+{% extends 'evaluator_app/base.html' %}
+{% load static %}
+
+{% block title %}{{ title }} | CogniLearn Evaluator{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* ==============================================================================
+   PROJECT FORM - SIMPLE & PROFESSIONAL DESIGN
+   ============================================================================== */
+    .project-form-shell {
+        max-width: 880px;
+        margin: 0 auto;
+        padding-bottom: 48px;
+    }
+
+    /* Page Header */
+    .form-header-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .form-header-title-area {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+
+    .form-header-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: var(--radius-md);
+        background: linear-gradient(135deg, rgba(79, 70, 229, 0.12), rgba(6, 182, 212, 0.12));
+        border: 1px solid rgba(79, 70, 229, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        color: var(--primary);
+        flex-shrink: 0;
+    }
+
+    .form-header-title {
+        font-size: 22px;
+        font-weight: 800;
+        color: var(--text-main);
+        letter-spacing: -0.02em;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .form-header-subtitle {
+        font-size: 13px;
+        color: var(--text-muted);
+        margin-top: 3px;
+    }
+
+    /* Form Section Cards */
+    .form-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-sm);
+        margin-bottom: 22px;
+        overflow: hidden;
+        transition: var(--transition);
+    }
+
+    .form-card:hover {
+        box-shadow: var(--shadow-md);
+        border-color: rgba(79, 70, 229, 0.25);
+    }
+
+    .form-card-header {
+        padding: 16px 22px;
+        background: var(--bg-subtle);
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .form-card-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--text-main);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin: 0;
+    }
+
+    .form-card-title i {
+        font-size: 16px;
+        color: var(--primary);
+    }
+
+    .form-card-body {
+        padding: 22px;
+    }
+
+    /* Input Fields & Enhancements */
+    .form-field-group {
+        margin-bottom: 18px;
+    }
+
+    .form-field-group:last-child {
+        margin-bottom: 0;
+    }
+
+    .form-label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--text-main);
+        margin-bottom: 6px;
+    }
+
+    .form-label-required {
+        color: var(--danger);
+        margin-left: 2px;
+    }
+
+    .form-help-text {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 5px;
+    }
+
+    .form-error-text {
+        font-size: 12px;
+        color: var(--danger);
+        font-weight: 600;
+        margin-top: 5px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    /* Custom Interactive Student Selector */
+    .student-selector-box {
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        background: var(--bg-surface);
+        overflow: hidden;
+    }
+
+    .student-selector-toolbar {
+        padding: 10px 14px;
+        background: var(--bg-subtle);
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .student-search-wrap {
+        position: relative;
+        flex: 1;
+        min-width: 180px;
+    }
+
+    .student-search-wrap i {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-dim);
+        font-size: 13px;
+    }
+
+    .student-search-input {
+        width: 100%;
+        padding: 6px 10px 6px 30px;
+        font-size: 12px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        background: var(--bg-surface);
+        color: var(--text-main);
+        outline: none;
+    }
+
+    .student-search-input:focus {
+        border-color: var(--primary);
+    }
+
+    .student-selector-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .student-action-btn {
+        background: transparent;
+        border: none;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--primary);
+        cursor: pointer;
+        padding: 4px 8px;
+        border-radius: var(--radius-sm);
+        transition: var(--transition);
+    }
+
+    .student-action-btn:hover {
+        background: var(--primary-light);
+    }
+
+    .student-list-container {
+        max-height: 220px;
+        overflow-y: auto;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .student-item-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 12px;
+        border-radius: var(--radius-sm);
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: var(--transition);
+        user-select: none;
+    }
+
+    .student-item-card:hover {
+        background: var(--bg-subtle);
+    }
+
+    .student-item-card.selected {
+        background: var(--primary-light);
+        border-color: rgba(79, 70, 229, 0.3);
+    }
+
+    .student-item-checkbox {
+        width: 16px;
+        height: 16px;
+        accent-color: var(--primary);
+        cursor: pointer;
+    }
+
+    .student-avatar-badge {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #4F46E5, #06B6D4);
+        color: #FFF;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+
+    .student-item-details {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .student-item-name {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--text-main);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .student-item-roll {
+        font-size: 11px;
+        color: var(--text-muted);
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .student-selector-empty {
+        padding: 24px 16px;
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 13px;
+    }
+
+    .student-selector-empty i {
+        font-size: 24px;
+        color: var(--text-dim);
+        display: block;
+        margin-bottom: 6px;
+    }
+
+    /* Tech Suggestion Chips */
+    .tech-chips-wrapper {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+    }
+
+    .tech-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 10px;
+        font-size: 11px;
+        font-weight: 600;
+        border-radius: var(--radius-full);
+        background: var(--bg-subtle);
+        border: 1px solid var(--border-color);
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: var(--transition);
+        user-select: none;
+    }
+
+    .tech-chip:hover {
+        background: var(--primary-light);
+        color: var(--primary);
+        border-color: rgba(79, 70, 229, 0.3);
+        transform: translateY(-1px);
+    }
+
+    .tech-chip.active {
+        background: var(--primary);
+        color: #FFF;
+        border-color: var(--primary);
+    }
+
+    /* Live Synchronized Progress Slider */
+    .progress-control-wrap {
+        background: var(--bg-subtle);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 14px;
+    }
+
+    .progress-track-visual {
+        height: 8px;
+        border-radius: var(--radius-full);
+        background: rgba(148, 163, 184, 0.2);
+        overflow: hidden;
+        margin-bottom: 12px;
+    }
+
+    .progress-fill-visual {
+        height: 100%;
+        width: 0%;
+        border-radius: var(--radius-full);
+        background: var(--primary);
+        transition: width 0.2s ease, background-color 0.2s ease;
+    }
+
+    .progress-inputs-row {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+
+    .progress-range-slider {
+        flex: 1;
+        accent-color: var(--primary);
+        cursor: pointer;
+    }
+
+    .progress-number-wrap {
+        width: 90px;
+        position: relative;
+    }
+
+    /* URL Input with Icon Adornment */
+    .icon-input-group {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+    .icon-input-group .icon-adornment {
+        position: absolute;
+        left: 12px;
+        color: var(--text-dim);
+        font-size: 15px;
+        pointer-events: none;
+        z-index: 2;
+    }
+
+    .icon-input-group input {
+        padding-left: 36px !important;
+    }
+
+    /* Action Footer */
+    .form-actions-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border-color);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="project-form-shell">
+
+    <!-- Top Header & Breadcrumb -->
+    <div class="form-header-bar">
+        <div class="form-header-title-area">
+            <a href="{% if is_edit %}{% url 'project_detail' project.id %}{% else %}{% url 'project_hub' %}{% endif %}"
+                class="btn btn-secondary btn-sm" title="Go Back">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <div class="form-header-icon">
+                <i class="bi {% if is_edit %}bi-pencil-square{% else %}bi-kanban-fill{% endif %}"></i>
+            </div>
+            <div>
+                <h1 class="form-header-title">
+                    {{ title }}
+                    <span class="badge"
+                        style="background: var(--primary-light); color: var(--primary); font-size: 11px; font-weight: 700; border-radius: var(--radius-full); padding: 4px 10px;">
+                        {% if is_edit %}Edit Mode{% else %}New Capstone / Project{% endif %}
+                    </span>
+                </h1>
+                <div class="form-header-subtitle">
+                    Configure project scope, assign team members from the selected batch, and manage deliverables.
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <a href="{% url 'project_hub' %}" class="btn btn-secondary btn-sm">
+                <i class="bi bi-grid me-1"></i> Projects Hub
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Project Form -->
+    <form method="POST" action="" id="projectForm" novalidate>
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger mb-4">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <div>{{ form.non_field_errors }}</div>
+        </div>
+        {% endif %}
+
+        <!-- CARD 1: Identity & Team Assignment -->
+        <div class="form-card">
+            <div class="form-card-header">
+                <h2 class="form-card-title">
+                    <i class="bi bi-info-circle-fill"></i> 1. Project Identity & Team Assignment
+                </h2>
+                <span style="font-size: 12px; color: var(--text-muted);">Required Fields Marked *</span>
+            </div>
+
+            <div class="form-card-body">
+                <!-- Project Title -->
+                <div class="form-field-group">
+                    <label class="form-label" for="id_title">
+                        <span>Project Title <span class="form-label-required">*</span></span>
+                    </label>
+                    {{ form.title }}
+                    {% if form.title.errors %}
+                    <div class="form-error-text"><i class="bi bi-x-circle-fill"></i> {{ form.title.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Batch & Project Type Row -->
+                <div class="form-row" style="margin-bottom: 18px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="id_project_batch">
+                            <span>Batch Assignment <span class="form-label-required">*</span></span>
+                        </label>
+                        {% if is_edit %}
+                            {{ form.batch }}
+                        {% else %}
+                            <div class="custom-batch-select" style="position: relative;">
+                                <div class="form-select" id="batchSelectTrigger" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: #fff;">
+                                    <span id="batchSelectLabel">-- Choose Batch(es) --</span>
+                                    <i class="bi bi-chevron-down"></i>
+                                </div>
+                                <div id="batchDropdownMenu" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-md); z-index: 100; max-height: 250px; overflow-y: auto; padding: 10px;">
+                                    <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid var(--border-color); cursor:pointer; font-size:13px; font-weight:700; color:var(--text-main);">
+                                        <input type="checkbox" id="selectAllBatches" style="cursor:pointer;">
+                                        Select All Batches
+                                    </label>
+                                    <div id="batchCheckboxesContainer">
+                                        {% for b in form.fields.batch.queryset %}
+                                            <label style="display:flex; align-items:center; gap:8px; margin-bottom:6px; cursor:pointer; font-size:13px; color:var(--text-main);">
+                                                <input type="checkbox" name="batch_ids" value="{{ b.id }}" data-name="{{ b.name }}" class="project-batch-checkbox" style="cursor:pointer;">
+                                                {{ b.name }} ({{ b.location.name }})
+                                            </label>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+                        <div class="form-help-text">Select batch(es) to load and assign enrolled students.</div>
+                        {% if form.batch.errors %}
+                        <div class="form-error-text"><i class="bi bi-x-circle-fill"></i> {{ form.batch.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="id_project_type">
+                            <span>Project Type <span class="form-label-required">*</span></span>
+                        </label>
+                        {{ form.project_type }}
+                        <div class="form-help-text">Individual project, team assignment, or capstone.</div>
+                        {% if form.project_type.errors %}
+                        <div class="form-error-text"><i class="bi bi-x-circle-fill"></i> {{ form.project_type.errors.0
+                            }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 18px; padding: 12px; background: rgba(79, 70, 229, 0.05); border: 1px solid rgba(79, 70, 229, 0.2); border-radius: var(--radius-md);">
+                    <label style="display: flex; align-items: center; gap: 10px; font-weight: 700; cursor: pointer; margin: 0; color: var(--text-main);">
+                        {{ form.assign_to_whole_batch }}
+                        <span>Assign to Entire Batch</span>
+                    </label>
+                    <div style="font-size: 13px; color: var(--text-muted); margin-top: 6px; margin-left: 28px;">
+                        If checked, this project will automatically be assigned to all active students in the selected batch. Manual student selection below will be disabled.
+                    </div>
+                </div>
+
+                <!-- Interactive Team Member Assignment -->
+                <div class="form-field-group" id="studentSelectionGroup">
+                    <div class="form-label">
+                        <span style="display: flex; align-items: center; gap: 8px;">
+                            <span>Assigned Student(s) <span class="form-label-required">*</span></span>
+                            <span id="selectedCountBadge" class="badge"
+                                style="background: var(--primary-light); color: var(--primary); font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: var(--radius-full);">
+                                0 Selected
+                            </span>
+                        </span>
+                        <div class="student-selector-actions">
+                            <button type="button" class="student-action-btn" id="selectAllStudentsBtn">
+                                <i class="bi bi-check-all"></i> Select All
+                            </button>
+                            <span style="color: var(--border-color);">|</span>
+                            <button type="button" class="student-action-btn" id="clearAllStudentsBtn"
+                                style="color: var(--text-muted);">
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Hidden native Django multi-select to preserve seamless form POST and backend validation -->
+                    <div style="display: none;">
+                        {{ form.students }}
+                    </div>
+
+                    <!-- Modern Interactive Student Selector UI -->
+                    <div class="student-selector-box">
+                        <div class="student-selector-toolbar">
+                            <div class="student-search-wrap">
+                                <i class="bi bi-search"></i>
+                                <input type="text" id="studentSearchInput" class="student-search-input"
+                                    placeholder="Filter students by name or roll number...">
+                            </div>
+                            <div id="batchStudentCountNote"
+                                style="font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+                                <i class="bi bi-people-fill text-primary"></i> Please select a batch
+                            </div>
+                        </div>
+
+                        <div class="student-list-container" id="customStudentList">
+                            <div class="student-selector-empty" id="studentSelectorEmpty">
+                                <i class="bi bi-person-x"></i>
+                                <span>Please select a batch to view and assign active students.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if form.students.errors %}
+                    <div class="form-error-text"><i class="bi bi-x-circle-fill"></i> {{ form.students.errors.0 }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 2: Technical Scope & Description -->
+        <div class="form-card">
+            <div class="form-card-header">
+                <h2 class="form-card-title">
+                    <i class="bi bi-cpu-fill"></i> 2. Technical Scope & Architecture
+                </h2>
+                <span style="font-size: 12px; color: var(--text-muted);">Tech Stack & Functional Details</span>
+            </div>
+
+            <div class="form-card-body">
+                <!-- Technologies -->
+                <div class="form-field-group">
+                    <label class="form-label" for="id_technologies">
+                        <span>Technologies Used <span class="form-label-required">*</span></span>
+                        <span style="font-size: 11px; font-weight: 500; color: var(--text-muted);">Click chips below to
+                            add</span>
+                    </label>
+                    {{ form.technologies }}
+
+                    <!-- Quick-add tech suggestion chips -->
+                    <div class="tech-chips-wrapper" id="techChipsContainer">
+                        <span class="tech-chip" data-tech="Python"><i class="bi bi-plus"></i> Python</span>
+                        <span class="tech-chip" data-tech="Django"><i class="bi bi-plus"></i> Django</span>
+                        <span class="tech-chip" data-tech="FastAPI"><i class="bi bi-plus"></i> FastAPI</span>
+                        <span class="tech-chip" data-tech="React"><i class="bi bi-plus"></i> React</span>
+                        <span class="tech-chip" data-tech="TypeScript"><i class="bi bi-plus"></i> TypeScript</span>
+                        <span class="tech-chip" data-tech="PostgreSQL"><i class="bi bi-plus"></i> PostgreSQL</span>
+                        <span class="tech-chip" data-tech="MongoDB"><i class="bi bi-plus"></i> MongoDB</span>
+                        <span class="tech-chip" data-tech="Docker"><i class="bi bi-plus"></i> Docker</span>
+                        <span class="tech-chip" data-tech="TailwindCSS"><i class="bi bi-plus"></i> TailwindCSS</span>
+                        <span class="tech-chip" data-tech="REST API"><i class="bi bi-plus"></i> REST API</span>
+                        <span class="tech-chip" data-tech="Redis"><i class="bi bi-plus"></i> Redis</span>
+                        <span class="tech-chip" data-tech="AWS"><i class="bi bi-plus"></i> AWS</span>
+                    </div>
+
+                    {% if form.technologies.errors %}
+                    <div class="form-error-text"><i class="bi bi-x-circle-fill"></i> {{ form.technologies.errors.0 }}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Description / Architecture -->
+                <div class="form-field-group">
+                    <label class="form-label" for="id_description">
+                        <span>Project Architecture & Overview</span>
+                    </label>
+                    {{ form.description }}
+                    <div class="form-help-text">Outline key objectives, database model architecture, and expected
+                        deliverables.</div>
+                    {% if form.description.errors %}
+                    <div class="form-error-text"><i class="bi bi-x-circle-fill"></i> {{ form.description.errors.0 }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 3: Timeline, Status & Deliverables -->
+        <div class="form-card">
+            <div class="form-card-header">
+                <h2 class="form-card-title">
+                    <i class="bi bi-speedometer2"></i> 3. Status, Schedule & Deliverables
+                </h2>
+                <span style="font-size: 12px; color: var(--text-muted);">Live Progress & Repository Links</span>
+            </div>
+
+            <div class="form-card-body">
+                <!-- Status & Progress Row -->
+                <div class="form-row" style="margin-bottom: 20px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="id_status">
+                            <span>Project Status <span class="form-label-required">*</span></span>
+                        </label>
+                        {{ form.status }}
+                        {% if form.status.errors %}
+                        <div class="form-error-text"><i class="bi bi-x-circle-fill"></i> {{ form.status.errors.0 }}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="id_progress_percentage">
+                            <span>Progress Milestone</span>
+                            <span id="progressPercentLabel"
+                                style="font-family: 'JetBrains Mono', monospace; font-weight: 800; color: var(--primary);">
+                                0%
+                            </span>
+                        </label>
+
+                        <!-- Synchronized visual slider and input wrapper -->
+                        <div class="progress-control-wrap">
+                            <div class="progress-track-visual">
+                                <div class="progress-fill-visual" id="progressFillVisual"></div>
+                            </div>
+                            <div class="progress-inputs-row">
+                                <input type="range" class="progress-range-slider" id="progressRangeSlider" min="0"
+                                    max="100" step="5" value="0">
+                                <div class="progress-number-wrap">
+                                    {{ form.progress_percentage }}
+                                </div>
+                            </div>
+                        </div>
+
+                        {% if form.progress_percentage.errors %}
+                        <div class="form-error-text"><i class="bi bi-x-circle-fill"></i> {{
+                            form.progress_percentage.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Start Date & Target Date Row -->
+                <div class="form-row" style="margin-bottom: 20px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="id_start_date">
+                            <span><i class="bi bi-calendar-event me-1 text-primary"></i> Start Date</span>
+                        </label>
+                        {{ form.start_date }}
+                        {% if form.start_date.errors %}
+                        <div class="form-error-text"><i class="bi bi-x-circle-fill"></i> {{ form.start_date.errors.0 }}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="id_target_completion_date">
+                            <span><i class="bi bi-calendar-check me-1 text-primary"></i> Target Completion Date</span>
+                        </label>
+                        {{ form.target_completion_date }}
+                        {% if form.target_completion_date.errors %}
+                        <div class="form-error-text"><i class="bi bi-x-circle-fill"></i> {{
+                            form.target_completion_date.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Deliverables URL Section -->
+                <div style="padding-top: 14px; border-top: 1px solid var(--border-color);">
+                    <div
+                        style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;">
+                        Deliverable & Repository Links (Optional)
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="form-field-group">
+                            <label class="form-label" for="id_github_repo_url">
+                                <span><i class="bi bi-github me-1 text-primary"></i> GitHub / GitLab Repository</span>
+                            </label>
+                            <div class="icon-input-group">
+                                <i class="bi bi-github icon-adornment"></i>
+                                {{ form.github_repo_url }}
+                            </div>
+                            {% if form.github_repo_url.errors %}
+                            <div class="form-error-text"><i class="bi bi-x-circle-fill"></i> {{
+                                form.github_repo_url.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="form-field-group">
+                            <label class="form-label" for="id_live_demo_url">
+                                <span><i class="bi bi-globe me-1 text-primary"></i> Live Deployed URL</span>
+                            </label>
+                            <div class="icon-input-group">
+                                <i class="bi bi-globe icon-adornment"></i>
+                                {{ form.live_demo_url }}
+                            </div>
+                            {% if form.live_demo_url.errors %}
+                            <div class="form-error-text"><i class="bi bi-x-circle-fill"></i> {{
+                                form.live_demo_url.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="form-field-group">
+                            <label class="form-label" for="id_documentation_url">
+                                <span><i class="bi bi-file-earmark-text me-1 text-primary"></i> Documentation / Slides /
+                                    Figma</span>
+                            </label>
+                            <div class="icon-input-group">
+                                <i class="bi bi-file-earmark-text icon-adornment"></i>
+                                {{ form.documentation_url }}
+                            </div>
+                            {% if form.documentation_url.errors %}
+                            <div class="form-error-text"><i class="bi bi-x-circle-fill"></i> {{
+                                form.documentation_url.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Footer -->
+        <div class="form-actions-footer">
+            <a href="{% if is_edit %}{% url 'project_detail' project.id %}{% else %}{% url 'project_hub' %}{% endif %}"
+                class="btn btn-secondary">
+                <i class="bi bi-x me-1"></i> Cancel
+            </a>
+            <button type="submit" class="btn btn-primary btn-lg" id="submitProjectBtn">
+                <i class="bi bi-check2-circle"></i> {% if is_edit %}Save Changes{% else %}Create Project{% endif %}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // --------------------------------------------------------------------------
+        // 1. Element References
+        // --------------------------------------------------------------------------
+        const batchSelect = document.getElementById('id_project_batch');
+        const nativeStudentsSelect = document.getElementById('id_project_students');
+        const customStudentList = document.getElementById('customStudentList');
+        const searchInput = document.getElementById('studentSearchInput');
+        const selectedCountBadge = document.getElementById('selectedCountBadge');
+        const batchStudentCountNote = document.getElementById('batchStudentCountNote');
+        const selectAllBtn = document.getElementById('selectAllStudentsBtn');
+        const clearAllBtn = document.getElementById('clearAllStudentsBtn');
+
+        // Progress Elements
+        const progressNumberInput = document.getElementById('id_progress_percentage');
+        const progressRangeSlider = document.getElementById('progressRangeSlider');
+        const progressFillVisual = document.getElementById('progressFillVisual');
+        const progressPercentLabel = document.getElementById('progressPercentLabel');
+
+        // Tech Chips
+        const techInput = document.getElementById('id_technologies');
+        const techChips = document.querySelectorAll('.tech-chip');
+
+        // Batch to Student data passed by Django
+        let batchStudentsMap = {};
+        try {
+            const rawJson = '{{ batch_students_json|escapejs }}';
+            batchStudentsMap = rawJson ? JSON.parse(rawJson) : {};
+        } catch (e) {
+            console.error("Could not parse batch_students_json", e);
+        }
+
+    // Keep track of selected student IDs
+    let selectedStudentIds = new Set();
+    if (nativeStudentsSelect) {
+        Array.from(nativeStudentsSelect.options).forEach(opt => {
+            if (opt.selected && opt.value) {
+                selectedStudentIds.add(opt.value.toString());
+            }
+        });
+    }
+
+    // Current students array for active batch
+    let currentBatchStudents = [];
+
+    // Helper: Generate Avatar initials
+    function getInitials(name) {
+        if (!name) return 'ST';
+        const parts = name.trim().split(/\s+/);
+        if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+
+    // Helper: Dynamic avatar gradients based on ID
+    function getAvatarGradient(id) {
+        const palettes = [
+            'linear-gradient(135deg, #4F46E5, #06B6D4)',
+            'linear-gradient(135deg, #10B981, #059669)',
+            'linear-gradient(135deg, #8B5CF6, #6366F1)',
+            'linear-gradient(135deg, #F59E0B, #D97706)',
+            'linear-gradient(135deg, #EC4899, #8B5CF6)',
+            'linear-gradient(135deg, #3B82F6, #1D4ED8)'
+        ];
+        const index = Math.abs(parseInt(id, 10) || 0) % palettes.length;
+        return palettes[index];
+    }
+
+    // --------------------------------------------------------------------------
+    // 2. Student Selection Management
+    // --------------------------------------------------------------------------
+    function syncNativeSelect() {
+        if (!nativeStudentsSelect) return;
+
+        // Update selection state of options in native select
+        Array.from(nativeStudentsSelect.options).forEach(opt => {
+            opt.selected = selectedStudentIds.has(opt.value.toString());
+        });
+
+        // Update selected badge
+        const count = selectedStudentIds.size;
+        selectedCountBadge.textContent = `${count} Selected`;
+        if (count > 0) {
+            selectedCountBadge.style.background = 'var(--primary)';
+            selectedCountBadge.style.color = '#FFFFFF';
+        } else {
+            selectedCountBadge.style.background = 'var(--primary-light)';
+            selectedCountBadge.style.color = 'var(--primary)';
+        }
+    }
+
+    function renderStudents(studentsList, query = '') {
+        currentBatchStudents = studentsList || [];
+        customStudentList.innerHTML = '';
+
+        if (!studentsList || studentsList.length === 0) {
+            customStudentList.innerHTML = `
+                <div class="student-selector-empty">
+                    <i class="bi bi-people"></i>
+                    <span>No active students found in this batch.</span>
+                </div>
+            `;
+            if (batchStudentCountNote) {
+                batchStudentCountNote.innerHTML = `<span style="color: var(--warning);"><i class="bi bi-exclamation-circle me-1"></i> No active students</span>`;
+            }
+            syncNativeSelect();
+            return;
+        }
+
+        // Also sync native select options to match this batch's students
+        nativeStudentsSelect.innerHTML = '';
+        studentsList.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.textContent = s.label || `${s.name} (${s.roll_number})`;
+            if (selectedStudentIds.has(s.id.toString())) {
+                opt.selected = true;
+            }
+            nativeStudentsSelect.appendChild(opt);
+        });
+
+        const filterLower = (query || '').trim().toLowerCase();
+        let renderedCount = 0;
+
+        studentsList.forEach(student => {
+            const idStr = student.id.toString();
+            const name = student.name || 'Unknown Student';
+            const roll = student.roll_number || 'N/A';
+
+            if (filterLower) {
+                const matchName = name.toLowerCase().includes(filterLower);
+                const matchRoll = roll.toLowerCase().includes(filterLower);
+                if (!matchName && !matchRoll) return;
+            }
+
+            renderedCount++;
+            const isSelected = selectedStudentIds.has(idStr);
+
+            const itemCard = document.createElement('div');
+            itemCard.className = `student-item-card ${isSelected ? 'selected' : ''}`;
+            itemCard.dataset.studentId = idStr;
+
+            itemCard.innerHTML = `
+                <input type="checkbox" class="student-item-checkbox" ${isSelected ? 'checked' : ''}>
+                <div class="student-avatar-badge" style="background: ${getAvatarGradient(student.id)}">
+                    ${getInitials(name)}
+                </div>
+                <div class="student-item-details">
+                    <div class="student-item-name">${name}</div>
+                    <div class="student-item-roll">ID: ${roll}</div>
+                </div>
+            `;
+
+            // Click Handler
+            itemCard.addEventListener('click', function (e) {
+                const checkbox = itemCard.querySelector('.student-item-checkbox');
+                if (e.target !== checkbox) {
+                    checkbox.checked = !checkbox.checked;
+                }
+                toggleStudent(idStr, checkbox.checked, itemCard);
+            });
+
+            customStudentList.appendChild(itemCard);
+        });
+
+        if (renderedCount === 0 && filterLower) {
+            customStudentList.innerHTML = `
+                <div class="student-selector-empty">
+                    <i class="bi bi-search"></i>
+                    <span>No students match "<strong>${filterLower}</strong>"</span>
+                </div>
+            `;
+        }
+
+        if (batchStudentCountNote) {
+            batchStudentCountNote.innerHTML = `<i class="bi bi-people-fill text-primary"></i> <strong>${studentsList.length}</strong> batch student(s)`;
+        }
+
+        syncNativeSelect();
+    }
+
+    function toggleStudent(studentId, isChecked, cardElement) {
+        if (isChecked) {
+            selectedStudentIds.add(studentId.toString());
+            if (cardElement) cardElement.classList.add('selected');
+        } else {
+            selectedStudentIds.delete(studentId.toString());
+            if (cardElement) cardElement.classList.remove('selected');
+        }
+        syncNativeSelect();
+    }
+
+    function updateBatch(batchIdsArray, preservePreselection = true) {
+        if (!preservePreselection) {
+            selectedStudentIds.clear();
+        }
+
+        if (!batchIdsArray || batchIdsArray.length === 0) {
+            customStudentList.innerHTML = `
+                <div class="student-selector-empty">
+                    <i class="bi bi-arrow-up-circle"></i>
+                    <span>Please select a batch to view enrolled students.</span>
+                </div>
+            `;
+            if (batchStudentCountNote) {
+                batchStudentCountNote.innerHTML = `<i class="bi bi-info-circle text-muted"></i> No batch selected`;
+            }
+            if (nativeStudentsSelect) nativeStudentsSelect.innerHTML = '';
+            syncNativeSelect();
+            return;
+        }
+
+        let combinedStudents = [];
+        let promises = [];
+
+        batchIdsArray.forEach(batchId => {
+            const localList = batchStudentsMap[batchId.toString()];
+            if (localList !== undefined) {
+                combinedStudents = combinedStudents.concat(localList);
+            } else {
+                promises.push(
+                    fetch(`/api/batches/${batchId}/students/`)
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.success) {
+                                batchStudentsMap[batchId.toString()] = data.students;
+                                combinedStudents = combinedStudents.concat(data.students);
+                            }
+                        })
+                        .catch(err => console.error("Error loading students:", err))
+                );
+            }
+        });
+
+        if (promises.length > 0) {
+            if (batchStudentCountNote) {
+                batchStudentCountNote.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Loading batch students...`;
+            }
+            Promise.all(promises).then(() => {
+                renderStudents(combinedStudents, searchInput.value);
+            });
+        } else {
+            renderStudents(combinedStudents, searchInput.value);
+        }
+    }
+
+    // Handle Custom Dropdown UI for multi-select batch
+    const batchSelectTrigger = document.getElementById('batchSelectTrigger');
+    const batchDropdownMenu = document.getElementById('batchDropdownMenu');
+    const selectAllBatches = document.getElementById('selectAllBatches');
+    const batchCheckboxes = document.querySelectorAll('.project-batch-checkbox');
+    const batchSelectLabel = document.getElementById('batchSelectLabel');
+
+    function getSelectedBatchIds() {
+        if (!batchSelectTrigger) {
+            // Edit mode uses the native select
+            return batchSelect && batchSelect.value ? [batchSelect.value] : [];
+        }
+        return Array.from(batchCheckboxes).filter(cb => cb.checked).map(cb => cb.value);
+    }
+
+    if (batchSelectTrigger) {
+        batchSelectTrigger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            batchDropdownMenu.style.display = batchDropdownMenu.style.display === 'none' ? 'block' : 'none';
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!batchSelectTrigger.contains(e.target) && !batchDropdownMenu.contains(e.target)) {
+                batchDropdownMenu.style.display = 'none';
+            }
+        });
+
+        function updateBatchLabel() {
+            const checkedBoxes = Array.from(batchCheckboxes).filter(cb => cb.checked);
+            if (checkedBoxes.length === 0) {
+                batchSelectLabel.textContent = '-- Choose Batch(es) --';
+                batchSelectLabel.style.color = '';
+            } else if (checkedBoxes.length === 1) {
+                batchSelectLabel.textContent = checkedBoxes[0].getAttribute('data-name');
+                batchSelectLabel.style.color = '#000';
+            } else {
+                batchSelectLabel.textContent = `${checkedBoxes.length} Batch(es) Selected`;
+                batchSelectLabel.style.color = '#000';
+            }
+            
+            // Check/uncheck 'Select All' based on state
+            selectAllBatches.checked = checkedBoxes.length === batchCheckboxes.length && batchCheckboxes.length > 0;
+            
+            updateBatch(getSelectedBatchIds(), false);
+        }
+
+        selectAllBatches.addEventListener('change', function() {
+            const isChecked = this.checked;
+            batchCheckboxes.forEach(cb => {
+                cb.checked = isChecked;
+            });
+            updateBatchLabel();
+        });
+
+        batchCheckboxes.forEach(cb => {
+            cb.addEventListener('change', updateBatchLabel);
+        });
+    } else if (batchSelect) {
+        // Edit mode native select
+        batchSelect.addEventListener('change', function () {
+            updateBatch([this.value], false);
+        });
+        if (batchSelect.value) {
+            updateBatch([batchSelect.value], true);
+        }
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function () {
+            renderStudents(currentBatchStudents, this.value);
+        });
+    }
+
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', function () {
+            currentBatchStudents.forEach(s => selectedStudentIds.add(s.id.toString()));
+            renderStudents(currentBatchStudents, searchInput ? searchInput.value : '');
+        });
+    }
+
+    if (clearAllBtn) {
+        clearAllBtn.addEventListener('click', function () {
+            selectedStudentIds.clear();
+            renderStudents(currentBatchStudents, searchInput ? searchInput.value : '');
+        });
+    }
+
+    // Assign to whole batch toggle
+    const assignWholeBatchCheckbox = document.getElementById('id_assign_to_whole_batch');
+    const studentSelectionGroup = document.getElementById('studentSelectionGroup');
+    if (assignWholeBatchCheckbox && studentSelectionGroup) {
+        function toggleStudentSelectionUI() {
+            if (assignWholeBatchCheckbox.checked) {
+                studentSelectionGroup.style.opacity = '0.5';
+                studentSelectionGroup.style.pointerEvents = 'none';
+            } else {
+                studentSelectionGroup.style.opacity = '1';
+                studentSelectionGroup.style.pointerEvents = 'auto';
+            }
+        }
+        assignWholeBatchCheckbox.addEventListener('change', toggleStudentSelectionUI);
+        toggleStudentSelectionUI();
+    }
+
+    // --------------------------------------------------------------------------
+    // 3. Tech Stack Suggestion Chips
+    // --------------------------------------------------------------------------
+    function updateTechChipStates() {
+        if (!techInput) return;
+        const currentVals = (techInput.value || '')
+            .split(',')
+            .map(t => t.trim().toLowerCase())
+            .filter(Boolean);
+
+        techChips.forEach(chip => {
+            const techName = chip.dataset.tech.toLowerCase();
+            if (currentVals.includes(techName)) {
+                chip.classList.add('active');
+                chip.innerHTML = `<i class="bi bi-check2"></i> ${chip.dataset.tech}`;
+            } else {
+                chip.classList.remove('active');
+                chip.innerHTML = `<i class="bi bi-plus"></i> ${chip.dataset.tech}`;
+            }
+        });
+    }
+
+    if (techInput) {
+        techInput.addEventListener('input', updateTechChipStates);
+        updateTechChipStates();
+    }
+
+    techChips.forEach(chip => {
+        chip.addEventListener('click', function () {
+            if (!techInput) return;
+            const techName = this.dataset.tech;
+            let currentList = (techInput.value || '')
+                .split(',')
+                .map(t => t.trim())
+                .filter(Boolean);
+
+            const index = currentList.findIndex(t => t.toLowerCase() === techName.toLowerCase());
+            if (index >= 0) {
+                // Remove
+                currentList.splice(index, 1);
+            } else {
+                // Add
+                currentList.push(techName);
+            }
+
+            techInput.value = currentList.join(', ');
+            updateTechChipStates();
+        });
+    });
+
+    // --------------------------------------------------------------------------
+    // 4. Synchronized Progress Slider & Color Bar
+    // --------------------------------------------------------------------------
+    function updateProgressUI(val) {
+        let pct = parseInt(val, 10);
+        if (isNaN(pct)) pct = 0;
+        pct = Math.max(0, Math.min(100, pct));
+
+        if (progressNumberInput && progressNumberInput.value != pct) {
+            progressNumberInput.value = pct;
+        }
+        if (progressRangeSlider && progressRangeSlider.value != pct) {
+            progressRangeSlider.value = pct;
+        }
+        if (progressPercentLabel) {
+            progressPercentLabel.textContent = `${pct}%`;
+        }
+        if (progressFillVisual) {
+            progressFillVisual.style.width = `${pct}%`;
+
+            // Color transition according to stage
+            if (pct < 35) {
+                progressFillVisual.style.background = 'var(--warning)';
+                progressPercentLabel.style.color = '#D97706';
+            } else if (pct < 80) {
+                progressFillVisual.style.background = 'var(--primary)';
+                progressPercentLabel.style.color = 'var(--primary)';
+            } else {
+                progressFillVisual.style.background = 'var(--success)';
+                progressPercentLabel.style.color = '#059669';
+            }
+        }
+    }
+
+    if (progressNumberInput) {
+        progressNumberInput.addEventListener('input', function () {
+            updateProgressUI(this.value);
+        });
+        // Initial setup
+        updateProgressUI(progressNumberInput.value || 0);
+    }
+
+    if (progressRangeSlider) {
+        progressRangeSlider.addEventListener('input', function () {
+            updateProgressUI(this.value);
+        });
+    }
+});
+</script>
+{% endblock %}

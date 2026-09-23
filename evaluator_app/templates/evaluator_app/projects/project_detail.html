@@ -1,0 +1,541 @@
+{% extends 'evaluator_app/base.html' %}
+{% load static %}
+
+{% block title %}{{ project.title }} | Student Project Details{% endblock %}
+{% block page_title %}Project Overview: {{ project.title }}{% endblock %}
+
+{% block content %}
+<div class="project-detail-container">
+    <!-- Breadcrumb -->
+    <nav class="custom-breadcrumb mb-3">
+        <a href="{% url 'project_hub' %}"><i class="bi bi-kanban-fill me-1"></i> Projects</a>
+        <span class="separator">/</span>
+        <span class="active">{{ project.title|truncatechars:40 }}</span>
+    </nav>
+
+    <!-- Hero Header Card -->
+    <div class="card project-hero-card mb-4">
+        <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                        <span class="project-type-pill type-{{ project.project_type|lower }}">
+                            {{ project.get_project_type_display }}
+                        </span>
+                        <span class="status-pill status-{{ project.status|lower }}">
+                            <i class="bi {% if project.status == 'COMPLETED' %}bi-check-circle-fill{% elif project.status == 'IN_PROGRESS' %}bi-arrow-repeat{% elif project.status == 'UNDER_REVIEW' %}bi-hourglass-split{% else %}bi-circle{% endif %}"></i>
+                            {{ project.get_status_display }}
+                        </span>
+                        {% if project.is_overdue %}
+                        <span class="badge bg-danger text-white">
+                            <i class="bi bi-exclamation-triangle-fill me-1"></i> Overdue (Target: {{ project.target_completion_date|date:"M d, Y" }})
+                        </span>
+                        {% endif %}
+                    </div>
+                    <h2 class="project-hero-title mb-2">{{ project.title }}</h2>
+                    <div class="project-hero-meta d-flex align-items-center gap-3 flex-wrap text-muted">
+                        <span><i class="bi bi-collection me-1"></i> <strong>Batch:</strong> {{ project.batch.name }}</span>
+                        <span><i class="bi bi-geo-alt-fill me-1"></i> <strong>Location:</strong> {{ project.batch.location.name }}</span>
+                        <span><i class="bi bi-calendar-event me-1"></i> <strong>Started:</strong> {{ project.start_date|date:"M d, Y" }}</span>
+                        {% if project.target_completion_date %}
+                        <span><i class="bi bi-flag-fill me-1"></i> <strong>Deadline:</strong> {{ project.target_completion_date|date:"M d, Y" }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Action Controls -->
+                <div class="d-flex gap-2 flex-wrap">
+                    <button type="button" class="btn btn-primary" onclick="openProgressModal()">
+                        <i class="bi bi-sliders me-1"></i> Update Progress
+                    </button>
+                    <button type="button" class="btn btn-success text-white" onclick="openEvaluationModal()">
+                        <i class="bi bi-award-fill me-1"></i> {% if project.is_evaluated %}Edit Evaluation{% else %}Evaluate Project{% endif %}
+                    </button>
+                    <a href="{% url 'project_edit' project.id %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-pencil-square me-1"></i> Edit
+                    </a>
+                    {% if is_admin_user %}
+                    <a href="{% url 'project_delete' project.id %}" class="btn btn-outline-danger">
+                        <i class="bi bi-trash"></i>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Progress Tracker Bar -->
+            <div class="project-hero-progress mt-4 pt-3 border-top">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-bold fs-6">
+                        <i class="bi bi-speedometer2 text-primary me-1"></i> Development Progress
+                    </span>
+                    <div class="d-flex align-items-center gap-3">
+                        {% if days_remaining is not None %}
+                            {% if days_remaining >= 0 %}
+                            <span class="text-muted small"><i class="bi bi-clock-history me-1"></i> {{ days_remaining }} days remaining</span>
+                            {% else %}
+                            <span class="text-danger small fw-bold"><i class="bi bi-exclamation-circle me-1"></i> {{ days_remaining|stringformat:"d"|slice:"1:" }} days late</span>
+                            {% endif %}
+                        {% endif %}
+                        <span class="fs-4 font-mono fw-bold {% if project.progress_percentage == 100 %}text-emerald{% elif project.progress_percentage > 50 %}text-primary{% else %}text-amber{% endif %}">
+                            {{ project.progress_percentage }}%
+                        </span>
+                    </div>
+                </div>
+                <div class="progress-bar-track progress-bar-lg">
+                    <div class="progress-bar-fill {% if project.progress_percentage == 100 %}bg-emerald{% elif project.status == 'UNDER_REVIEW' %}bg-purple{% elif project.progress_percentage < 30 %}bg-amber{% else %}bg-primary{% endif %}"
+                         style="width: {{ project.progress_percentage }}%;"></div>
+                </div>
+            </div>
+
+            <!-- Deliverables Strip -->
+            <div class="project-hero-links mt-3 d-flex gap-2 flex-wrap">
+                {% if project.github_repo_url %}
+                <a href="{{ project.github_repo_url }}" target="_blank" class="btn btn-sm btn-dark deliverable-link-pill">
+                    <i class="bi bi-github me-1"></i> GitHub Repository
+                    <i class="bi bi-box-arrow-up-right ms-1 small"></i>
+                </a>
+                {% endif %}
+                {% if project.live_demo_url %}
+                <a href="{{ project.live_demo_url }}" target="_blank" class="btn btn-sm btn-info text-white deliverable-link-pill">
+                    <i class="bi bi-globe me-1"></i> Live Deployment Demo
+                    <i class="bi bi-box-arrow-up-right ms-1 small"></i>
+                </a>
+                {% endif %}
+                {% if project.documentation_url %}
+                <a href="{{ project.documentation_url }}" target="_blank" class="btn btn-sm btn-outline-primary deliverable-link-pill">
+                    <i class="bi bi-file-earmark-text me-1"></i> Documentation / Slides
+                    <i class="bi bi-box-arrow-up-right ms-1 small"></i>
+                </a>
+                {% endif %}
+                {% if not project.github_repo_url and not project.live_demo_url and not project.documentation_url %}
+                <span class="text-muted small"><i class="bi bi-info-circle me-1"></i> No links provided yet. Use "Update Progress" to add repository or live demo links.</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Layout (2 Columns) -->
+    <div class="row g-4">
+        <!-- Left Column: Team, Tech Stack, Description, Updates -->
+        <div class="col-lg-7">
+            <!-- Team Members Card -->
+            <div class="card mb-4">
+                <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center py-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="bi bi-people-fill text-primary me-2"></i>Assigned Students ({{ project.students.count }})
+                    </h5>
+                    <span class="badge bg-light text-dark">{{ project.batch.name }}</span>
+                </div>
+                <div class="card-body p-3">
+                    <div class="student-team-grid">
+                        {% for stu in project.students.all %}
+                        <div class="student-member-card">
+                            <div class="student-avatar-lg" style="background-color: {{ stu.avatar_color|default:'#6366F1' }};">
+                                {{ stu.initials }}
+                            </div>
+                            <div class="student-member-info">
+                                <h6 class="mb-0">
+                                    <a href="{% url 'student_detail' stu.id %}" class="fw-bold">{{ stu.name }}</a>
+                                </h6>
+                                <span class="font-mono text-muted small">{{ stu.roll_number }}</span>
+                                <div class="student-member-stats mt-1">
+                                    <span class="stat-pill" title="Attendance">
+                                        <i class="bi bi-calendar-check text-success"></i> {{ stu.attendance_percentage }}%
+                                    </span>
+                                    <span class="stat-pill" title="Average Daily Evaluation">
+                                        <i class="bi bi-award text-warning"></i> {{ stu.average_score }}%
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted mb-0">No students assigned to this project.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tech Stack & Description Card -->
+            <div class="card mb-4">
+                <div class="card-header bg-transparent border-bottom py-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="bi bi-cpu-fill text-primary me-2"></i>Technology Stack & System Details
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <!-- Technologies -->
+                    <div class="mb-4">
+                        <label class="section-micro-label d-block mb-2">Technologies, Frameworks & Libraries:</label>
+                        <div class="tech-badge-container tech-badge-large">
+                            {% for tech in project.tech_list %}
+                            <span class="tech-tag tech-tag-lg">{{ tech }}</span>
+                            {% empty %}
+                            <span class="text-muted">No technologies specified</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Description / Scope -->
+                    <div>
+                        <label class="section-micro-label d-block mb-2">Project Architecture & Abstract:</label>
+                        <div class="project-desc-box">
+                            {% if project.description %}
+                            {{ project.description|linebreaks }}
+                            {% else %}
+                            <p class="text-muted mb-0">No description provided yet. Click "Edit" to add project requirements and architecture details.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress Update Stream / Milestones -->
+            <div class="card mb-4">
+                <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center py-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="bi bi-clock-history text-primary me-2"></i>Milestones & Progress Activity Log
+                    </h5>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="openProgressModal()">
+                        <i class="bi bi-plus-lg me-1"></i> Add Log
+                    </button>
+                </div>
+                <div class="card-body p-4">
+                    {% if updates %}
+                    <div class="timeline-activity-list">
+                        {% for upd in updates %}
+                        <div class="timeline-item">
+                            <div class="timeline-dot bg-primary"></div>
+                            <div class="timeline-content">
+                                <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap">
+                                    <span class="fw-bold font-mono text-primary fs-6">{{ upd.progress_percentage }}% Progress</span>
+                                    <span class="text-muted small">{{ upd.created_at|date:"M d, Y - h:i A" }}</span>
+                                </div>
+                                <div class="text-muted small mb-1">
+                                    <i class="bi bi-person-check me-1"></i> Logged by: <strong>{{ upd.author.get_full_name|default:upd.author.username }}</strong>
+                                    {% if upd.status_at_update %}
+                                    <span class="badge bg-light text-dark ms-2">{{ upd.status_at_update }}</span>
+                                    {% endif %}
+                                </div>
+                                <p class="mb-0 text-dark">{{ upd.notes }}</p>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted mb-0 text-center py-3">
+                        <i class="bi bi-journal-text me-1"></i> No progress logs yet. Use "Update Progress" to post development updates and milestones.
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Evaluation Scorecard & Rubric -->
+        <div class="col-lg-5">
+            <!-- Project Scorecard -->
+            <div class="card mb-4 evaluation-scorecard-card">
+                <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center py-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="bi bi-award-fill text-warning me-2"></i>Project Evaluation Scorecard
+                    </h5>
+                    {% if project.is_evaluated %}
+                    <span class="badge bg-success text-white">Evaluated</span>
+                    {% else %}
+                    <span class="badge bg-secondary text-white">Pending Review</span>
+                    {% endif %}
+                </div>
+                <div class="card-body p-4">
+                    {% if project.is_evaluated %}
+                    <!-- Total Score Display Gauge -->
+                    <div class="score-summary-header text-center py-3 mb-4 rounded bg-light">
+                        <span class="text-muted text-uppercase small fw-bold d-block mb-1">Overall Project Grade</span>
+                        <div class="d-flex justify-content-center align-items-center gap-3">
+                            <span class="display-5 fw-bold text-primary font-mono">{{ project.total_score }}%</span>
+                            <span class="badge grade-badge-lg grade-{{ project.grade|lower }} fs-4 px-3 py-2">
+                                {{ project.grade }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- 5-Point Evaluation Rubric Breakdown -->
+                    <h6 class="rubric-section-title mb-3">Evaluation Rubric Breakdown:</h6>
+                    
+                    <!-- 1. Feature Completeness (30%) -->
+                    <div class="rubric-metric-row mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="rubric-name"><i class="bi bi-check-all text-primary me-1"></i> Feature Completeness & Functionality (30%)</span>
+                            <span class="rubric-score font-mono fw-bold">{{ project.functionality_score }}/100</span>
+                        </div>
+                        <div class="progress-bar-track"><div class="progress-bar-fill bg-primary" style="width: {{ project.functionality_score }}%;"></div></div>
+                    </div>
+
+                    <!-- 2. Code Quality & Modularity (25%) -->
+                    <div class="rubric-metric-row mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="rubric-name"><i class="bi bi-code-square text-indigo me-1"></i> Code Quality & Architecture (25%)</span>
+                            <span class="rubric-score font-mono fw-bold">{{ project.code_quality_score }}/100</span>
+                        </div>
+                        <div class="progress-bar-track"><div class="progress-bar-fill bg-indigo" style="width: {{ project.code_quality_score }}%;"></div></div>
+                    </div>
+
+                    <!-- 3. Presentation & Demo (20%) -->
+                    <div class="rubric-metric-row mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="rubric-name"><i class="bi bi-easel2-fill text-amber me-1"></i> Presentation & Demo Delivery (20%)</span>
+                            <span class="rubric-score font-mono fw-bold">{{ project.presentation_score }}/100</span>
+                        </div>
+                        <div class="progress-bar-track"><div class="progress-bar-fill bg-amber" style="width: {{ project.presentation_score }}%;"></div></div>
+                    </div>
+
+                    <!-- 4. UI/UX Design & Responsiveness (15%) -->
+                    <div class="rubric-metric-row mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="rubric-name"><i class="bi bi-palette-fill text-emerald me-1"></i> UI/UX Design & Aesthetics (15%)</span>
+                            <span class="rubric-score font-mono fw-bold">{{ project.ui_ux_score }}/100</span>
+                        </div>
+                        <div class="progress-bar-track"><div class="progress-bar-fill bg-emerald" style="width: {{ project.ui_ux_score }}%;"></div></div>
+                    </div>
+
+                    <!-- 5. Viva & Doubts (10%) -->
+                    <div class="rubric-metric-row mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="rubric-name"><i class="bi bi-question-diamond-fill text-purple me-1"></i> Viva, Q&A & Doubts (10%)</span>
+                            <span class="rubric-score font-mono fw-bold">{{ project.viva_score }}/100</span>
+                        </div>
+                        <div class="progress-bar-track"><div class="progress-bar-fill bg-purple" style="width: {{ project.viva_score }}%;"></div></div>
+                    </div>
+
+                    <!-- Qualitative Feedback -->
+                    {% if project.strengths %}
+                    <div class="feedback-block mb-3 p-3 rounded bg-success-subtle border border-success">
+                        <h6 class="text-success fw-bold mb-1"><i class="bi bi-hand-thumbs-up-fill me-1"></i> Key Strengths</h6>
+                        <p class="mb-0 small text-dark">{{ project.strengths }}</p>
+                    </div>
+                    {% endif %}
+
+                    {% if project.areas_to_improve %}
+                    <div class="feedback-block mb-3 p-3 rounded bg-warning-subtle border border-warning">
+                        <h6 class="text-warning-emphasis fw-bold mb-1"><i class="bi bi-tools me-1"></i> Areas for Improvement</h6>
+                        <p class="mb-0 small text-dark">{{ project.areas_to_improve }}</p>
+                    </div>
+                    {% endif %}
+
+                    {% if project.evaluator_feedback %}
+                    <div class="feedback-block p-3 rounded bg-light border">
+                        <h6 class="fw-bold mb-1"><i class="bi bi-chat-quote-fill text-primary me-1"></i> Evaluator Remarks</h6>
+                        <p class="mb-0 small text-muted">{{ project.evaluator_feedback }}</p>
+                    </div>
+                    {% endif %}
+
+                    <div class="mt-4 pt-3 border-top text-center">
+                        <button type="button" class="btn btn-outline-primary w-100" onclick="openEvaluationModal()">
+                            <i class="bi bi-pencil-fill me-1"></i> Re-Evaluate / Update Scores
+                        </button>
+                    </div>
+
+                    {% else %}
+                    <!-- Not yet evaluated state -->
+                    <div class="text-center py-4">
+                        <div class="empty-icon mb-3">
+                            <i class="bi bi-award" style="font-size: 40px; color: #CBD5E1;"></i>
+                        </div>
+                        <h5 class="fw-bold mb-2">Project Not Evaluated Yet</h5>
+                        <p class="text-muted small mb-4">
+                            Grade student presentation, code quality, UI/UX, functionality, and viva using the comprehensive rubric.
+                        </p>
+                        <button type="button" class="btn btn-success text-white" onclick="openEvaluationModal()">
+                            <i class="bi bi-award-fill me-1"></i> Evaluate Now
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Update Progress -->
+<div class="modal-backdrop" id="progressModal" style="display: none;">
+    <div class="modal-dialog modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="bi bi-sliders text-primary me-2"></i>Update Project Progress
+                </h3>
+                <button type="button" class="modal-close" onclick="closeProgressModal()">&times;</button>
+            </div>
+            <form method="POST" action="{% url 'project_update_progress' project.id %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Progress Percentage (0 - 100%)</label>
+                        <div class="d-flex align-items-center gap-3">
+                            <input type="range" class="form-range flex-grow-1" id="modalProgressRange" min="0" max="100" step="5" value="{{ project.progress_percentage }}" oninput="updateRangeVal(this.value)">
+                            <span class="font-mono fw-bold fs-5 text-primary" id="rangeValDisplay">{{ project.progress_percentage }}%</span>
+                        </div>
+                        <input type="hidden" name="progress_percentage" id="modalProgressInput" value="{{ project.progress_percentage }}">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Project Status</label>
+                        <select name="status" id="modalStatusSelect" class="form-select">
+                            <option value="PLANNING" {% if project.status == 'PLANNING' %}selected{% endif %}>Planning & Design</option>
+                            <option value="IN_PROGRESS" {% if project.status == 'IN_PROGRESS' %}selected{% endif %}>In Progress / Development</option>
+                            <option value="UNDER_REVIEW" {% if project.status == 'UNDER_REVIEW' %}selected{% endif %}>Under Evaluator Review</option>
+                            <option value="COMPLETED" {% if project.status == 'COMPLETED' %}selected{% endif %}>Completed</option>
+                            <option value="ON_HOLD" {% if project.status == 'ON_HOLD' %}selected{% endif %}>On Hold / Needs Revision</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Milestone / Progress Log Notes</label>
+                        <textarea name="milestone_notes" class="form-textarea" rows="2" placeholder="e.g. Added user auth, API serializers, verified responsive design..."></textarea>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small text-muted">GitHub Repository URL</label>
+                        <input type="url" name="github_repo_url" class="form-input form-input-sm" value="{{ project.github_repo_url|default:'' }}" placeholder="https://github.com/...">
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small text-muted">Live Demo / Deployed URL</label>
+                        <input type="url" name="live_demo_url" class="form-input form-input-sm" value="{{ project.live_demo_url|default:'' }}" placeholder="https://...">
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small text-muted">Documentation / Presentation URL</label>
+                        <input type="url" name="documentation_url" class="form-input form-input-sm" value="{{ project.documentation_url|default:'' }}" placeholder="https://...">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeProgressModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check2-circle me-1"></i> Save Updates
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Project Evaluation & Rubric -->
+<div class="modal-backdrop" id="evalModal" style="display: none;">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="bi bi-award-fill text-warning me-2"></i>Project Evaluation Rubric
+                </h3>
+                <button type="button" class="modal-close" onclick="closeEvaluationModal()">&times;</button>
+            </div>
+            <form method="POST" action="{% url 'project_evaluate' project.id %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="alert alert-info py-2 small mb-4">
+                        <i class="bi bi-info-circle-fill me-1"></i>
+                        Composite score is automatically computed with weighted rubric: Functionality (30%), Code Quality (25%), Presentation (20%), UI/UX (15%), Viva (10%).
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">1. Feature Completeness & Functionality (0-100)</label>
+                            <input type="number" name="functionality_score" class="form-input score-input" min="0" max="100" step="1" value="{{ project.functionality_score|default:80 }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">2. Code Quality & Modularity (0-100)</label>
+                            <input type="number" name="code_quality_score" class="form-input score-input" min="0" max="100" step="1" value="{{ project.code_quality_score|default:80 }}" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">3. Presentation & Demo (0-100)</label>
+                            <input type="number" name="presentation_score" class="form-input score-input" min="0" max="100" step="1" value="{{ project.presentation_score|default:75 }}" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">4. UI/UX Design & Responsive (0-100)</label>
+                            <input type="number" name="ui_ux_score" class="form-input score-input" min="0" max="100" step="1" value="{{ project.ui_ux_score|default:75 }}" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">5. Viva & Q&A (0-100)</label>
+                            <input type="number" name="viva_score" class="form-input score-input" min="0" max="100" step="1" value="{{ project.viva_score|default:75 }}" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Key Strengths</label>
+                        <textarea name="strengths" class="form-textarea" rows="2" placeholder="e.g. Clean database design, seamless user flows, strong Django knowledge...">{{ project.strengths }}</textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Areas for Improvement</label>
+                        <textarea name="areas_to_improve" class="form-textarea" rows="2" placeholder="e.g. Needs better CSS responsiveness on mobile, add form validation tests...">{{ project.areas_to_improve }}</textarea>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label fw-bold">Overall Evaluator Remarks & Feedback</label>
+                        <textarea name="evaluator_feedback" class="form-textarea" rows="3" placeholder="General mentor advice, technical rating and next steps for the student...">{{ project.evaluator_feedback }}</textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeEvaluationModal()">Cancel</button>
+                    <button type="submit" class="btn btn-success text-white">
+                        <i class="bi bi-check2-circle me-1"></i> Submit Evaluation & Grade
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function openProgressModal() {
+    const modal = document.getElementById('progressModal');
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+}
+
+function closeProgressModal() {
+    const modal = document.getElementById('progressModal');
+    modal.style.display = 'none';
+    modal.classList.remove('active');
+}
+
+function openEvaluationModal() {
+    const modal = document.getElementById('evalModal');
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+}
+
+function closeEvaluationModal() {
+    const modal = document.getElementById('evalModal');
+    modal.style.display = 'none';
+    modal.classList.remove('active');
+}
+
+function updateRangeVal(val) {
+    document.getElementById('rangeValDisplay').textContent = `${val}%`;
+    document.getElementById('modalProgressInput').value = val;
+    
+    const statusSelect = document.getElementById('modalStatusSelect');
+    if (parseInt(val) === 100 && statusSelect.value !== 'COMPLETED') {
+        statusSelect.value = 'COMPLETED';
+    } else if (parseInt(val) < 100 && statusSelect.value === 'COMPLETED') {
+        statusSelect.value = 'IN_PROGRESS';
+    }
+}
+
+// Modal dismiss events
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeProgressModal();
+        closeEvaluationModal();
+    }
+});
+document.getElementById('progressModal').addEventListener('click', function(e) {
+    if (e.target === this) closeProgressModal();
+});
+document.getElementById('evalModal').addEventListener('click', function(e) {
+    if (e.target === this) closeEvaluationModal();
+});
+</script>
+{% endblock %}

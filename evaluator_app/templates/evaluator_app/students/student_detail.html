@@ -1,0 +1,822 @@
+{% extends 'evaluator_app/base.html' %}
+
+{% block title %}{{ student.name }} - Performance Scorecard{% endblock %}
+{% block page_title %}{{ student.name }} - 360° Scorecard{% endblock %}
+
+{% block content %}
+<!-- Student Profile Header Banner -->
+<div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-xl); padding: 24px 28px; margin-bottom: 24px; box-shadow: var(--shadow-sm); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+    <div style="display: flex; align-items: center; gap: 20px;">
+        <div style="width: 68px; height: 68px; border-radius: var(--radius-full); background: {{ student.avatar_color }}; color: #FFF; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 800; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);">
+            {{ student.initials }}
+        </div>
+        <div>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+                <h2 style="font-size: 24px; font-weight: 800; color: var(--text-main);">{{ student.name }}</h2>
+                <span class="badge-status status-present">{{ student.status }}</span>
+            </div>
+            <div style="font-size: 13px; color: var(--text-muted); display: flex; gap: 16px; flex-wrap: wrap;">
+                <span><strong>Roll No:</strong> <code>{{ student.roll_number }}</code></span>
+                <span><strong>Batch:</strong> <a href="{% url 'batch_detail' student.batch.id %}">{{ student.batch.name }}</a></span>
+                <span><strong>Center:</strong> {{ student.batch.location.name }}</span>
+                <span><strong>Phone:</strong> {{ student.phone|default:"-" }}</span>
+                <span><strong>Email:</strong> {{ student.email|default:"-" }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        {% if has_evaluated_today and not request.user.profile.is_admin %}
+        <span class="btn btn-secondary" style="opacity: 0.6; cursor: not-allowed;" title="Already Evaluated Today">
+            <i class="bi bi-award-fill"></i> Evaluated Today
+        </span>
+        {% else %}
+        <a href="{% url 'student_evaluate' student.id %}?date={{ today_date|date:'Y-m-d' }}" class="btn btn-primary">
+            <i class="bi bi-award-fill"></i> {% if has_evaluated_today %}Edit Evaluation{% else %}Evaluate Today{% endif %}
+        </a>
+        {% endif %}
+        <a href="{% url 'student_edit' student.id %}" class="btn btn-secondary">
+            <i class="bi bi-pencil"></i> Edit Profile
+        </a>
+        <a href="{% url 'batch_detail' student.batch.id %}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Batch Details
+        </a>
+    </div>
+</div>
+
+<!-- Key Performance Scorecards -->
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <div class="kpi-icon-box kpi-icon-accent">
+            <i class="bi bi-trophy-fill"></i>
+        </div>
+        <div class="kpi-info">
+            <div class="kpi-title">Overall Score</div>
+            <div class="kpi-value" style="color: var(--primary);">{{ student.average_score }}%</div>
+            <div class="kpi-meta">
+                {% if student.latest_evaluation %}
+                    Grade: <span class="badge-grade grade-{{ student.latest_evaluation.grade|lower|slugify }}">{{ student.latest_evaluation.grade }}</span>
+                {% else %}
+                    No evaluations yet
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon-box kpi-icon-success">
+            <i class="bi bi-calendar-check-fill"></i>
+        </div>
+        <div class="kpi-info">
+            <div class="kpi-title">Attendance Rate</div>
+            <div class="kpi-value" style="color: var(--success);">{{ att_percentage }}%</div>
+            <div class="kpi-meta">{{ att_present }} Present, {{ att_late }} Late, {{ att_absent }} Absent</div>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon-box kpi-icon-primary">
+            <i class="bi bi-display"></i>
+        </div>
+        <div class="kpi-info">
+            <div class="kpi-title">Presentation & Problem Solving</div>
+            <div class="kpi-value">{{ eval_stats.avg_prob|floatformat:1|default:"0.0" }}%</div>
+            <div class="kpi-meta">Pres: {{ eval_stats.avg_pres|floatformat:0|default:"-" }}% • PPT: {{ eval_stats.avg_ppt|floatformat:0|default:"-" }}%</div>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon-box kpi-icon-warning">
+            <i class="bi bi-person-check-fill"></i>
+        </div>
+        <div class="kpi-info">
+            <div class="kpi-title">Engagement & Tasks</div>
+            <div class="kpi-value">{{ eval_stats.avg_punct|floatformat:1|default:"0.0" }}%</div>
+            <div class="kpi-meta">Tasks: {{ eval_stats.avg_tasks_completed|floatformat:1|default:"0" }} / {{ eval_stats.avg_tasks_given|floatformat:1|default:"0" }} completed</div>
+        </div>
+    </div>
+</div>
+
+<!-- Detailed Metrics Matrix Row -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">
+            <i class="bi bi-sliders text-primary"></i> Evaluated Competency Breakdown
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+        <!-- Category 1: General & Behavioral -->
+        <div style="background: var(--bg-subtle); padding: 18px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <div style="font-size: 13px; font-weight: 800; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+                <i class="bi bi-person-check text-primary"></i> Behavioral & Study Habits
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-muted);">Punctuality:</span>
+                    <strong>{{ eval_stats.avg_punct|floatformat:1|default:"-" }}%</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-muted);">Tutor Interaction:</span>
+                    <strong>{{ eval_stats.avg_tutor_int|floatformat:1|default:"-" }}%</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-muted);">Classmate Interaction:</span>
+                    <strong>{{ eval_stats.avg_peer_int|floatformat:1|default:"-" }}%</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-muted);">Tendency to Study:</span>
+                    <strong>{{ eval_stats.avg_study_ten|floatformat:1|default:"-" }}%</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Category 2: Project & Presentation -->
+        <div style="background: var(--bg-subtle); padding: 18px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <div style="font-size: 13px; font-weight: 800; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+                <i class="bi bi-display text-secondary"></i> Project & Technical Task
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-muted);">Presentation & Delivery:</span>
+                    <strong>{{ eval_stats.avg_pres|floatformat:1|default:"-" }}%</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-muted);">Problems & Solutions:</span>
+                    <strong>{{ eval_stats.avg_prob|floatformat:1|default:"-" }}%</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-muted);">PPT/PDF Documentation:</span>
+                    <strong>{{ eval_stats.avg_ppt|floatformat:1|default:"-" }}%</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-muted);">Daily Tasks Completed:</span>
+                    <strong>{{ eval_stats.avg_tasks_completed|floatformat:1|default:"0" }} / {{ eval_stats.avg_tasks_given|floatformat:1|default:"0" }}</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Category 3: Communication & Feedback -->
+        <div style="background: var(--bg-subtle); padding: 18px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <div style="font-size: 13px; font-weight: 800; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+                <i class="bi bi-chat-quote text-accent"></i> Communication & Adaptability
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-muted);">Communication Skills:</span>
+                    <strong>{{ eval_stats.avg_comm|floatformat:1|default:"-" }}%</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-muted);">Implementing Suggestions:</span>
+                    <strong>{{ eval_stats.avg_sugg|floatformat:1|default:"-" }}%</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-muted);">Asking & Clearing Doubts:</span>
+                    <strong>{{ eval_stats.avg_doubt|floatformat:1|default:"-" }}%</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Visual Performance Analytics Row -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 28px;">
+    <!-- Score Progression Chart -->
+    <div class="card" style="margin-bottom: 0;">
+        <div class="card-header">
+            <div class="card-title">
+                <i class="bi bi-graph-up text-primary"></i> Daily Score Progression
+            </div>
+        </div>
+        <div style="height: 260px; position: relative;">
+            <canvas id="progressionChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Multi-Skill Radar Chart -->
+    <div class="card" style="margin-bottom: 0;">
+        <div class="card-header">
+            <div class="card-title">
+                <i class="bi bi-radar text-accent"></i> Multi-Domain Competency Radar
+            </div>
+        </div>
+        <div style="height: 260px; position: relative;">
+            <canvas id="skillRadarChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Student Profile Insights & Latest Remarks Banner -->
+{% if student.latest_evaluation %}
+<div class="card" style="background: linear-gradient(135deg, rgba(79, 70, 229, 0.05), rgba(6, 182, 212, 0.05)); border: 1px solid rgba(79, 70, 229, 0.2);">
+    <div class="card-header">
+        <div class="card-title">
+            <i class="bi bi-stars text-primary"></i> Mentor Insights & Profile Summary (Latest Session)
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
+        {% if student.latest_evaluation.strongest_areas %}
+        <div style="background: var(--bg-surface); padding: 16px; border-radius: var(--radius-md); border-left: 4px solid var(--success);">
+            <div style="font-size: 12px; font-weight: 800; color: #065F46; text-transform: uppercase; margin-bottom: 4px;">
+                <i class="bi bi-trophy-fill"></i> Strongest Areas
+            </div>
+            <p style="font-size: 13px; color: var(--text-main); line-height: 1.4;">
+                {{ student.latest_evaluation.strongest_areas }}
+            </p>
+        </div>
+        {% endif %}
+
+        {% if student.latest_evaluation.areas_for_improvement %}
+        <div style="background: var(--bg-surface); padding: 16px; border-radius: var(--radius-md); border-left: 4px solid var(--warning);">
+            <div style="font-size: 12px; font-weight: 800; color: #92400E; text-transform: uppercase; margin-bottom: 4px;">
+                <i class="bi bi-graph-up-arrow"></i> Areas for Improvement
+            </div>
+            <p style="font-size: 13px; color: var(--text-main); line-height: 1.4;">
+                {{ student.latest_evaluation.areas_for_improvement }}
+            </p>
+        </div>
+        {% endif %}
+
+        {% if student.latest_evaluation.interested_areas %}
+        <div style="background: var(--bg-surface); padding: 16px; border-radius: var(--radius-md); border-left: 4px solid var(--accent);">
+            <div style="font-size: 12px; font-weight: 800; color: #5B21B6; text-transform: uppercase; margin-bottom: 4px;">
+                <i class="bi bi-compass-fill"></i> Interested Areas / Career Focus
+            </div>
+            <p style="font-size: 13px; color: var(--text-main); line-height: 1.4;">
+                {{ student.latest_evaluation.interested_areas }}
+            </p>
+        </div>
+        {% endif %}
+
+        {% if student.latest_evaluation.general_remarks %}
+        <div style="background: var(--bg-surface); padding: 16px; border-radius: var(--radius-md); border-left: 4px solid var(--primary);">
+            <div style="font-size: 12px; font-weight: 800; color: var(--primary); text-transform: uppercase; margin-bottom: 4px;">
+                <i class="bi bi-chat-text-fill"></i> General Mentor Advice
+            </div>
+            <p style="font-size: 13px; color: var(--text-main); line-height: 1.4; font-style: italic;">
+                "{{ student.latest_evaluation.general_remarks }}"
+            </p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Assigned Tasks & Deliverables Section -->
+<div class="card">
+    <div class="card-header" style="flex-wrap: wrap; gap: 12px;">
+        <div>
+            <div class="card-title">
+                <i class="bi bi-journal-check text-primary"></i> Assigned Tasks & Deliverables
+                <span class="badge" style="background: rgba(99, 102, 241, 0.15); color: var(--primary); font-size: 11px; margin-left: 6px;">
+                    {{ student_tasks.count }} Total Tasks
+                </span>
+            </div>
+            <div style="display: flex; gap: 10px; font-size: 12px; margin-top: 4px;">
+                <span style="color: var(--warning); font-weight: 700;"><i class="bi bi-hourglass-split"></i> {{ tasks_pending_count }} Pending</span>
+                <span style="color: var(--success); font-weight: 700;"><i class="bi bi-check-circle-fill"></i> {{ tasks_completed_count }} Completed</span>
+                {% if tasks_late_count > 0 %}
+                    <span style="color: #8B5CF6; font-weight: 700;"><i class="bi bi-alarm-fill"></i> {{ tasks_late_count }} Completed Late</span>
+                {% endif %}
+                {% if tasks_overdue_count > 0 %}
+                    <span style="color: var(--danger); font-weight: 700;"><i class="bi bi-exclamation-triangle-fill"></i> {{ tasks_overdue_count }} Overdue</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <button type="button" class="btn btn-primary btn-sm" data-modal="studentAssignTaskModal">
+            <i class="bi bi-plus-circle-fill"></i> Assign Task
+        </button>
+    </div>
+
+    <div class="table-responsive" style="overflow-x: auto;">
+        <table class="task-table" style="margin-bottom: 0;">
+            <thead>
+                <tr>
+                    <th style="min-width: 250px;">Task Deliverable</th>
+                    <th style="min-width: 130px;">Date Given</th>
+                    <th style="min-width: 130px;">Due Date</th>
+                    <th style="min-width: 140px;">Status</th>
+                    <th style="min-width: 160px;">Completed Date & Time</th>
+                    <th style="min-width: 180px;">Evaluator Remarks</th>
+                    <th style="text-align: right; min-width: 130px;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for task in student_tasks %}
+                <tr>
+                    <td>
+                        <div style="font-weight: 700; color: var(--text-main); font-size: 13px; line-height: 1.35;">{{ task.title }}</div>
+                        {% if task.description %}
+                            <div style="font-size: 11px; color: var(--text-dim); margin-top: 3px; max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ task.description }}">
+                                {{ task.description }}
+                            </div>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        <span class="date-chip">
+                            <i class="bi bi-calendar-event"></i> {{ task.assigned_date|date:"M d, Y" }}
+                        </span>
+                    </td>
+
+                    <td>
+                        {% if task.due_date %}
+                            <span class="date-chip {% if task.is_overdue %}date-overdue{% endif %}">
+                                <i class="bi bi-calendar2-check"></i> {{ task.due_date|date:"M d, Y" }}
+                            </span>
+                        {% else %}
+                            <span style="color: var(--text-dim); font-size: 11px;">—</span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if task.status == 'COMPLETED' %}
+                            <span class="status-chip chip-completed">
+                                <i class="bi bi-check-circle-fill"></i> Completed
+                            </span>
+                        {% elif task.status == 'LATE' %}
+                            <span class="status-chip chip-late">
+                                <i class="bi bi-alarm-fill"></i> Completed Late
+                            </span>
+                        {% elif task.is_overdue %}
+                            <span class="status-chip chip-overdue">
+                                <i class="bi bi-exclamation-triangle-fill"></i> Overdue
+                            </span>
+                        {% else %}
+                            <span class="status-chip chip-pending">
+                                <i class="bi bi-hourglass-split"></i> Pending
+                            </span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if task.completed_at %}
+                            <div class="completion-stamp">
+                                <span class="comp-date">
+                                    <i class="bi bi-calendar-check text-success"></i> {{ task.completed_at|date:"M d, Y" }}
+                                </span>
+                                <span class="comp-time">
+                                    <i class="bi bi-clock"></i> {{ task.completed_at|date:"h:i A" }}
+                                </span>
+                            </div>
+                        {% else %}
+                            <span class="awaiting-chip">
+                                <i class="bi bi-dash-circle"></i> Not completed
+                            </span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if task.evaluator_remarks %}
+                            <div style="font-size: 11px; color: var(--text-muted); font-style: italic; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ task.evaluator_remarks }}">
+                                "{{ task.evaluator_remarks }}"
+                            </div>
+                        {% else %}
+                            <span style="color: var(--text-dim); font-size: 11px;">—</span>
+                        {% endif %}
+                    </td>
+
+                    <td style="text-align: right; white-space: nowrap;">
+                        <button type="button" class="btn-action-primary btn-open-student-task-update"
+                                data-task-id="{{ task.id }}"
+                                data-task-title="{{ task.title }}"
+                                data-status="{{ task.status }}"
+                                data-completed-at="{{ task.completed_at|date:'Y-m-d\TH:i' }}"
+                                data-remarks="{{ task.evaluator_remarks }}">
+                            <i class="bi bi-pencil-square"></i> {% if task.status == 'PENDING' %}Update / Complete{% else %}Edit{% endif %}
+                        </button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" style="text-align: center; color: var(--text-dim); padding: 36px 20px;">
+                        <i class="bi bi-journal-x" style="font-size: 28px; display: block; margin-bottom: 8px; color: var(--text-muted);"></i>
+                        No tasks assigned to {{ student.name }} yet. Click "Assign Task" to create one.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Student Projects & Capstones Section -->
+<div class="card mb-4">
+    <div class="card-header" style="flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center;">
+        <div>
+            <div class="card-title">
+                <i class="bi bi-kanban-fill text-primary"></i> Projects & Capstones
+                <span class="badge" style="background: rgba(99, 102, 241, 0.15); color: var(--primary); font-size: 11px; margin-left: 6px;">
+                    {{ student_projects.count }} Total Projects
+                </span>
+            </div>
+            <div style="display: flex; gap: 10px; font-size: 12px; margin-top: 4px;">
+                <span style="color: var(--warning); font-weight: 700;"><i class="bi bi-gear-wide-connected"></i> {{ projects_in_progress_count }} In Progress</span>
+                <span style="color: var(--success); font-weight: 700;"><i class="bi bi-check-circle-fill"></i> {{ projects_completed_count }} Completed</span>
+            </div>
+        </div>
+
+        <a href="{% url 'project_create' %}?student_id={{ student.id }}" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-circle-fill"></i> Assign New Project
+        </a>
+    </div>
+
+    <div class="card-body p-3">
+        {% if student_projects %}
+        <div class="student-projects-list-grid">
+            {% for proj in student_projects %}
+            <div class="student-project-summary-card">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                    <span class="project-type-pill type-{{ proj.project_type|lower }}">
+                        {{ proj.get_project_type_display }}
+                    </span>
+                    <span class="status-pill status-{{ proj.status|lower }}">
+                        {{ proj.get_status_display }}
+                    </span>
+                </div>
+                
+                <h5 class="mb-1 fw-bold">
+                    <a href="{% url 'project_detail' proj.id %}" class="text-dark hover-primary">{{ proj.title }}</a>
+                </h5>
+                
+                <!-- Tech badges -->
+                <div class="tech-badge-container mb-2">
+                    {% for tech in proj.tech_list %}
+                    <span class="tech-tag">{{ tech }}</span>
+                    {% endfor %}
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span class="text-muted">Progress</span>
+                        <strong class="font-mono text-primary">{{ proj.progress_percentage }}%</strong>
+                    </div>
+                    <div class="progress-bar-track">
+                        <div class="progress-bar-fill {% if proj.progress_percentage == 100 %}bg-emerald{% elif proj.progress_percentage < 40 %}bg-amber{% else %}bg-primary{% endif %}" style="width: {{ proj.progress_percentage }}%;"></div>
+                    </div>
+                </div>
+
+                <!-- Score / Grade & Action -->
+                <div class="d-flex justify-content-between align-items-center pt-2 border-top mt-2">
+                    <div>
+                        {% if proj.is_evaluated %}
+                        <span class="eval-grade-badge grade-{{ proj.grade|lower }}">
+                            <i class="bi bi-star-fill text-warning me-1"></i> {{ proj.total_score }}% ({{ proj.grade }})
+                        </span>
+                        {% else %}
+                        <span class="text-muted small">Not Evaluated</span>
+                        {% endif %}
+                    </div>
+                    <a href="{% url 'project_detail' proj.id %}" class="btn btn-sm btn-outline-primary">
+                        View Details <i class="bi bi-arrow-right ms-1"></i>
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-4 text-muted">
+            <i class="bi bi-kanban" style="font-size: 28px; display: block; margin-bottom: 8px; color: var(--text-muted);"></i>
+            No projects assigned to {{ student.name }} yet.
+            <div class="mt-2">
+                <a href="{% url 'project_create' %}?student_id={{ student.id }}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-plus-circle me-1"></i> Create Project for this Student
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Detailed Evaluation History Timeline Table -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">
+            <i class="bi bi-clock-history text-primary"></i> Daily Evaluation History ({{ evaluations.count }} sessions)
+        </div>
+        {% if has_evaluated_today and not request.user.profile.is_admin %}
+        <!-- Hidden if already evaluated and not admin -->
+        {% else %}
+        <a href="{% url 'student_evaluate' student.id %}?date={{ today_date|date:'Y-m-d' }}" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg"></i> New Evaluation
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Topic / Task Evaluated</th>
+                    <th>Behavior & Study</th>
+                    <th>Tasks</th>
+                    <th>Project & PPT</th>
+                    <th>Comm & Doubts</th>
+                    <th>Score</th>
+                    <th>Grade</th>
+                    <th>Mentor Remarks & Insights</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ev in evaluations %}
+                <tr>
+                    <td style="white-space: nowrap; font-weight: 700;">
+                        {{ ev.date|date:"d M Y" }}
+                    </td>
+                    <td>
+                        <div style="font-weight: 700; color: var(--text-main);">{{ ev.topic }}</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">Evaluator: {{ ev.evaluator.username|default:"Assigned Mentor" }}</div>
+                    </td>
+                    <td style="font-size: 12px;">
+                        <div>Punct: <strong>{{ ev.punctuality_score|floatformat:0 }}</strong> • Study: <strong>{{ ev.tendency_to_study_score|floatformat:0 }}</strong></div>
+                        <div style="color: var(--text-muted); font-size: 11px;">Tutor: {{ ev.tutor_interaction_score|floatformat:0 }} • Peer: {{ ev.classmate_interaction_score|floatformat:0 }}</div>
+                    </td>
+                    <td style="font-size: 12px;">
+                        <span class="badge-grade grade-bplus" style="font-size: 11px; padding: 2px 6px;">{{ ev.tasks_completed }}/{{ ev.tasks_given }}</span>
+                    </td>
+                    <td style="font-size: 12px;">
+                        <div>Pres: <strong>{{ ev.presentation_score|floatformat:0 }}</strong> • Prob: <strong>{{ ev.problem_solving_score|floatformat:0 }}</strong></div>
+                        <div style="color: var(--text-muted); font-size: 11px;">PPT: {{ ev.ppt_evaluation_score|floatformat:0 }} ({{ ev.ppt_slide_count }} slides)</div>
+                    </td>
+                    <td style="font-size: 12px;">
+                        <div>Comm: <strong>{{ ev.communication_score|floatformat:0 }}</strong></div>
+                        <div style="color: var(--text-muted); font-size: 11px;">Sugg: {{ ev.suggestion_implementation_score|floatformat:0 }} • Doubts: {{ ev.doubt_clearing_score|floatformat:0 }}</div>
+                    </td>
+                    <td>
+                        <strong style="font-size: 15px; color: var(--primary);">{{ ev.total_score }}%</strong>
+                    </td>
+                    <td>
+                        <span class="badge-grade grade-{{ ev.grade|lower|slugify }}">{{ ev.grade }}</span>
+                    </td>
+                    <td style="max-width: 260px; font-size: 12px; color: var(--text-muted);">
+                        {% if ev.strongest_areas %}<div style="color: #065F46; margin-bottom: 2px;"><strong>Strongest:</strong> {{ ev.strongest_areas|truncatechars:45 }}</div>{% endif %}
+                        {% if ev.areas_for_improvement %}<div style="color: #991B1B; margin-bottom: 2px;"><strong>Improvement:</strong> {{ ev.areas_for_improvement|truncatechars:45 }}</div>{% endif %}
+                        {% if ev.interested_areas %}<div style="color: #5B21B6; margin-bottom: 2px;"><strong>Focus:</strong> {{ ev.interested_areas|truncatechars:40 }}</div>{% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" style="text-align: center; color: var(--text-dim); padding: 32px;">
+                        No daily evaluations recorded yet. Click "Record Evaluation" to add the first evaluation.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Attendance Record Log -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">
+            <i class="bi bi-calendar-check text-primary"></i> Attendance History
+        </div>
+    </div>
+
+    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+        {% for att in attendance_records %}
+        <div style="background: var(--bg-subtle); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 12px; display: flex; align-items: center; gap: 6px;">
+            <span style="font-weight: 700;">{{ att.date|date:"d M" }}:</span>
+            <span class="badge-status status-{{ att.status|lower }}">{{ att.status }}</span>
+        </div>
+        {% empty %}
+        <div style="color: var(--text-dim); font-size: 13px;">No attendance entries recorded yet.</div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- ============================================================================== -->
+<!-- MODAL: ASSIGN TASK TO THIS STUDENT -->
+<!-- ============================================================================== -->
+<div class="modal-backdrop" id="studentAssignTaskModal">
+    <div class="modal-content" style="max-width: 540px;">
+        <div class="modal-header">
+            <h3 class="modal-title"><i class="bi bi-plus-circle-fill text-primary"></i> Assign Task to {{ student.name }}</h3>
+            <button type="button" class="modal-close" data-close-modal="studentAssignTaskModal">&times;</button>
+        </div>
+        <form method="POST" action="{% url 'task_create' %}">
+            {% csrf_token %}
+            <input type="hidden" name="target_type" value="STUDENT">
+            <input type="hidden" name="batch" value="{{ student.batch.id }}">
+            <input type="hidden" name="student" value="{{ student.id }}">
+            <input type="hidden" name="next" value="{% url 'student_detail' student.id %}">
+
+            <div class="modal-body" style="padding: 24px;">
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label class="form-label" style="font-weight: 700;">Task Title / Deliverable *</label>
+                    <input type="text" name="title" class="form-input" placeholder="e.g. Build REST API for Product Catalog" required>
+                </div>
+
+                <!-- Task Description -->
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label class="form-label" style="font-weight: 700; display: flex; justify-content: space-between; align-items: center;">
+                        <span><i class="bi bi-card-text text-primary me-1"></i> Task Description</span>
+                        <span style="font-size: 11px; font-weight: 500; color: var(--text-muted);">(Optional)</span>
+                    </label>
+                    <textarea name="description" class="form-textarea" rows="3" placeholder="Enter task description, requirements, instructions, or specific criteria for the student..." style="font-size: 13px; line-height: 1.5;"></textarea>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                        Evaluators can add detailed specifications, instructions, or expected outcomes.
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight: 700;">Date Given *</label>
+                        <input type="date" name="assigned_date" class="form-input" value="{% now 'Y-m-d' %}" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Due Date Deadline</label>
+                        <input type="date" name="due_date" class="form-input">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Priority</label>
+                    <select name="priority" class="form-select">
+                        <option value="NORMAL" selected>Normal</option>
+                        <option value="HIGH">High Priority</option>
+                        <option value="URGENT">Urgent</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="modal-footer" style="padding: 14px 24px; background: var(--bg-subtle); display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-secondary" data-close-modal="studentAssignTaskModal">Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="bi bi-send-check-fill"></i> Assign Task</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ============================================================================== -->
+<!-- MODAL: UPDATE STUDENT TASK STATUS -->
+<!-- ============================================================================== -->
+<div class="modal-backdrop" id="studentUpdateTaskModal">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h3 class="modal-title"><i class="bi bi-clock-history text-primary"></i> Update Task Completion</h3>
+            <button type="button" class="modal-close" data-close-modal="studentUpdateTaskModal">&times;</button>
+        </div>
+        <form method="POST" id="studentUpdateTaskForm" action="">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{% url 'student_detail' student.id %}">
+            <div class="modal-body" style="padding: 24px;">
+                <div style="background: var(--bg-subtle); border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 16px; border: 1px solid var(--border-color);">
+                    <div id="stu_modal_task_title" style="font-size: 14px; font-weight: 800; color: var(--text-main);"></div>
+                    <div style="font-size: 12px; color: var(--primary); margin-top: 2px;">Student: {{ student.name }}</div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label class="form-label" style="font-weight: 700;">Task Status *</label>
+                    <select name="status" id="stu_modal_task_status" class="form-select" required onchange="toggleStuCompletionTime(this.value)">
+                        <option value="COMPLETED">Completed (On Time)</option>
+                        <option value="LATE">Completed Late</option>
+                        <option value="PENDING">Pending (Still in Progress)</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="stu_completion_time_group" style="margin-bottom: 14px;">
+                    <label class="form-label" style="font-weight: 700;">Date & Time Completed *</label>
+                    <input type="datetime-local" name="completed_at" id="stu_modal_completed_at" class="form-input">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Evaluator Remarks</label>
+                    <input type="text" name="evaluator_remarks" id="stu_modal_evaluator_remarks" class="form-input" placeholder="e.g. Solution tested and approved.">
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 14px 24px; background: var(--bg-subtle); display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-secondary" data-close-modal="studentUpdateTaskModal">Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Dedicated evaluation page used instead of modal -->
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function toggleStuCompletionTime(status) {
+    const group = document.getElementById('stu_completion_time_group');
+    const input = document.getElementById('stu_modal_completed_at');
+    if (status === 'PENDING') {
+        group.style.display = 'none';
+        input.value = '';
+    } else {
+        group.style.display = 'block';
+        if (!input.value) {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            input.value = `${year}-${month}-${day}T${hours}:${minutes}`;
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Student Task update modal triggers
+    document.querySelectorAll('.btn-open-student-task-update').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const taskId = this.dataset.taskId;
+            const taskTitle = this.dataset.taskTitle;
+            const status = this.dataset.status;
+            let completedAt = this.dataset.completedAt;
+            const remarks = this.dataset.remarks || '';
+
+            document.getElementById('studentUpdateTaskForm').action = `/tasks/${taskId}/update-status/`;
+            document.getElementById('stu_modal_task_title').textContent = taskTitle;
+            document.getElementById('stu_modal_task_status').value = status;
+            document.getElementById('stu_modal_evaluator_remarks').value = remarks;
+
+            if (!completedAt && status !== 'PENDING') {
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                completedAt = `${year}-${month}-${day}T${hours}:${minutes}`;
+            }
+            document.getElementById('stu_modal_completed_at').value = completedAt || '';
+            toggleStuCompletionTime(status);
+
+            const modal = document.getElementById('studentUpdateTaskModal');
+            if (modal) modal.classList.add('active');
+        });
+    });
+    const progDates = {{ prog_dates_json|safe }};
+    const progScores = {{ prog_scores_json|safe }};
+    const radarLabels = {{ radar_labels_json|safe }};
+    const radarData = {{ radar_metrics_json|safe }};
+
+    // Progression Line Chart
+    const lineCtx = document.getElementById('progressionChart');
+    if (lineCtx && progDates.length > 0) {
+        new Chart(lineCtx, {
+            type: 'line',
+            data: {
+                labels: progDates,
+                datasets: [{
+                    label: 'Evaluation Score (%)',
+                    data: progScores,
+                    borderColor: '#4F46E5',
+                    backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                    fill: true,
+                    tension: 0.35,
+                    pointRadius: 5,
+                    pointBackgroundColor: '#4F46E5',
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { min: 0, max: 100, ticks: { callback: v => v + '%' } }
+                }
+            }
+        });
+    }
+
+    // Skill Radar Chart
+    const radarCtx = document.getElementById('skillRadarChart');
+    if (radarCtx) {
+        new Chart(radarCtx, {
+            type: 'radar',
+            data: {
+                labels: radarLabels,
+                datasets: [{
+                    label: 'Domain Proficiency (%)',
+                    data: radarData,
+                    borderColor: '#8B5CF6',
+                    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+                    pointBackgroundColor: '#8B5CF6',
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    r: {
+                        min: 0,
+                        max: 100,
+                        ticks: { stepSize: 20 }
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

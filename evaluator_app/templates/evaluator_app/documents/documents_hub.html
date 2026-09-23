@@ -1,0 +1,168 @@
+{% extends 'evaluator_app/base.html' %}
+{% block title %}Documents & Reports{% endblock %}
+{% block page_title %}Documents & Reports{% endblock %}
+
+{% block content %}
+<style>
+    .documents-hub-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding-bottom: 50px;
+        font-family: 'Inter', sans-serif;
+    }
+    .documents-header {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+    .documents-header h2 {
+        font-size: 32px;
+        font-weight: 800;
+        background: linear-gradient(135deg, #047857, #10B981);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 12px;
+    }
+    .documents-header p {
+        color: #64748B;
+        font-size: 16px;
+        max-width: 600px;
+        margin: 0 auto;
+        line-height: 1.5;
+    }
+    .card-section {
+        background: #FFFFFF;
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        border: 1px solid rgba(0, 0, 0, 0.03);
+        padding: 30px;
+    }
+    .form-group {
+        margin-bottom: 24px;
+    }
+    .form-group label {
+        display: block;
+        font-size: 14px;
+        font-weight: 700;
+        color: #334155;
+        margin-bottom: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .custom-select {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        background-color: #F8FAFC;
+        font-size: 15px;
+        color: #1E293B;
+        transition: all 0.2s ease;
+    }
+    .custom-select:focus {
+        border-color: #10B981;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+    }
+    .action-btn {
+        display: inline-block;
+        width: 100%;
+        text-align: center;
+        background: #10B981;
+        color: white;
+        padding: 14px 24px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 16px;
+        text-decoration: none;
+        border: none;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .action-btn:hover {
+        background: #059669;
+        color: white;
+    }
+    .action-btn:disabled {
+        background: #CBD5E1;
+        cursor: not-allowed;
+    }
+</style>
+
+<div class="documents-hub-container">
+    <div class="documents-header">
+        <h2>Batch Documents & Comprehensive Reports</h2>
+        <p>Select a location and batch to generate a highly detailed, professional report aggregating attendance, tasks, evaluations, and projects.</p>
+    </div>
+
+    <div class="card-section">
+        <div class="form-group">
+            <label>1. Select Location</label>
+            <select id="locationSelect" class="custom-select">
+                <option value="">-- Choose a Location --</option>
+                {% for location in locations_batches.keys %}
+                <option value="{{ location.id }}">{{ location.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>2. Select Batch</label>
+            <select id="batchSelect" class="custom-select" disabled>
+                <option value="">-- Select Location First --</option>
+            </select>
+        </div>
+
+        <button id="previewBtn" class="action-btn" disabled>
+            <i class="bi bi-file-earmark-bar-graph"></i> Generate Preview
+        </button>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const locationsBatches = {
+        {% for loc, batches in locations_batches.items %}
+        "{{ loc.id }}": [
+            {% for b in batches %}
+            {"id": "{{ b.id }}", "name": "{{ b.name|escapejs }} ({{ b.code|escapejs }})"},
+            {% endfor %}
+        ],
+        {% endfor %}
+    };
+
+    const locationSelect = document.getElementById('locationSelect');
+    const batchSelect = document.getElementById('batchSelect');
+    const previewBtn = document.getElementById('previewBtn');
+
+    locationSelect.addEventListener('change', function() {
+        const locId = this.value;
+        batchSelect.innerHTML = '<option value="">-- Choose a Batch --</option>';
+        
+        if (locId && locationsBatches[locId]) {
+            locationsBatches[locId].forEach(batch => {
+                const opt = document.createElement('option');
+                opt.value = batch.id;
+                opt.textContent = batch.name;
+                batchSelect.appendChild(opt);
+            });
+            batchSelect.disabled = false;
+        } else {
+            batchSelect.innerHTML = '<option value="">-- Select Location First --</option>';
+            batchSelect.disabled = true;
+        }
+        
+        previewBtn.disabled = true;
+    });
+
+    batchSelect.addEventListener('change', function() {
+        previewBtn.disabled = !this.value;
+    });
+
+    previewBtn.addEventListener('click', function() {
+        if (!this.disabled && batchSelect.value) {
+            window.location.href = `/documents/batch/${batchSelect.value}/preview/`;
+        }
+    });
+});
+</script>
+{% endblock %}

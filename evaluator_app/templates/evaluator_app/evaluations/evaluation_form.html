@@ -1,0 +1,290 @@
+{% extends 'evaluator_app/base.html' %}
+
+{% block title %}
+    {% if is_bulk %}Bulk Evaluate {{ batch.name }}{% else %}Evaluate {{ student.name }}{% endif %} - Student Evaluator Portal
+{% endblock %}
+{% block page_title %}Comprehensive Daily Evaluation{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <div class="card-title">
+                    <i class="bi bi-award-fill text-primary"></i> 
+                    {% if is_bulk %}
+                        Bulk Evaluation: {{ batch.name }}
+                    {% else %}
+                        Daily Evaluation: {{ student.name }}
+                    {% endif %}
+                </div>
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                    {% if is_bulk %}
+                        Batch: {{ batch.name }} • Code: <code>{{ batch.code }}</code> • Center: {{ batch.location.name }}
+                    {% else %}
+                        Roll No: <code>{{ student.roll_number }}</code> • Batch: {{ student.batch.name }} • Center: {{ student.batch.location.name }} • Attendance: <strong>{{ student.attendance_percentage }}%</strong>
+                    {% endif %}
+                </div>
+            </div>
+            {% if is_bulk %}
+            <a href="{% url 'evaluation_hub' %}?batch_id={{ batch.id }}" class="btn btn-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Back to Hub
+            </a>
+            {% else %}
+            <a href="{% url 'student_detail' student.id %}" class="btn btn-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Back to Student
+            </a>
+            {% endif %}
+        </div>
+        
+        {% if evaluation %}
+        <div style="background: var(--bg-subtle); padding: 12px 24px; border-bottom: 1px solid var(--border-color); font-size: 13px; color: var(--text-muted); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div>
+                <i class="bi bi-clock-history"></i> Evaluated on <strong>{{ evaluation.created_at|date:"M d, Y" }}</strong> by <strong style="color: var(--text-main);">{{ evaluation.evaluator.get_full_name|default:evaluation.evaluator.username }}</strong>
+            </div>
+            {% if evaluation.updated_at|date:"YmdHi" != evaluation.created_at|date:"YmdHi" %}
+            <div style="color: var(--primary); font-weight: 600; background: var(--primary-light); padding: 4px 10px; border-radius: var(--radius-sm);">
+                <i class="bi bi-pencil-square"></i> Last updated by Admin on {{ evaluation.updated_at|date:"M d, Y, h:i A" }}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <form method="post" enctype="multipart/form-data" style="padding-top: 24px;">
+            {% csrf_token %}
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Evaluation Date *</label>
+                    {{ form.date }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Task / Topic Evaluated *</label>
+                    {{ form.topic }}
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 24px; padding: 16px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                <label style="display: flex; align-items: center; gap: 10px; font-weight: 700; cursor: pointer; margin: 0; color: var(--text-main);">
+                    {{ form.project_and_practical_task_given }}
+                    <span>Project & Practical Task Given Today</span>
+                </label>
+                <div style="font-size: 13px; color: var(--text-muted); margin-top: 6px; margin-left: 28px;">
+                    Uncheck this if no task/project was given. The evaluation score will be calculated based solely on behavioral and interaction metrics.
+                </div>
+            </div>
+
+            <!-- 1. Behavioral -->
+            <div style="background: var(--bg-subtle); padding: 18px; border-radius: var(--radius-lg); margin-bottom: 20px; border: 1px solid var(--border-color);">
+                <div style="font-size: 13px; font-weight: 800; color: var(--text-main); text-transform: uppercase; margin-bottom: 12px;">
+                    <i class="bi bi-person-check text-primary"></i> 1. General & Behavioral Engagement (0-100)
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Punctuality Score</label>
+                        {{ form.punctuality_score }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Tutor Interaction</label>
+                        {{ form.tutor_interaction_score }}
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Classmate Interaction</label>
+                        {{ form.classmate_interaction_score }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Tendency to Study</label>
+                        {{ form.tendency_to_study_score }}
+                    </div>
+                </div>
+                <div id="daily_tasks_row" class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Tasks Given Today</label>
+                        {{ form.tasks_given }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Tasks Completed Today</label>
+                        {{ form.tasks_completed }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Project / Task Based -->
+            <div id="project_task_section" style="background: var(--bg-subtle); padding: 18px; border-radius: var(--radius-lg); margin-bottom: 20px; border: 1px solid var(--border-color);">
+                <div style="font-size: 13px; font-weight: 800; color: var(--text-main); text-transform: uppercase; margin-bottom: 12px;">
+                    <i class="bi bi-display text-secondary"></i> 2. Project & Practical Task Assessment (0-100)
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Presentation & Way of Presenting</label>
+                        {{ form.presentation_score }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Problems & Solution Approach</label>
+                        {{ form.problem_solving_score }}
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">PPT / PDF Evaluation Score</label>
+                        {{ form.ppt_evaluation_score }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Slide / Page Count</label>
+                        {{ form.ppt_slide_count }}
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
+                        {{ form.ppt_has_images }}
+                        <label class="form-label" style="margin-bottom: 0;">Images / Diagrams Included</label>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">PPT Explanation Notes</label>
+                        {{ form.ppt_explanation_notes }}
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top: 12px;">
+                    <label class="form-label">Upload Document (PPT/PDF/Image) - Optional</label>
+                    {{ form.document_upload }}
+                </div>
+            </div>
+
+            <!-- 3. Communication & Doubts -->
+            <div style="background: var(--bg-subtle); padding: 18px; border-radius: var(--radius-lg); margin-bottom: 20px; border: 1px solid var(--border-color);">
+                <div style="font-size: 13px; font-weight: 800; color: var(--text-main); text-transform: uppercase; margin-bottom: 12px;">
+                    <i class="bi bi-chat-quote text-accent"></i> 3. Communication & Mentorship (0-100)
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Communication Skills</label>
+                        {{ form.communication_score }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Taking Suggestions & Implementing</label>
+                        {{ form.suggestion_implementation_score }}
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Asking Doubts & Clearing Doubts</label>
+                    {{ form.doubt_clearing_score }}
+                </div>
+            </div>
+
+            <!-- 4. Remarks -->
+            <div style="background: var(--bg-subtle); padding: 18px; border-radius: var(--radius-lg); margin-bottom: 20px; border: 1px solid var(--border-color);">
+                <div style="font-size: 13px; font-weight: 800; color: var(--text-main); text-transform: uppercase; margin-bottom: 12px;">
+                    <i class="bi bi-pencil-square text-primary"></i> 4. Student Insights & Remarks
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Strongest Area of the Student</label>
+                        {{ form.strongest_areas }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Area(s) Needing Improvement</label>
+                        {{ form.areas_for_improvement }}
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Interested Areas / Focus</label>
+                        {{ form.interested_areas }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">General Remarks & Advice</label>
+                        {{ form.general_remarks }}
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-color);">
+                {% if is_bulk %}
+                <a href="{% url 'evaluation_hub' %}?batch_id={{ batch.id }}" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="bi bi-check2-circle"></i> Save Bulk Evaluation
+                </button>
+                {% else %}
+                <a href="{% url 'student_detail' student.id %}" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="bi bi-check2-circle"></i> Save Comprehensive Evaluation
+                </button>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.score-input').forEach(input => {
+        // Create wrapper
+        const wrapper = document.createElement('div');
+        wrapper.style.display = 'flex';
+        wrapper.style.alignItems = 'center';
+        wrapper.style.gap = '16px';
+        wrapper.style.width = '100%';
+        
+        // Wrap input
+        input.parentNode.insertBefore(wrapper, input);
+        
+        // Input container to take remaining space
+        const inputContainer = document.createElement('div');
+        inputContainer.style.flex = '1';
+        inputContainer.appendChild(input);
+        wrapper.appendChild(inputContainer);
+        
+        // Create value badge
+        const badge = document.createElement('div');
+        badge.className = 'score-badge-display';
+        wrapper.appendChild(badge);
+        
+        // Update function
+        const updateBadge = () => {
+            const val = parseInt(input.value) || 0;
+            badge.textContent = val;
+            
+            // Color logic
+            if (val >= 80) {
+                badge.style.backgroundColor = 'var(--success-light)';
+                badge.style.color = 'var(--success)';
+                badge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+            } else if (val >= 60) {
+                badge.style.backgroundColor = 'var(--info-light)';
+                badge.style.color = 'var(--info)';
+                badge.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+            } else if (val >= 40) {
+                badge.style.backgroundColor = 'var(--warning-light)';
+                badge.style.color = '#92400E';
+                badge.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+            } else {
+                badge.style.backgroundColor = 'var(--danger-light)';
+                badge.style.color = 'var(--danger)';
+                badge.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+            }
+        };
+        
+        input.addEventListener('input', updateBadge);
+        updateBadge(); // Initial state
+    });
+
+    const checkbox = document.getElementById('id_project_and_practical_task_given');
+    const tasksRow = document.getElementById('daily_tasks_row');
+    const projectSection = document.getElementById('project_task_section');
+
+    const toggleSections = () => {
+        if (checkbox && tasksRow && projectSection) {
+            const isGiven = checkbox.checked;
+            tasksRow.style.display = isGiven ? 'flex' : 'none';
+            projectSection.style.display = isGiven ? 'block' : 'none';
+        }
+    };
+
+    if (checkbox) {
+        checkbox.addEventListener('change', toggleSections);
+        toggleSections(); // Initial state
+    }
+});
+</script>
+{% endblock %}

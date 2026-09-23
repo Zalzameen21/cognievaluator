@@ -1,0 +1,351 @@
+{% extends 'evaluator_app/base.html' %}
+{% load static %}
+
+{% block title %}Import Students - {{ batch.name }} - Student Evaluator Portal{% endblock %}
+{% block page_title %}Batch Student Import{% endblock %}
+
+{% block content %}
+<div style="max-width: 860px; margin: 0 auto;">
+    <!-- Top Header -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 14px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <a href="{% url 'batch_detail' batch.id %}" class="btn btn-secondary btn-sm" title="Back to Batch">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <div>
+                <h2 style="font-size: 22px; font-weight: 800; color: var(--text-main); margin: 0;">Import Students via Excel / CSV</h2>
+                <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
+                    Target Batch: <strong style="color: var(--primary);">{{ batch.name }}</strong> ({{ batch.location.name }}) • Code: <code>{{ batch.code }}</code>
+                </div>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 8px;">
+            <a href="{% url 'download_student_template' batch.id 'xlsx' %}" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+                <i class="bi bi-file-earmark-excel-fill" style="color: #10B981;"></i> Download .xlsx
+            </a>
+            <a href="{% url 'download_student_template' batch.id 'csv' %}" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 6px;">
+                <i class="bi bi-file-earmark-text"></i> Download .csv
+            </a>
+        </div>
+    </div>
+
+    <!-- Results Banner (If POST produced results) -->
+    {% if results %}
+    <div class="card" style="border-left: 4px solid {% if results.error_count > 0 %}var(--danger){% elif results.created_count > 0 or results.updated_count > 0 %}var(--success){% else %}var(--warning){% endif %}; margin-bottom: 24px;">
+        <div class="card-header">
+            <div class="card-title" style="font-size: 15px;">
+                <i class="bi bi-clipboard-data-fill text-primary"></i> Import Execution Summary
+            </div>
+            <a href="{% url 'batch_detail' batch.id %}" class="btn btn-primary btn-sm">
+                <i class="bi bi-check2"></i> View Batch Students
+            </a>
+        </div>
+
+        <!-- Metrics Grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px;">
+            <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: var(--radius-md); padding: 12px; text-align: center;">
+                <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #059669;">Imported</div>
+                <div style="font-size: 22px; font-weight: 900; color: #059669; font-family: 'JetBrains Mono', monospace;">{{ results.created_count }}</div>
+            </div>
+
+            <div style="background: rgba(79, 70, 229, 0.08); border: 1px solid rgba(79, 70, 229, 0.2); border-radius: var(--radius-md); padding: 12px; text-align: center;">
+                <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--primary);">Updated</div>
+                <div style="font-size: 22px; font-weight: 900; color: var(--primary); font-family: 'JetBrains Mono', monospace;">{{ results.updated_count }}</div>
+            </div>
+
+            <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: var(--radius-md); padding: 12px; text-align: center;">
+                <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #D97706;">Skipped</div>
+                <div style="font-size: 22px; font-weight: 900; color: #D97706; font-family: 'JetBrains Mono', monospace;">{{ results.skipped_count }}</div>
+            </div>
+
+            <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: var(--radius-md); padding: 12px; text-align: center;">
+                <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #DC2626;">Errors</div>
+                <div style="font-size: 22px; font-weight: 900; color: #DC2626; font-family: 'JetBrains Mono', monospace;">{{ results.error_count }}</div>
+            </div>
+        </div>
+
+        <!-- Error Rows Details -->
+        {% if results.error_rows %}
+        <div style="margin-top: 14px;">
+            <div style="font-size: 13px; font-weight: 700; color: #DC2626; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                <i class="bi bi-exclamation-triangle-fill"></i> Rows with Errors (Not Imported)
+            </div>
+            <div class="table-responsive">
+                <table class="data-table" style="font-size: 12px;">
+                    <thead>
+                        <tr>
+                            <th style="width: 80px;">Row #</th>
+                            <th style="width: 140px;">Roll Number</th>
+                            <th style="width: 160px;">Name</th>
+                            <th>Reason / Error Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for err in results.error_rows %}
+                        <tr>
+                            <td><code>#{{ err.row }}</code></td>
+                            <td><strong>{{ err.roll_number }}</strong></td>
+                            <td>{{ err.name }}</td>
+                            <td style="color: #DC2626;">{{ err.reason }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Skipped Duplicates Details -->
+        {% if results.skipped_rows %}
+        <div style="margin-top: 14px;">
+            <div style="font-size: 13px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">
+                <i class="bi bi-info-circle"></i> Skipped Duplicates (Already Enrolled)
+            </div>
+            <div style="max-height: 140px; overflow-y: auto; background: var(--bg-subtle); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 12px; color: var(--text-dim);">
+                {% for sk in results.skipped_rows %}
+                    <div>• Row #{{ sk.row }}: <strong>{{ sk.roll_number }}</strong> ({{ sk.name }}) - {{ sk.reason }}</div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Upload Card -->
+    <div class="card" style="margin-bottom: 24px;">
+        <div class="card-header">
+            <div class="card-title">
+                <i class="bi bi-cloud-arrow-up-fill text-primary"></i> Upload Spreadsheet
+            </div>
+            <span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #059669; font-size: 11px;">
+                Supports .xlsx &bull; .xls &bull; .csv
+            </span>
+        </div>
+
+        <form method="post" enctype="multipart/form-data" id="importForm">
+            {% csrf_token %}
+
+            <!-- Drag & Drop Zone -->
+            <div class="file-drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                <div class="drop-zone-icon" id="dropIcon">
+                    <i class="bi bi-file-earmark-spreadsheet-fill"></i>
+                </div>
+                <div style="font-size: 15px; font-weight: 700; color: var(--text-main); margin-bottom: 4px;" id="dropTitle">
+                    Click to browse or drag & drop Excel / CSV file
+                </div>
+                <div style="font-size: 12px; color: var(--text-muted);" id="dropSub">
+                    Microsoft Excel (.xlsx, .xls) or Comma-Separated Values (.csv) up to 10MB
+                </div>
+                <input type="file" name="file" id="fileInput" accept=".xlsx, .xls, .csv" style="display: none;" required>
+            </div>
+
+            <!-- File Selected Preview Box -->
+            <div id="filePreviewBox" style="display: none; background: var(--bg-subtle); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; margin-top: 14px; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <i class="bi bi-file-earmark-excel-fill" style="font-size: 24px; color: #10B981;"></i>
+                    <div>
+                        <div id="previewFileName" style="font-size: 13px; font-weight: 700; color: var(--text-main);"></div>
+                        <div id="previewFileSize" style="font-size: 11px; color: var(--text-dim);"></div>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="clearFileSelection()">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+
+            <!-- Duplicate Handling Option -->
+            <div style="margin-top: 20px; padding: 14px 16px; background: var(--bg-subtle); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                <div style="font-size: 13px; font-weight: 700; color: var(--text-main); margin-bottom: 8px;">
+                    If a student roll number already exists in this batch:
+                </div>
+                <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; color: var(--text-main);">
+                        <input type="radio" name="duplicate_action" value="skip" checked>
+                        <span><strong>Skip record</strong> (Leave existing student details unchanged)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; color: var(--text-main);">
+                        <input type="radio" name="duplicate_action" value="update">
+                        <span><strong>Update record</strong> (Overwrite with new details from file)</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Batch Start Date Notice -->
+            <div style="display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 10px 14px; background: rgba(79, 70, 229, 0.05); border: 1px solid rgba(79, 70, 229, 0.15); border-radius: var(--radius-md); font-size: 12px; color: var(--text-muted);">
+                <i class="bi bi-info-circle-fill text-primary" style="font-size: 16px; flex-shrink: 0;"></i>
+                <div>
+                    <strong>Enrollment Date Rule:</strong> Student enrollment dates cannot be earlier than this batch's start date (<strong>{{ batch.start_date|date:"d M, Y" }}</strong>). If empty, it automatically defaults to <code>{{ batch.start_date|date:"Y-m-d" }}</code>.
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-color);">
+                <a href="{% url 'batch_detail' batch.id %}" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary" id="btnSubmitImport">
+                    <i class="bi bi-cloud-arrow-up-fill"></i> Upload & Import Students
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Column Formatting Reference Guide -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title" style="font-size: 14px;">
+                <i class="bi bi-table text-primary"></i> Supported Column Headers & Guidelines
+            </div>
+            <a href="{% url 'download_student_template' batch.id 'xlsx' %}" class="btn btn-secondary btn-sm" style="font-size: 11px;">
+                <i class="bi bi-download"></i> Sample Excel
+            </a>
+        </div>
+
+        <div class="table-responsive">
+            <table class="data-table" style="font-size: 12px;">
+                <thead>
+                    <tr>
+                        <th style="width: 140px;">Column Name</th>
+                        <th style="width: 90px;">Required?</th>
+                        <th style="width: 140px;">Example Value</th>
+                        <th>Notes & Alternate Accepted Headers</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>Roll Number</code></td>
+                        <td><span class="badge" style="background: rgba(239, 68, 68, 0.12); color: #DC2626; font-size: 10px;">Required</span></td>
+                        <td><code>STU-2026-001</code></td>
+                        <td>Unique student identifier. Also accepts: <em>Roll No, Roll, Student ID, ID</em>.</td>
+                    </tr>
+                    <tr>
+                        <td><code>Full Name</code></td>
+                        <td><span class="badge" style="background: rgba(239, 68, 68, 0.12); color: #DC2626; font-size: 10px;">Required</span></td>
+                        <td><code>Rahul Sharma</code></td>
+                        <td>Student full name. Also accepts: <em>Name, Student Name, Fullname</em>.</td>
+                    </tr>
+                    <tr>
+                        <td><code>Email</code></td>
+                        <td><span class="badge" style="background: var(--bg-subtle); color: var(--text-dim); font-size: 10px;">Optional</span></td>
+                        <td><code>rahul@example.com</code></td>
+                        <td>Email address for correspondence. Also accepts: <em>Email Address, Mail</em>.</td>
+                    </tr>
+                    <tr>
+                        <td><code>Phone</code></td>
+                        <td><span class="badge" style="background: var(--bg-subtle); color: var(--text-dim); font-size: 10px;">Optional</span></td>
+                        <td><code>+91 9876543210</code></td>
+                        <td>Phone or WhatsApp number. Also accepts: <em>Mobile, Phone Number, Contact</em>.</td>
+                    </tr>
+                    <tr>
+                        <td><code>Enrollment Date</code></td>
+                        <td><span class="badge" style="background: var(--bg-subtle); color: var(--text-dim); font-size: 10px;">Optional</span></td>
+                        <td><code>{{ batch.start_date|date:"Y-m-d" }}</code></td>
+                        <td>Format: <code>YYYY-MM-DD</code>. Must be on or after <strong>{{ batch.start_date|date:"d M, Y" }}</strong>. Defaults to batch start date if left empty. Also accepts: <em>Join Date, Joining Date, Date</em>.</td>
+                    </tr>
+                    <tr>
+                        <td><code>Status</code></td>
+                        <td><span class="badge" style="background: var(--bg-subtle); color: var(--text-dim); font-size: 10px;">Optional</span></td>
+                        <td><code>ACTIVE</code></td>
+                        <td><code>ACTIVE</code>, <code>INACTIVE</code>, <code>COMPLETED</code>, or <code>DROPPED</code>. Defaults to <code>ACTIVE</code>.</td>
+                    </tr>
+                    <tr>
+                        <td><code>Notes</code></td>
+                        <td><span class="badge" style="background: var(--bg-subtle); color: var(--text-dim); font-size: 10px;">Optional</span></td>
+                        <td><code>Python & Django track</code></td>
+                        <td>Academic background, special interests or tutor comments. Also accepts: <em>Remarks, Comments, Background</em>.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Drop Zone Styling */
+.file-drop-zone {
+    border: 2px dashed var(--border-color);
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+    padding: 36px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.file-drop-zone:hover, .file-drop-zone.dragover {
+    border-color: var(--primary);
+    background: rgba(79, 70, 229, 0.03);
+    transform: scale(1.005);
+}
+.drop-zone-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: rgba(16, 185, 129, 0.12);
+    color: #10B981;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    margin: 0 auto 14px;
+    transition: transform 0.2s ease;
+}
+.file-drop-zone:hover .drop-zone-icon {
+    transform: translateY(-2px);
+}
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const previewBox = document.getElementById('filePreviewBox');
+    const previewName = document.getElementById('previewFileName');
+    const previewSize = document.getElementById('previewFileSize');
+    const dropTitle = document.getElementById('dropTitle');
+
+    function handleFile(file) {
+        if (!file) return;
+        previewName.textContent = file.name;
+        previewSize.textContent = (file.size / 1024).toFixed(1) + ' KB';
+        previewBox.style.display = 'flex';
+        dropTitle.textContent = 'Change selected file';
+    }
+
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) {
+            handleFile(e.target.files[0]);
+        }
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.add('dragover');
+        });
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.remove('dragover');
+        });
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            fileInput.files = e.dataTransfer.files;
+            handleFile(e.dataTransfer.files[0]);
+        }
+    });
+
+    window.clearFileSelection = function() {
+        fileInput.value = '';
+        previewBox.style.display = 'none';
+        dropTitle.textContent = 'Click to browse or drag & drop Excel / CSV file';
+    };
+});
+</script>
+{% endblock %}

@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Batch Report - {{ batch.name }}</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 2cm;
+            @frame footer_frame {           
+                -pdf-frame-content: footer_content;
+                left: 50pt; width: 512pt; top: 772pt; height: 20pt;
+            }
+        }
+        body {
+            font-family: Helvetica, sans-serif;
+            font-size: 11px;
+            color: #333333;
+        }
+        h1 {
+            font-size: 24px;
+            color: #1E3A8A;
+            text-align: center;
+            margin-bottom: 5px;
+        }
+        h2 {
+            font-size: 16px;
+            color: #10B981;
+            border-bottom: 1px solid #E2E8F0;
+            padding-bottom: 5px;
+            margin-top: 20px;
+            page-break-after: avoid;
+        }
+        .header-info {
+            text-align: center;
+            font-size: 12px;
+            color: #64748B;
+            margin-bottom: 30px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            border: 1px solid #CBD5E1;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #F8FAFC;
+            font-weight: bold;
+            color: #475569;
+        }
+        .text-center {
+            text-align: center;
+        }
+        .page-break {
+            page-break-before: always;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="footer_content">
+        Page <pdf:pagenumber> of <pdf:pagecount> - {{ batch.name }}
+    </div>
+
+    <h1>Comprehensive Batch Report</h1>
+    <div class="header-info">
+        <strong>Batch:</strong> {{ batch.name }} ({{ batch.code }}) | 
+        <strong>Location:</strong> {{ batch.location.name }}<br>
+        <strong>Dates:</strong> {{ batch.start_date|date:"M d, Y" }} - {% if batch.end_date %}{{ batch.end_date|date:"M d, Y" }}{% else %}Ongoing{% endif %}<br>
+        <strong>Generated on:</strong> {% now "F j, Y H:i" %}
+    </div>
+
+    <h2>Batch Overview</h2>
+    <table>
+        <tr>
+            <th>Course Type</th>
+            <td>{{ batch.get_schedule_type_display }}</td>
+            <th>Total Students</th>
+            <td>{{ students.count }}</td>
+        </tr>
+        <tr>
+            <th>Class Days</th>
+            <td>{{ batch.class_days }}</td>
+            <th>Active Students</th>
+            <td>{{ students.count }}</td>
+        </tr>
+    </table>
+
+    <div class="page-break"></div>
+
+    <h2>Student List</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Roll No</th>
+                <th>Name</th>
+                <th>Phone</th>
+                <th>Email</th>
+                <th>Status</th>
+                <th>Join Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for student in students %}
+            <tr>
+                <td>{{ student.roll_number }}</td>
+                <td>{{ student.name }}</td>
+                <td>{{ student.phone }}</td>
+                <td>{{ student.email }}</td>
+                <td>{{ student.get_status_display }}</td>
+                <td>{{ student.join_date|date:"d/m/Y" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" class="text-center">No students found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="page-break"></div>
+
+    <h2>Attendance Summary (Overall)</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Roll No</th>
+                <th>Name</th>
+                <th>Total Classes</th>
+                <th>Present</th>
+                <th>Absent</th>
+                <th>Late</th>
+                <th>Attendance %</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for student in students %}
+            <tr>
+                <td>{{ student.roll_number }}</td>
+                <td>{{ student.name }}</td>
+                <td class="text-center">{{ student.total_classes }}</td>
+                <td class="text-center">{{ student.present }}</td>
+                <td class="text-center">{{ student.absent }}</td>
+                <td class="text-center">{{ student.late }}</td>
+                <td class="text-center"><strong>{{ student.attendance_pct }}%</strong></td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="text-center">No attendance data found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <div class="page-break"></div>
+
+    <h2>Task Performance (Overall)</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Roll No</th>
+                <th>Name</th>
+                <th>Assigned</th>
+                <th>Completed</th>
+                <th>Pending</th>
+                <th>Needs Rev.</th>
+                <th>Completion %</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for student in students %}
+            <tr>
+                <td>{{ student.roll_number }}</td>
+                <td>{{ student.name }}</td>
+                <td class="text-center">{{ student.tasks_assigned }}</td>
+                <td class="text-center">{{ student.tasks_completed }}</td>
+                <td class="text-center">{{ student.tasks_pending }}</td>
+                <td class="text-center">{{ student.tasks_needs_revision }}</td>
+                <td class="text-center"><strong>{{ student.task_completion_pct }}%</strong></td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="text-center">No task data found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <div class="page-break"></div>
+    
+    <h2>Individual Student Reports</h2>
+    {% for student in students %}
+        <h3>{{ student.name }} ({{ student.roll_number }})</h3>
+        
+        <!-- Basic Info -->
+        <table>
+            <tr>
+                <th width="20%">Status</th>
+                <td width="30%">{{ student.get_status_display }}</td>
+                <th width="20%">Contact</th>
+                <td width="30%">{{ student.phone }}</td>
+            </tr>
+            <tr>
+                <th>Join Date</th>
+                <td>{{ student.join_date|date:"M d, Y" }}</td>
+                <th>Email</th>
+                <td>{{ student.email|default:"N/A" }}</td>
+            </tr>
+        </table>
+        
+        <!-- Attendance & Tasks -->
+        <table>
+            <tr>
+                <th colspan="2" class="text-center" style="background-color:#E2E8F0;">Attendance Statistics</th>
+                <th colspan="2" class="text-center" style="background-color:#E2E8F0;">Task Performance</th>
+            </tr>
+            <tr>
+                <th>Total Classes</th>
+                <td>{{ student.total_classes }}</td>
+                <th>Tasks Assigned</th>
+                <td>{{ student.tasks_assigned }}</td>
+            </tr>
+            <tr>
+                <th>Present</th>
+                <td>{{ student.present }}</td>
+                <th>Tasks Completed</th>
+                <td>{{ student.tasks_completed }}</td>
+            </tr>
+            <tr>
+                <th>Absent / Late</th>
+                <td>{{ student.absent }} / {{ student.late }}</td>
+                <th>Pending / Needs Rev.</th>
+                <td>{{ student.tasks_pending }} / {{ student.tasks_needs_revision }}</td>
+            </tr>
+            <tr>
+                <th>Attendance %</th>
+                <td><strong>{{ student.attendance_pct }}%</strong></td>
+                <th>Completion %</th>
+                <td><strong>{{ student.task_completion_pct }}%</strong></td>
+            </tr>
+        </table>
+        
+        <!-- Evaluations -->
+        <table>
+            <tr>
+                <th colspan="4" class="text-center" style="background-color:#E2E8F0;">Evaluation Overview</th>
+            </tr>
+            <tr>
+                <th width="25%">Evaluations Count</th>
+                <td width="25%">{{ student.eval_count }}</td>
+                <th width="25%">Average Score</th>
+                <td width="25%"><strong>{{ student.avg_score }} / 100</strong></td>
+            </tr>
+            <tr>
+                <th>Latest Evaluation</th>
+                <td colspan="3">
+                    {% if student.latest_eval %}
+                        {{ student.latest_eval.date|date:"M d, Y" }} - Grade: {{ student.latest_eval.grade }} ({{ student.latest_eval.total_score }})
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </td>
+            </tr>
+        </table>
+        
+        <!-- Projects -->
+        {% if student.student_projects.exists %}
+        <table>
+            <tr>
+                <th colspan="3" class="text-center" style="background-color:#E2E8F0;">Project Progress</th>
+            </tr>
+            <tr>
+                <th>Project Name</th>
+                <th>Status</th>
+                <th>Progress</th>
+            </tr>
+            {% for project in student.student_projects %}
+            <tr>
+                <td>{{ project.title }}</td>
+                <td>{{ project.get_status_display }}</td>
+                <td>{{ project.progress_percentage }}%</td>
+            </tr>
+            {% endfor %}
+        </table>
+        {% endif %}
+        
+        <br>
+        <div style="border-bottom: 1px dashed #CBD5E1; margin-bottom: 20px;"></div>
+        
+    {% endfor %}
+
+</body>
+</html>

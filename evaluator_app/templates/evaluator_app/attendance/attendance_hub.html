@@ -1,0 +1,467 @@
+{% extends 'evaluator_app/base.html' %}
+
+{% block title %}Batch Attendance Hub - Student Evaluator Portal{% endblock %}
+{% block page_title %}Batch Attendance Hub{% endblock %}
+
+{% block content %}
+<!-- Selection Header Bar -->
+<div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-xl); padding: 20px 24px; margin-bottom: 24px; box-shadow: var(--shadow-sm); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+    <form method="get" style="display: flex; gap: 14px; flex-wrap: wrap; align-items: center;">
+        <div>
+            <label class="form-label" style="margin-bottom: 4px; font-size: 11px; text-transform: uppercase;">Select Batch or Group</label>
+            <select name="selection" class="form-select" style="width: 280px; font-weight: 600;" onchange="
+                var val = this.value; 
+                var form = this.form;
+                // Clear both hidden inputs first
+                form.querySelector('input[name=batch_id]').value = '';
+                form.querySelector('input[name=group_id]').value = '';
+                if(val.startsWith('b_')) {
+                    form.querySelector('input[name=batch_id]').value = val.substring(2);
+                } else if(val.startsWith('g_')) {
+                    form.querySelector('input[name=group_id]').value = val.substring(2);
+                }
+                form.submit();
+            ">
+                <option value="">-- Select --</option>
+                {% if accessible_groups %}
+                <optgroup label="Merged Batch Groups">
+                    {% for g in accessible_groups %}
+                        <option value="g_{{ g.id }}" {% if selected_group and selected_group.id == g.id %}selected{% endif %}>
+                            [GROUP] {{ g.name }}
+                        </option>
+                    {% endfor %}
+                </optgroup>
+                {% endif %}
+                <optgroup label="Individual Batches">
+                    {% for b in accessible_batches %}
+                        <option value="b_{{ b.id }}" {% if selected_batch and selected_batch.id == b.id %}selected{% endif %}>
+                            {{ b.name }} ({{ b.location.name }})
+                        </option>
+                    {% endfor %}
+                </optgroup>
+            </select>
+            <!-- Hidden inputs to route correctly -->
+            <input type="hidden" name="batch_id" value="{% if selected_batch %}{{ selected_batch.id }}{% endif %}">
+            <input type="hidden" name="group_id" value="{% if selected_group %}{{ selected_group.id }}{% endif %}">
+        </div>
+
+        <div>
+            <label class="form-label" style="margin-bottom: 4px; font-size: 11px; text-transform: uppercase;">Attendance Date</label>
+            <input type="date" name="date" value="{{ selected_date }}" class="form-input" style="width: 170px;" onchange="this.form.submit()">
+        </div>
+
+        <div style="align-self: flex-end;">
+            <button type="submit" class="btn btn-secondary"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+        </div>
+    </form>
+
+    {% if selected_group %}
+    <div style="display: flex; gap: 10px; align-items: center;">
+        <a href="{% url 'attendance_register_group' selected_group.id %}" class="btn btn-secondary">
+            <i class="bi bi-grid-3x3"></i> View Monthly Matrix
+        </a>
+    </div>
+    {% elif selected_batch %}
+    <div style="display: flex; gap: 10px; align-items: center;">
+        <button type="button" class="btn btn-warning" onclick="openRescheduleModal()">
+            <i class="bi bi-calendar2-range"></i> Reschedule Class
+        </button>
+        <a href="{% url 'attendance_register' selected_batch.id %}" class="btn btn-secondary">
+            <i class="bi bi-grid-3x3"></i> View Monthly Matrix
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ============================================================================== -->
+<!-- CRITICAL ALERT: STUDENTS WITH ATTENDANCE BELOW 50% -->
+<!-- ============================================================================== -->
+{% if low_attendance_count > 0 %}
+<div class="card" style="border: 1px solid #FECACA; background: linear-gradient(135deg, rgba(254, 242, 242, 0.7), rgba(254, 226, 226, 0.4)); margin-bottom: 24px; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.08);">
+    <div class="card-header" style="flex-wrap: wrap; gap: 12px; border-bottom: 1px solid #FCA5A5;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 36px; height: 36px; border-radius: 50%; background: #EF4444; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 18px;">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+            </div>
+            <div>
+                <div class="card-title" style="color: #991B1B; font-size: 15px;">
+                    Critical Attendance Alert — Students Below 50% Attendance
+                </div>
+                <div style="font-size: 12px; color: #B91C1C; margin-top: 2px;">
+                    {{ low_attendance_count }} student{{ low_attendance_count|pluralize }} in your assigned batches currently falling below the 50% minimum attendance threshold.
+                </div>
+            </div>
+        </div>
+        <span class="badge" style="background: #EF4444; color: #FFFFFF; font-weight: 800; font-size: 12px; padding: 6px 14px; border-radius: var(--radius-full);">
+            {{ low_attendance_count }} Critical Student{{ low_attendance_count|pluralize }}
+        </span>
+    </div>
+
+    <div style="padding: 16px 20px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px;">
+            {% for item in low_attendance_students %}
+            <div style="background: #FFFFFF; border: 1px solid #FECACA; border-radius: var(--radius-md); padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; box-shadow: 0 2px 6px rgba(239, 68, 68, 0.04);">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 38px; height: 38px; border-radius: 50%; background: {{ item.student.avatar_color }}; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0;">
+                        {{ item.student.initials }}
+                    </div>
+                    <div>
+                        <a href="{% url 'student_detail' item.student.id %}" style="font-weight: 700; font-size: 13px; color: var(--text-main); text-decoration: none;">
+                            {{ item.student.name }}
+                        </a>
+                        <div style="font-size: 11px; color: var(--text-dim); display: flex; align-items: center; gap: 6px; margin-top: 2px;">
+                            <code>{{ item.student.roll_number }}</code>
+                            <span>•</span>
+                            <span class="badge-schedule badge-daily" style="font-size: 9px; padding: 1px 5px;">{{ item.batch.code }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="text-align: right; flex-shrink: 0;">
+                    <div style="font-size: 16px; font-weight: 900; color: #DC2626; font-family: 'JetBrains Mono', monospace;">
+                        {{ item.attendance_pct }}%
+                    </div>
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">
+                        {{ item.present_count }}/{{ item.total_sessions }} Present
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if selected_batch or selected_group %}
+<!-- Attendance Stats Live Bar -->
+<div class="kpi-grid" style="margin-bottom: 24px;">
+    <div class="kpi-card">
+        <div class="kpi-icon-box kpi-icon-success">
+            <i class="bi bi-person-check-fill"></i>
+        </div>
+        <div class="kpi-info">
+            <div class="kpi-title">Present</div>
+            <div class="kpi-value" id="livePresentCount" style="color: var(--success);">{{ present_count }}</div>
+            <div class="kpi-meta">Students present on time</div>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon-box kpi-icon-warning">
+            <i class="bi bi-alarm-fill"></i>
+        </div>
+        <div class="kpi-info">
+            <div class="kpi-title">Late</div>
+            <div class="kpi-value" id="liveLateCount" style="color: var(--warning);">{{ late_count }}</div>
+            <div class="kpi-meta">Arrived after start time</div>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon-box kpi-icon-primary" style="background: var(--danger-light); color: var(--danger);">
+            <i class="bi bi-person-x-fill"></i>
+        </div>
+        <div class="kpi-info">
+            <div class="kpi-title">Absent</div>
+            <div class="kpi-value" id="liveAbsentCount" style="color: var(--danger);">{{ absent_count }}</div>
+            <div class="kpi-meta">Unapproved leave</div>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon-box kpi-icon-accent">
+            <i class="bi bi-pie-chart-fill"></i>
+        </div>
+        <div class="kpi-info">
+            <div class="kpi-title">Attendance Rate</div>
+            <div class="kpi-value" id="liveAttendanceRate">{{ present_rate }}%</div>
+            <div class="kpi-meta">Session attendance percentage</div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================================== -->
+<!-- LOCK & PERMISSION STATUS BANNER -->
+<!-- ============================================================================== -->
+{% if is_already_marked and not is_admin %}
+<div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: var(--radius-lg); padding: 16px 20px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+    <div style="display: flex; align-items: center; gap: 14px;">
+        <div style="width: 42px; height: 42px; border-radius: 50%; background: #FEE2E2; color: #DC2626; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;">
+            <i class="bi bi-lock-fill"></i>
+        </div>
+        <div>
+            <div style="font-weight: 800; font-size: 14px; color: #991B1B;">
+                Attendance Finalized & Locked
+            </div>
+            <div style="font-size: 12px; color: #7F1D1D; margin-top: 2px;">
+                Attendance for <strong>{{ selected_batch.name }}</strong> on <strong>{{ selected_date_display }}</strong> has already been saved and finalized. Once saved, it cannot be changed. Only <strong>System Administrators</strong> have permission to modify saved attendance.
+            </div>
+        </div>
+    </div>
+    <span class="badge" style="background: #FEE2E2; color: #991B1B; font-weight: 700; font-size: 11px; padding: 6px 14px; border: 1px solid #FECACA;">
+        <i class="bi bi-shield-lock-fill"></i> Read Only Mode
+    </span>
+</div>
+{% elif is_already_marked and is_admin %}
+<div style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: var(--radius-lg); padding: 16px 20px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+    <div style="display: flex; align-items: center; gap: 14px;">
+        <div style="width: 42px; height: 42px; border-radius: 50%; background: #EEF2FF; color: #4F46E5; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;">
+            <i class="bi bi-shield-lock"></i>
+        </div>
+        <div>
+            <div style="font-weight: 800; font-size: 14px; color: #3730A3;">
+                Admin Attendance Override Mode
+            </div>
+            <div style="font-size: 12px; color: #4338CA; margin-top: 2px;">
+                Attendance for this date was previously finalized. As an <strong>Administrator</strong>, you have permission to edit and update these records.
+            </div>
+        </div>
+    </div>
+    <span class="badge" style="background: #EEF2FF; color: #4338CA; font-weight: 700; font-size: 11px; padding: 6px 14px; border: 1px solid #C7D2FE;">
+        <i class="bi bi-key-fill"></i> Administrator Access
+    </span>
+</div>
+{% endif %}
+
+{% if reschedule_exception %}
+<div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: var(--radius-lg); padding: 16px 20px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+    <div style="display: flex; align-items: center; gap: 14px;">
+        <div style="width: 42px; height: 42px; border-radius: 50%; background: #FEE2E2; color: #DC2626; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;">
+            <i class="bi bi-calendar-minus"></i>
+        </div>
+        <div>
+            <div style="font-weight: 800; font-size: 14px; color: #991B1B;">
+                Class Cancelled / Rescheduled
+            </div>
+            <div style="font-size: 12px; color: #7F1D1D; margin-top: 2px;">
+                This scheduled class was shifted by an Administrator.
+                {% if reschedule_exception.rescheduled_date %}
+                It has been rescheduled to <strong>{{ reschedule_exception.rescheduled_date|date:"l, M d, Y" }}</strong>.
+                {% else %}
+                It was permanently cancelled.
+                {% endif %}
+                {% if reschedule_exception.reason %}<br><em>Reason: {{ reschedule_exception.reason }}</em>{% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% elif makeup_exception %}
+<div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: var(--radius-lg); padding: 16px 20px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+    <div style="display: flex; align-items: center; gap: 14px;">
+        <div style="width: 42px; height: 42px; border-radius: 50%; background: #D1FAE5; color: #059669; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;">
+            <i class="bi bi-calendar-plus"></i>
+        </div>
+        <div>
+            <div style="font-weight: 800; font-size: 14px; color: #065F46;">
+                Rescheduled Makeup Class
+            </div>
+            <div style="font-size: 12px; color: #047857; margin-top: 2px;">
+                This is a special makeup class covering for the cancelled class on <strong>{{ makeup_exception.original_date|date:"l, M d, Y" }}</strong>.
+                {% if makeup_exception.reason %}<br><em>Reason: {{ makeup_exception.reason }}</em>{% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% elif not is_class_day %}
+<div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: var(--radius-lg); padding: 16px 20px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+    <div style="display: flex; align-items: center; gap: 14px;">
+        <div style="width: 42px; height: 42px; border-radius: 50%; background: #FEF3C7; color: #D97706; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;">
+            <i class="bi bi-calendar-x"></i>
+        </div>
+        <div>
+            <div style="font-weight: 800; font-size: 14px; color: #92400E;">
+                Non-Class Day ({{ selected_date_day_name }})
+            </div>
+            <div style="font-size: 12px; color: #B45309; margin-top: 2px;">
+                The selected date does not fall on a scheduled class day for this batch. The batch schedule is: <strong>{{ selected_batch.short_days_display }}</strong>.
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Attendance Form Table -->
+<form method="post">
+    {% csrf_token %}
+    <div class="card">
+        <div class="card-header" style="flex-wrap: wrap; gap: 12px;">
+            <div>
+                <div class="card-title">
+                    <i class="bi bi-card-checklist text-primary"></i> Roll Call: {{ selected_batch.name }}
+                </div>
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                    Date: <strong>{{ selected_date_display }}</strong> • Schedule: <strong>{{ selected_batch.get_schedule_type_display }}</strong>
+                </div>
+            </div>
+
+            <!-- Quick Bulk Actions (Only active when editable) -->
+            {% if can_edit_attendance %}
+            <div style="display: flex; gap: 8px;">
+                <button type="button" id="markAllPresentBtn" class="btn btn-success btn-sm">
+                    <i class="bi bi-check-all"></i> Mark All Present
+                </button>
+                <button type="button" id="markAllAbsentBtn" class="btn btn-danger btn-sm">
+                    <i class="bi bi-x"></i> Mark All Absent
+                </button>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Student Details</th>
+                        <th>Roll Number</th>
+                        <th>Cumulative Attendance</th>
+                        <th>Status Selection</th>
+                        <th>Remarks / Reason</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in students_data %}
+                    <tr class="att-student-row">
+                        <td>{{ forloop.counter }}</td>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div style="width: 34px; height: 34px; border-radius: var(--radius-full); background: {{ item.student.avatar_color }}; color: #FFF; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700;">
+                                    {{ item.student.initials }}
+                                </div>
+                                <div>
+                                    <a href="{% url 'student_detail' item.student.id %}" style="font-weight: 700; color: var(--text-main);">
+                                        {{ item.student.name }}
+                                    </a>
+                                </div>
+                            </div>
+                        </td>
+                        <td><code>{{ item.student.roll_number }}</code></td>
+                        <td>
+                            {% if item.is_low_attendance %}
+                                <span class="badge" style="background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA; font-weight: 800; font-size: 11px;">
+                                    <i class="bi bi-exclamation-triangle-fill"></i> {{ item.cum_attendance_pct }}% (Low)
+                                </span>
+                            {% elif item.cum_attendance_pct >= 75 %}
+                                <span class="badge" style="background: #D1FAE5; color: #065F46; border: 1px solid #A7F3D0; font-weight: 700; font-size: 11px;">
+                                    <i class="bi bi-check-circle-fill"></i> {{ item.cum_attendance_pct }}%
+                                </span>
+                            {% else %}
+                                <span class="badge" style="background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; font-weight: 700; font-size: 11px;">
+                                    {{ item.cum_attendance_pct }}%
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="att-radio-group">
+                                <label class="att-radio-btn {% if item.status == 'PRESENT' %}active present{% endif %} {% if not can_edit_attendance %}disabled{% endif %}" {% if not can_edit_attendance %}style="opacity: 0.8; cursor: not-allowed;"{% endif %}>
+                                    <input type="radio" name="status_{{ item.student.id }}" value="PRESENT" {% if item.status == 'PRESENT' %}checked{% endif %} {% if not can_edit_attendance %}disabled{% endif %} style="display: none;">
+                                    Present
+                                </label>
+                                <label class="att-radio-btn {% if item.status == 'LATE' %}active late{% endif %} {% if not can_edit_attendance %}disabled{% endif %}" {% if not can_edit_attendance %}style="opacity: 0.8; cursor: not-allowed;"{% endif %}>
+                                    <input type="radio" name="status_{{ item.student.id }}" value="LATE" {% if item.status == 'LATE' %}checked{% endif %} {% if not can_edit_attendance %}disabled{% endif %} style="display: none;">
+                                    Late
+                                </label>
+                                <label class="att-radio-btn {% if item.status == 'ABSENT' %}active absent{% endif %} {% if not can_edit_attendance %}disabled{% endif %}" {% if not can_edit_attendance %}style="opacity: 0.8; cursor: not-allowed;"{% endif %}>
+                                    <input type="radio" name="status_{{ item.student.id }}" value="ABSENT" {% if item.status == 'ABSENT' %}checked{% endif %} {% if not can_edit_attendance %}disabled{% endif %} style="display: none;">
+                                    Absent
+                                </label>
+                                <label class="att-radio-btn {% if item.status == 'EXCUSED' %}active excused{% endif %} {% if not can_edit_attendance %}disabled{% endif %}" {% if not can_edit_attendance %}style="opacity: 0.8; cursor: not-allowed;"{% endif %}>
+                                    <input type="radio" name="status_{{ item.student.id }}" value="EXCUSED" {% if item.status == 'EXCUSED' %}checked{% endif %} {% if not can_edit_attendance %}disabled{% endif %} style="display: none;">
+                                    Excused
+                                </label>
+                            </div>
+                        </td>
+                        <td>
+                            <input type="text" name="remarks_{{ item.student.id }}" value="{{ item.remarks }}" class="form-input" style="padding: 6px 10px; font-size: 13px;" placeholder="Optional reason/notes..." {% if not can_edit_attendance %}disabled readonly style="background: var(--bg-subtle); cursor: not-allowed;"{% endif %}>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: var(--text-dim); padding: 32px;">
+                            No students enrolled in this batch.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-color);">
+            {% if can_edit_attendance %}
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="bi bi-check2-circle"></i> {% if is_already_marked and is_admin %}Update Attendance Records (Admin){% else %}Save Attendance Records{% endif %}
+                </button>
+            {% else %}
+                <button type="button" class="btn btn-secondary btn-lg" disabled style="opacity: 0.75; cursor: not-allowed;">
+                    {% if not is_class_day %}
+                    <i class="bi bi-calendar-x"></i> Attendance Locked (Non-Class Day)
+                    {% else %}
+                    <i class="bi bi-lock-fill"></i> Attendance Locked (Admin Permission Required)
+                    {% endif %}
+                </button>
+            {% endif %}
+        </div>
+    </div>
+</form>
+{% else %}
+<div style="text-align: center; padding: 48px; background: var(--bg-surface); border-radius: var(--radius-lg); border: 1px dashed var(--border-color);">
+    <i class="bi bi-calendar-x" style="font-size: 40px; color: var(--text-dim); display: block; margin-bottom: 12px;"></i>
+    <h3 style="font-size: 18px; font-weight: 700; color: var(--text-main);">No Batches Available</h3>
+    <p style="font-size: 14px; color: var(--text-muted); margin-top: 4px;">Please create a batch first to mark attendance.</p>
+</div>
+{% endif %}
+
+<!-- Reschedule Class Modal -->
+{% if selected_batch %}
+<div id="rescheduleModal" class="modal-backdrop" style="display: none;">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <div class="modal-title">
+                <i class="bi bi-calendar2-range text-warning"></i> Reschedule Class Date
+            </div>
+            <button class="modal-close" onclick="closeRescheduleModal()"><i class="bi bi-x"></i></button>
+        </div>
+        <form method="post" action="{% url 'batch_reschedule_class' %}">
+            {% csrf_token %}
+            <input type="hidden" name="batch_id" value="{{ selected_batch.id }}">
+            <div class="modal-body">
+                <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">
+                    Use this tool to shift a scheduled class day to a new date, or cancel it entirely. This ensures the attendance matrix remains accurate.
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Original Class Date (To Cancel/Shift) *</label>
+                    <input type="date" name="original_date" value="{{ selected_date }}" class="form-input" required>
+                    <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">The date that is being replaced.</div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">New Makeup Date (Optional)</label>
+                    <input type="date" name="rescheduled_date" class="form-input">
+                    <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">Leave blank if the class is permanently cancelled without a makeup day.</div>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">Reason</label>
+                    <input type="text" name="reason" class="form-input" placeholder="e.g. Trainer unavailable, Public holiday...">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeRescheduleModal()">Cancel</button>
+                <button type="submit" class="btn btn-warning"><i class="bi bi-check2"></i> Apply Reschedule</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openRescheduleModal() {
+        document.getElementById('rescheduleModal').style.display = 'flex';
+    }
+    function closeRescheduleModal() {
+        document.getElementById('rescheduleModal').style.display = 'none';
+    }
+</script>
+{% endif %}
+
+{% endblock %}

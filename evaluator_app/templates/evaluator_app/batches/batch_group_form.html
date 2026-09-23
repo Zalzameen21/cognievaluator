@@ -1,0 +1,65 @@
+{% extends 'evaluator_app/base.html' %}
+
+{% block title %}{{ title }} - Student Evaluator Portal{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+    <!-- Page Header -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <div>
+            <h2 style="font-size: 24px; font-weight: 800; color: var(--text-main); margin: 0; display: flex; align-items: center; gap: 12px; letter-spacing: -0.02em;">
+                <div style="width: 40px; height: 40px; border-radius: var(--radius-md); background: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 18px;">
+                    <i class="bi bi-collection-fill"></i>
+                </div>
+                {{ title }}
+            </h2>
+            <p style="margin: 4px 0 0 52px; font-size: 13px; color: var(--text-muted);">
+                Group multiple batches to manage attendance simultaneously.
+            </p>
+        </div>
+        <div>
+            <a href="{% url 'batch_group_list' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Groups
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Form Card -->
+    <div class="card" style="box-shadow: var(--shadow-md); border-color: rgba(79, 70, 229, 0.1);">
+        <form method="post" id="batchGroupForm">
+            {% csrf_token %}
+            
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label class="form-label">Batch Group Name *</label>
+                {{ form.name }}
+                {% if form.name.errors %}<div style="color: var(--danger); font-size: 12px; margin-top: 4px;">{{ form.name.errors }}</div>{% endif %}
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">e.g., "Thursday Combined CSE/AD"</div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label class="form-label">Select Batches to Merge *</label>
+                <div class="checkbox-list-container" style="max-height: 250px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px; background: var(--bg-surface);">
+                    {{ form.batches }}
+                </div>
+                <style>
+                    .checkbox-list-container ul { list-style: none; padding: 0; margin: 0; }
+                    .checkbox-list-container li { margin-bottom: 8px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+                    .checkbox-list-container li:last-child { margin-bottom: 0; }
+                    .checkbox-list-container label { cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--text-main); }
+                </style>
+                {% if form.batches.errors %}<div style="color: var(--danger); font-size: 12px; margin-top: 4px;">{{ form.batches.errors }}</div>{% endif %}
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Select the batches you want to group together.</div>
+            </div>
+
+            <!-- Form Actions -->
+            <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 12px;">
+                <a href="{% url 'batch_group_list' %}" class="btn btn-secondary" style="padding: 10px 24px; font-weight: 600;">Cancel</a>
+                <button type="submit" class="btn btn-primary" style="padding: 10px 24px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px;">
+                    <i class="bi bi-save"></i> Save Batch Group
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

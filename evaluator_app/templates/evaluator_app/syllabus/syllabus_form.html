@@ -1,0 +1,32 @@
+{% extends 'evaluator_app/base.html' %}
+{% block title %}Create Syllabus — Student Evaluator Portal{% endblock %}
+{% block page_title %}Create Syllabus{% endblock %}
+{% block content %}
+<div style="max-width:640px;margin:0 auto;">
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><i class="bi bi-journal-plus text-primary"></i> New Syllabus</div>
+      <a href="{% url 'syllabus_list' %}" class="btn btn-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back</a>
+    </div>
+    <form method="post" style="padding:28px;">
+      {% csrf_token %}
+      <div class="form-group">
+        <label class="form-label">Syllabus Name <span class="form-label-required">*</span></label>
+        <input type="text" name="name" class="form-input" placeholder="e.g. Python Full Stack – Beginner to Advanced" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Total Modules <span class="form-label-required">*</span></label>
+        <input type="number" name="total_modules" class="form-input" min="1" value="1" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea name="description" class="form-textarea" rows="3" placeholder="Brief overview of this syllabus..."></textarea>
+      </div>
+      <div style="display:flex;gap:12px;justify-content:flex-end;border-top:1px solid var(--border-color);padding-top:18px;margin-top:10px;">
+        <a href="{% url 'syllabus_list' %}" class="btn btn-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check2-circle"></i> Create Syllabus</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,169 @@
+{% extends 'evaluator_app/base.html' %}
+
+{% block title %}{{ batch.name }} - Attendance Register{% endblock %}
+{% block page_title %}Attendance Register Matrix{% endblock %}
+
+{% block content %}
+<div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-xl); padding: 20px 24px; margin-bottom: 24px; box-shadow: var(--shadow-sm); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+    <div>
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+            <h2 style="font-size: 20px; font-weight: 800; color: var(--text-main);">
+                {% if group %}[GROUP] {{ group.name }}{% else %}{{ batch.name }}{% endif %}
+            </h2>
+            {% if not group %}
+            <span class="location-badge"><i class="bi bi-geo-alt"></i> {{ batch.location.name }}</span>
+            <span class="badge-schedule badge-daily">{{ batch.get_schedule_type_display }}</span>
+            {% endif %}
+        </div>
+        <div style="font-size: 13px; color: var(--text-muted);">
+            Attendance Matrix for last {{ dates|length }} days
+        </div>
+    </div>
+
+    <div style="display: flex; gap: 10px;">
+        <a href="{% url 'attendance_hub' %}?{% if group %}group_id={{ group.id }}{% else %}batch_id={{ batch.id }}{% endif %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> Mark Today's Attendance
+        </a>
+        {% if not group %}
+        <button type="button" class="btn btn-secondary" onclick="openExportModal()">
+            <i class="bi bi-download"></i> Export Attendance
+        </button>
+        <a href="{% url 'batch_detail' batch.id %}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Batch Details
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header" style="flex-wrap: wrap; gap: 10px;">
+        <div class="card-title">
+            <i class="bi bi-grid-3x3 text-primary"></i> Multi-Day Attendance Matrix
+        </div>
+        <!-- Legend -->
+        <div style="display: flex; gap: 12px; font-size: 12px; align-items: center;">
+            <span style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--success);"></span> Present (P)</span>
+            <span style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--warning);"></span> Late (L)</span>
+            <span style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--danger);"></span> Absent (A)</span>
+            <span style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--border-color);"></span> Not Marked (-)</span>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="data-table" style="font-size: 13px;">
+            <thead>
+                <tr>
+                    <th style="position: sticky; left: 0; background: var(--bg-subtle); z-index: 2;">Student</th>
+                    {% for d in dates %}
+                        <th style="text-align: center; min-width: 44px; padding: 10px 4px;" {% if d in makeup_dates %}title="Rescheduled Makeup Class"{% endif %}>
+                            <div style="font-size: 10px; font-weight: 800; color: var(--text-muted); margin-bottom: 2px;">{{ d|date:"D"|upper }}</div>
+                            <div>{{ d|date:"d" }}{% if d in makeup_dates %}<span style="color: var(--warning); font-weight: bold; margin-left: 1px;">*</span>{% endif %}</div>
+                            <div style="font-size: 10px; font-weight: normal; color: var(--text-dim);">{{ d|date:"M" }}</div>
+                        </th>
+                    {% endfor %}
+                    <th style="text-align: center;">Period %</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in matrix %}
+                <tr>
+                    <td style="position: sticky; left: 0; background: var(--bg-surface); z-index: 1; font-weight: 700; white-space: nowrap; padding-right: 24px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+                            <div>
+                                <a href="{% url 'student_detail' row.student.id %}">{{ row.student.name }}</a>
+                                <div style="font-size: 11px; font-family: monospace; color: var(--text-muted);">{{ row.student.roll_number }}</div>
+                            </div>
+                            <a href="{% url 'export_student_attendance' row.student.id %}" title="Download Individual Attendance (CSV)" style="color: var(--primary); background: var(--bg-subtle); width: 26px; height: 26px; border-radius: 4px; display: flex; align-items: center; justify-content: center; text-decoration: none;">
+                                <i class="bi bi-file-earmark-arrow-down"></i>
+                            </a>
+                        </div>
+                    </td>
+                    {% for cell in row.statuses %}
+                        <td style="text-align: center; padding: 10px 4px;">
+                            {% if cell.status == 'PRESENT' %}
+                                <span style="display: inline-flex; width: 24px; height: 24px; border-radius: 6px; background: var(--success-light); color: var(--success); font-weight: 800; font-size: 11px; align-items: center; justify-content: center;" title="{{ cell.date|date:'d M' }}: Present">P</span>
+                            {% elif cell.status == 'LATE' %}
+                                <span style="display: inline-flex; width: 24px; height: 24px; border-radius: 6px; background: var(--warning-light); color: var(--warning); font-weight: 800; font-size: 11px; align-items: center; justify-content: center;" title="{{ cell.date|date:'d M' }}: Late">L</span>
+                            {% elif cell.status == 'ABSENT' %}
+                                <span style="display: inline-flex; width: 24px; height: 24px; border-radius: 6px; background: var(--danger-light); color: var(--danger); font-weight: 800; font-size: 11px; align-items: center; justify-content: center;" title="{{ cell.date|date:'d M' }}: Absent">A</span>
+                            {% elif cell.status == 'EXCUSED' %}
+                                <span style="display: inline-flex; width: 24px; height: 24px; border-radius: 6px; background: var(--info-light); color: var(--info); font-weight: 800; font-size: 11px; align-items: center; justify-content: center;" title="{{ cell.date|date:'d M' }}: Excused">E</span>
+                            {% else %}
+                                <span style="display: inline-flex; width: 24px; height: 24px; border-radius: 6px; background: var(--bg-subtle); color: var(--text-dim); font-size: 11px; align-items: center; justify-content: center;">-</span>
+                            {% endif %}
+                        </td>
+                    {% endfor %}
+                    <td style="text-align: center; font-weight: 800; color: var(--primary);">
+                        {{ row.period_percentage }}%
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="{{ dates|length|add:2 }}" style="text-align: center; padding: 32px;">
+                        No students enrolled in this batch.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Export Attendance Modal -->
+<div id="exportModal" class="modal-backdrop" style="display: none;">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+            <div class="modal-title">
+                <i class="bi bi-download"></i> Export Batch Attendance
+            </div>
+            <button type="button" class="modal-close" onclick="closeExportModal()"><i class="bi bi-x"></i></button>
+        </div>
+        <form method="get" action="{% url 'export_batch_attendance' batch.id %}">
+            <div class="modal-body">
+                <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">
+                    Download the attendance records for the entire batch. Select a specific month, or leave it blank to export the entire year.
+                </div>
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px;">Year *</label>
+                    <select name="year" class="form-input" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-surface); color: var(--text-main);" required>
+                        <option value="2026" selected>2026</option>
+                        <option value="2025">2025</option>
+                        <option value="2024">2024</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px;">Month (Optional)</label>
+                    <select name="month" class="form-input" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-surface); color: var(--text-main);">
+                        <option value="">-- All Year --</option>
+                        <option value="1">January</option>
+                        <option value="2">February</option>
+                        <option value="3">March</option>
+                        <option value="4">April</option>
+                        <option value="5">May</option>
+                        <option value="6">June</option>
+                        <option value="7">July</option>
+                        <option value="8">August</option>
+                        <option value="9">September</option>
+                        <option value="10">October</option>
+                        <option value="11">November</option>
+                        <option value="12">December</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 16px 24px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 12px; background: var(--bg-subtle); border-radius: 0 0 var(--radius-lg) var(--radius-lg);">
+                <button type="button" class="btn btn-secondary" onclick="closeExportModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary" onclick="setTimeout(closeExportModal, 500)"><i class="bi bi-file-earmark-arrow-down"></i> Download CSV</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openExportModal() {
+        document.getElementById('exportModal').style.display = 'flex';
+    }
+    function closeExportModal() {
+        document.getElementById('exportModal').style.display = 'none';
+    }
+</script>
+{% endblock %}

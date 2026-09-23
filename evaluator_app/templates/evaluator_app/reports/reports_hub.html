@@ -1,0 +1,423 @@
+{% extends 'evaluator_app/base.html' %}
+{% block title %}Reports Hub{% endblock %}
+{% block page_title %}Reports Hub{% endblock %}
+
+{% block content %}
+<style>
+    /* Professional Reports Hub Styling */
+    .reports-hub-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding-bottom: 50px;
+        font-family: 'Inter', sans-serif;
+    }
+    
+    .reports-header {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+    .reports-header h2 {
+        font-size: 32px;
+        font-weight: 800;
+        background: linear-gradient(135deg, #2563EB, #7C3AED);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 12px;
+    }
+    .reports-header p {
+        color: #64748B;
+        font-size: 16px;
+        max-width: 600px;
+        margin: 0 auto;
+        line-height: 1.5;
+    }
+
+    .report-card-section {
+        background: #FFFFFF;
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        border: 1px solid rgba(0, 0, 0, 0.03);
+        margin-bottom: 40px;
+        overflow: hidden;
+    }
+
+    .report-card-header {
+        padding: 24px 30px;
+        border-bottom: 1px solid #F1F5F9;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .report-card-header.batch-header {
+        background: linear-gradient(90deg, rgba(37, 99, 235, 0.03), transparent);
+    }
+    .report-card-header.student-header {
+        background: linear-gradient(90deg, rgba(16, 185, 129, 0.03), transparent);
+    }
+
+    .report-card-header h3 {
+        font-size: 18px;
+        font-weight: 700;
+        margin: 0;
+    }
+    .batch-header h3 { color: #1E3A8A; }
+    .student-header h3 { color: #064E3B; }
+
+    .icon-wrapper {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+    }
+    .batch-header .icon-wrapper { background: #DBEAFE; color: #2563EB; }
+    .student-header .icon-wrapper { background: #D1FAE5; color: #10B981; }
+
+    .report-card-body {
+        padding: 30px;
+    }
+
+    .selection-area {
+        background: #F8FAFC;
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 30px;
+        border: 1px dashed #CBD5E1;
+    }
+    
+    .selection-area label {
+        display: block;
+        font-size: 14px;
+        font-weight: 700;
+        color: #334155;
+        margin-bottom: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .custom-input-group {
+        display: flex;
+        align-items: center;
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        padding: 4px 16px;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+    .custom-input-group:focus-within {
+        border-color: #3B82F6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    .custom-input-group i {
+        color: #94A3B8;
+        font-size: 18px;
+        margin-right: 12px;
+    }
+    .custom-input-group select,
+    .custom-input-group input {
+        border: none;
+        background: transparent;
+        height: 44px;
+        flex: 1;
+        font-size: 15px;
+        color: #1E293B;
+        outline: none;
+    }
+    .custom-input-group select:focus,
+    .custom-input-group input:focus {
+        box-shadow: none;
+        outline: none;
+    }
+
+    .reports-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 20px;
+    }
+
+    .download-btn {
+        background: #FFFFFF;
+        border: 2px solid #E2E8F0;
+        border-radius: 12px;
+        padding: 24px 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: #475569;
+        text-decoration: none;
+        outline: none;
+    }
+
+    .download-btn:disabled {
+        background: #F8FAFC;
+        border-color: #F1F5F9;
+        color: #94A3B8;
+        cursor: not-allowed;
+    }
+
+    .download-btn:disabled .btn-icon {
+        color: #CBD5E1;
+        background: #F1F5F9;
+    }
+
+    .btn-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: #F1F5F9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        margin-bottom: 16px;
+        transition: all 0.3s ease;
+        color: #64748B;
+    }
+
+    .btn-title {
+        font-size: 15px;
+        font-weight: 700;
+        margin-bottom: 6px;
+        transition: color 0.3s ease;
+    }
+    
+    .btn-desc {
+        font-size: 12px;
+        font-weight: 500;
+        line-height: 1.4;
+        transition: color 0.3s ease;
+    }
+
+    /* Batch Button Active States */
+    .download-btn.batch-btn:not(:disabled) {
+        border-color: rgba(37, 99, 235, 0.2);
+    }
+    .download-btn.batch-btn:not(:disabled):hover {
+        border-color: #2563EB;
+        background: #EFF6FF;
+        transform: translateY(-4px);
+        box-shadow: 0 10px 20px rgba(37, 99, 235, 0.1);
+    }
+    .download-btn.batch-btn:not(:disabled) .btn-icon {
+        background: #DBEAFE;
+        color: #2563EB;
+    }
+    .download-btn.batch-btn:not(:disabled):hover .btn-icon {
+        background: #2563EB;
+        color: #FFFFFF;
+        transform: scale(1.1);
+    }
+    .download-btn.batch-btn:not(:disabled) .btn-title {
+        color: #1E3A8A;
+    }
+    .download-btn.batch-btn:not(:disabled) .btn-desc {
+        color: #60A5FA;
+    }
+
+    /* Student Button Active States */
+    .download-btn.student-btn:not(:disabled) {
+        border-color: rgba(16, 185, 129, 0.2);
+    }
+    .download-btn.student-btn:not(:disabled):hover {
+        border-color: #10B981;
+        background: #ECFDF5;
+        transform: translateY(-4px);
+        box-shadow: 0 10px 20px rgba(16, 185, 129, 0.1);
+    }
+    .download-btn.student-btn:not(:disabled) .btn-icon {
+        background: #D1FAE5;
+        color: #10B981;
+    }
+    .download-btn.student-btn:not(:disabled):hover .btn-icon {
+        background: #10B981;
+        color: #FFFFFF;
+        transform: scale(1.1);
+    }
+    .download-btn.student-btn:not(:disabled) .btn-title {
+        color: #064E3B;
+    }
+    .download-btn.student-btn:not(:disabled) .btn-desc {
+        color: #34D399;
+    }
+
+</style>
+
+<div class="reports-hub-container">
+    
+    <div class="reports-header">
+        <h2>Data Export & Reporting</h2>
+        <p>
+            Generate and download clean, formatted CSV datasets. Select your target below to activate the corresponding report exports.
+        </p>
+    </div>
+
+    <!-- BATCH REPORTS -->
+    <div class="report-card-section">
+        <div class="report-card-header batch-header">
+            <div class="icon-wrapper"><i class="bi bi-collection-fill"></i></div>
+            <h3>Batch-Level Reports</h3>
+        </div>
+        <div class="report-card-body">
+            <div class="selection-area">
+                <label>1. Select a Batch</label>
+                <div class="custom-input-group">
+                    <i class="bi bi-diagram-3-fill"></i>
+                    <select id="batchSelect">
+                        <option value="">-- Choose a Batch from the list --</option>
+                        {% for b in batches %}
+                        <option value="{{ b.id }}">{{ b.name }} ({{ b.code }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="reports-grid">
+                <!-- Batch Student List -->
+                <button class="download-btn batch-btn" data-type="batch_list" disabled>
+                    <div class="btn-icon"><i class="bi bi-people-fill"></i></div>
+                    <div class="btn-title">Student Roster</div>
+                    <div class="btn-desc">Full list of enrolled students</div>
+                </button>
+
+                <!-- Batch Attendance -->
+                <button class="download-btn batch-btn" data-type="batch_attendance" disabled>
+                    <div class="btn-icon"><i class="bi bi-calendar-check-fill"></i></div>
+                    <div class="btn-title">Attendance Matrix</div>
+                    <div class="btn-desc">Complete daily attendance logs</div>
+                </button>
+
+                <!-- Batch Syllabus -->
+                <button class="download-btn batch-btn" data-type="batch_syllabus" disabled>
+                    <div class="btn-icon"><i class="bi bi-journal-bookmark-fill"></i></div>
+                    <div class="btn-title">Syllabus Schedule</div>
+                    <div class="btn-desc">Timeline of assigned modules</div>
+                </button>
+
+                <!-- Batch Tasks -->
+                <button class="download-btn batch-btn" data-type="batch_tasks" disabled>
+                    <div class="btn-icon"><i class="bi bi-list-task"></i></div>
+                    <div class="btn-title">Task Workflow</div>
+                    <div class="btn-desc">All assignments & deliverables</div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- STUDENT REPORTS -->
+    <div class="report-card-section">
+        <div class="report-card-header student-header">
+            <div class="icon-wrapper"><i class="bi bi-person-lines-fill"></i></div>
+            <h3>Individual Student Reports</h3>
+        </div>
+        <div class="report-card-body">
+            <div class="selection-area">
+                <label>1. Search & Select a Student</label>
+                <div class="custom-input-group">
+                    <i class="bi bi-search"></i>
+                    <input list="studentsList" id="studentSearchInput" placeholder="Start typing a student's name...">
+                    <datalist id="studentsList">
+                        {% for s in students %}
+                        <option data-id="{{ s.id }}" value="{{ s.name }} ({{ s.roll_number }}) - {{ s.batch.name }}"></option>
+                        {% endfor %}
+                    </datalist>
+                    <input type="hidden" id="studentSelect" value="">
+                </div>
+            </div>
+
+            <div class="reports-grid">
+                <!-- Student Attendance -->
+                <button class="download-btn student-btn" data-type="student_attendance" disabled>
+                    <div class="btn-icon"><i class="bi bi-person-check-fill"></i></div>
+                    <div class="btn-title">Individual Attendance</div>
+                    <div class="btn-desc">Personalized daily status report</div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const batchSelect = document.getElementById('batchSelect');
+        const studentSelect = document.getElementById('studentSelect');
+        const studentSearchInput = document.getElementById('studentSearchInput');
+        const batchBtns = document.querySelectorAll('.batch-btn');
+        const studentBtns = document.querySelectorAll('.student-btn');
+        
+        // Enable/Disable Batch Buttons based on selection
+        batchSelect.addEventListener('change', function() {
+            const hasValue = this.value !== "";
+            batchBtns.forEach(btn => {
+                btn.disabled = !hasValue;
+            });
+        });
+
+        // Enable/Disable Student Buttons based on selection via Datalist
+        studentSearchInput.addEventListener('input', function() {
+            const val = this.value;
+            const options = document.getElementById('studentsList').options;
+            let matchedId = "";
+            for (let i = 0; i < options.length; i++) {
+                if (options[i].value === val) {
+                    matchedId = options[i].getAttribute('data-id');
+                    break;
+                }
+            }
+            
+            studentSelect.value = matchedId;
+            const hasValue = matchedId !== "";
+            
+            studentBtns.forEach(btn => {
+                btn.disabled = !hasValue;
+            });
+        });
+        
+        // Handle Download Clicks
+        document.querySelectorAll('.download-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (this.disabled) return;
+
+                const type = this.getAttribute('data-type');
+                
+                if (type.startsWith('batch_')) {
+                    const batchId = batchSelect.value;
+                    if (!batchId) return;
+                    
+                    let url = '';
+                    if (type === 'batch_list') {
+                        url = `/batches/${batchId}/export/`;
+                    } else if (type === 'batch_attendance') {
+                        url = `/batches/${batchId}/export-attendance/`;
+                    } else if (type === 'batch_syllabus') {
+                        url = `/batches/${batchId}/schedule/download/`;
+                    } else if (type === 'batch_tasks') {
+                        url = `/batches/${batchId}/export-tasks/`;
+                    }
+                    
+                    if (url) window.location.href = url;
+                } 
+                else if (type.startsWith('student_')) {
+                    const studentId = studentSelect.value;
+                    if (!studentId) return;
+                    
+                    if (type === 'student_attendance') {
+                        window.location.href = `/students/${studentId}/export-attendance/`;
+                    }
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

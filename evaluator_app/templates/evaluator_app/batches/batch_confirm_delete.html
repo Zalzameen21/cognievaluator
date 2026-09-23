@@ -1,0 +1,40 @@
+{% extends 'evaluator_app/base.html' %}
+
+{% block title %}Delete Batch - Student Evaluator Portal{% endblock %}
+{% block page_title %}Delete Batch{% endblock %}
+
+{% block content %}
+<div style="max-width: 540px; margin: 60px auto;">
+    <div class="card" style="padding: 32px 32px 24px 32px; border-radius: var(--radius-xl); box-shadow: var(--shadow-md); border: 1px solid var(--border-color);">
+        <div style="display: flex; align-items: flex-start; gap: 24px;">
+            <div style="flex-shrink: 0; width: 60px; height: 60px; background-color: var(--danger-light); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.1);">
+                <i class="bi bi-exclamation-triangle" style="font-size: 28px; color: var(--danger);"></i>
+            </div>
+            <div>
+                <h3 style="font-size: 22px; font-weight: 800; color: var(--text-main); margin-bottom: 8px; line-height: 1.3;">
+                    Delete "{{ batch.name }}"?
+                </h3>
+                <p style="font-size: 14px; color: var(--text-muted); line-height: 1.6; margin-bottom: 16px;">
+                    This action is permanent and cannot be undone. Deleting this batch will instantly erase all associated data, including:
+                </p>
+                <ul style="font-size: 13px; color: var(--text-muted); font-weight: 500; margin-bottom: 28px; padding-left: 20px; line-height: 1.8;">
+                    <li>Enrolled Student Profiles</li>
+                    <li>Attendance Logs & Registers</li>
+                    <li>Daily & Task Evaluations</li>
+                    <li>Project Hub Data</li>
+                </ul>
+            </div>
+        </div>
+
+        <form method="post" style="display: flex; gap: 14px; justify-content: flex-end; border-top: 1px solid var(--border-color); padding-top: 24px;">
+            {% csrf_token %}
+            <a href="{% url 'batch_detail' batch.id %}" class="btn btn-secondary" style="padding: 10px 24px; font-weight: 600;">
+                Cancel
+            </a>
+            <button type="submit" class="btn btn-danger" style="padding: 10px 24px; font-weight: 600; background-color: var(--danger); border-color: var(--danger); box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);">
+                Yes, delete batch
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

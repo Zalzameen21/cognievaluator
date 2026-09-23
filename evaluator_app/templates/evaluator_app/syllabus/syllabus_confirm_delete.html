@@ -1,0 +1,24 @@
+{% extends 'evaluator_app/base.html' %}
+{% block title %}Delete Syllabus{% endblock %}
+{% block content %}
+<div style="max-width:480px;margin:40px auto;">
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title" style="color:var(--danger);"><i class="bi bi-trash"></i> Delete Syllabus</div>
+    </div>
+    <div style="padding:28px;">
+      <p style="color:var(--text-main);font-size:15px;">Are you sure you want to delete <strong>{{ syllabus.name }}</strong>?</p>
+      <p style="color:var(--text-muted);font-size:13px;">This will also remove all associated task schedules for batches using this syllabus. This action cannot be undone.</p>
+      <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:24px;">
+        <a href="{% url 'syllabus_list' %}" class="btn btn-secondary">Cancel</a>
+        <form method="post">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-primary" style="background:var(--danger);border-color:var(--danger);">
+            <i class="bi bi-trash"></i> Yes, Delete
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

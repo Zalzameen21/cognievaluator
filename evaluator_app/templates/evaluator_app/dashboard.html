@@ -1,0 +1,400 @@
+{% extends 'evaluator_app/base.html' %}
+{% load static %}
+
+{% block title %}Dashboard - Student Evaluator Portal{% endblock %}
+
+{% block page_title %}
+    {% if is_admin_user %}
+        Academic Oversight Dashboard
+    {% else %}
+        Evaluator Workspace
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+<!-- Welcome Banner & Quick Actions -->
+<div style="background: linear-gradient(135deg, #1E1B4B, #312E81); border-radius: var(--radius-xl); padding: 28px 32px; color: #FFFFFF; margin-bottom: 28px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px; box-shadow: var(--shadow-lg);">
+    <div>
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+            <span style="background: rgba(255, 255, 255, 0.15); padding: 4px 12px; border-radius: var(--radius-full); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #38BDF8;">
+                {% if is_admin_user %}Global Admin View{% else %}Assigned Center: {% for l in accessible_locations %}{{ l.name }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
+            </span>
+            <span style="font-size: 13px; color: #C7D2FE;">{{ today_date|date:"l, F d, Y" }}</span>
+        </div>
+        <h2 style="font-size: 26px; font-weight: 800; letter-spacing: -0.02em;">Welcome back, {{ user.get_full_name|default:user.username }}! 👋</h2>
+        <p style="font-size: 14px; color: #E0E7FF; margin-top: 4px; max-width: 600px;">
+            {% if is_admin_user %}
+                Monitor student performance across all training centers (Kozhikode, Kochi, Wayanad), assign evaluators, and analyze academic metrics.
+            {% else %}
+                Track daily performance metrics, evaluate students on practical tasks, and record batch attendance for your assigned center.
+            {% endif %}
+        </p>
+    </div>
+
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <a href="{% url 'evaluation_hub' %}" class="btn btn-primary" style="background: linear-gradient(135deg, #06B6D4, #3B82F6); box-shadow: 0 4px 15px rgba(6, 182, 212, 0.4);">
+            <i class="bi bi-award-fill"></i> Today's Evaluations
+        </a>
+        <a href="{% url 'attendance_hub' %}" class="btn" style="background: rgba(255, 255, 255, 0.15); color: #FFF; border: 1px solid rgba(255, 255, 255, 0.25);">
+            <i class="bi bi-calendar-check-fill"></i> Mark Attendance
+        </a>
+        <a href="{% url 'batch_create' %}" class="btn" style="background: rgba(255, 255, 255, 0.15); color: #FFF; border: 1px solid rgba(255, 255, 255, 0.25);">
+            <i class="bi bi-plus-circle-fill"></i> Create Batch
+        </a>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <div class="kpi-icon-box kpi-icon-primary">
+            <i class="bi bi-collection-play-fill"></i>
+        </div>
+        <div class="kpi-info">
+            <div class="kpi-title">Active Batches</div>
+            <div class="kpi-value">{{ total_batches }}</div>
+            <div class="kpi-meta">Daily & Weekly schedules</div>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon-box kpi-icon-success">
+            <i class="bi bi-people-fill"></i>
+        </div>
+        <div class="kpi-info">
+            <div class="kpi-title">Total Students</div>
+            <div class="kpi-value">{{ total_students }}</div>
+            <div class="kpi-meta">{{ active_students }} Active enrolled</div>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon-box kpi-icon-warning">
+            <i class="bi bi-lightning-charge-fill"></i>
+        </div>
+        <div class="kpi-info">
+            <div class="kpi-title">Evaluations Today</div>
+            <div class="kpi-value">{{ today_evaluations_count }}</div>
+            <div class="kpi-meta">Daily practical evaluations</div>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon-box kpi-icon-accent">
+            <i class="bi bi-graph-up-arrow"></i>
+        </div>
+        <div class="kpi-info">
+            <div class="kpi-title">Avg Evaluation Score</div>
+            <div class="kpi-value">{{ avg_score }}%</div>
+            <div class="kpi-meta">Overall cohort average</div>
+        </div>
+    </div>
+
+    <!-- Student Tasks Summary Card -->
+    <a href="{% url 'task_hub' %}?status=PENDING" style="text-decoration: none; color: inherit;">
+        <div class="kpi-card" style="border: 2px solid {% if pending_tasks_count > 0 %}var(--warning){% else %}transparent{% endif %}; cursor: pointer;">
+            <div class="kpi-icon-box" style="background: rgba(245, 158, 11, 0.15); color: #F59E0B;">
+                <i class="bi bi-list-check"></i>
+            </div>
+            <div class="kpi-info">
+                <div class="kpi-title">Pending Tasks</div>
+                <div class="kpi-value" style="color: var(--warning);">{{ pending_tasks_count }}</div>
+                <div class="kpi-meta">{{ completed_tasks_count }} Completed • {{ late_tasks_count }} Late</div>
+            </div>
+        </div>
+    </a>
+
+    <!-- Task Evaluation Hub Card -->
+    <a href="{% url 'task_evaluation_hub' %}" style="text-decoration: none; color: inherit;">
+        <div class="kpi-card" style="border: 2px solid {% if tasks_unevaluated_count > 0 %}rgba(79, 70, 229, 0.4){% else %}transparent{% endif %}; cursor: pointer;">
+            <div class="kpi-icon-box" style="background: rgba(79, 70, 229, 0.15); color: var(--primary);">
+                <i class="bi bi-patch-check-fill"></i>
+            </div>
+            <div class="kpi-info">
+                <div class="kpi-title">Task Evaluations</div>
+                <div class="kpi-value" style="color: var(--primary);">{{ tasks_evaluated_count }}</div>
+                <div class="kpi-meta">{{ tasks_unevaluated_count }} Awaiting Review &bull; Evaluate &rarr;</div>
+            </div>
+        </div>
+    </a>
+
+    <!-- Student Projects & Tech Card -->
+    <a href="{% url 'project_hub' %}" style="text-decoration: none; color: inherit;">
+        <div class="kpi-card" style="border: 2px solid {% if total_projects_count > 0 %}rgba(79, 70, 229, 0.3){% else %}transparent{% endif %}; cursor: pointer;">
+            <div class="kpi-icon-box" style="background: rgba(99, 102, 241, 0.15); color: #6366F1;">
+                <i class="bi bi-kanban-fill"></i>
+            </div>
+            <div class="kpi-info">
+                <div class="kpi-title">Student Projects</div>
+                <div class="kpi-value" style="color: var(--primary);">{{ total_projects_count }}</div>
+                <div class="kpi-meta">{{ in_progress_projects_count }} Active • {{ completed_projects_count }} Done (Avg {{ avg_project_progress }}%)</div>
+            </div>
+        </div>
+    </a>
+</div>
+
+<!-- ============================================================================== -->
+<!-- CRITICAL ATTENDANCE ALERT (< 50%) -->
+<!-- ============================================================================== -->
+{% if low_attendance_count > 0 %}
+<div class="card" style="border: 1px solid #FECACA; background: linear-gradient(135deg, rgba(254, 242, 242, 0.8), rgba(254, 226, 226, 0.4)); margin-bottom: 28px; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.08);">
+    <div class="card-header" style="flex-wrap: wrap; gap: 12px; border-bottom: 1px solid #FCA5A5;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="width: 38px; height: 38px; border-radius: 50%; background: #EF4444; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 18px;">
+                <i class="bi bi-exclamation-octagon-fill"></i>
+            </div>
+            <div>
+                <div class="card-title" style="color: #991B1B; font-size: 15px;">
+                    Critical Student Attendance Alert (< 50% Threshold)
+                </div>
+                <div style="font-size: 12px; color: #B91C1C; margin-top: 2px;">
+                    {{ low_attendance_count }} student{{ low_attendance_count|pluralize }} currently have cumulative attendance below the mandatory 50% mark.
+                </div>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <span class="badge" style="background: #EF4444; color: #FFFFFF; font-weight: 800; font-size: 12px; padding: 6px 14px; border-radius: var(--radius-full);">
+                {{ low_attendance_count }} Student{{ low_attendance_count|pluralize }} Below 50%
+            </span>
+            <a href="{% url 'attendance_hub' %}" class="btn btn-secondary btn-sm" style="font-size: 12px; border-color: #FECACA; background: #FFF;">
+                <i class="bi bi-calendar-check"></i> Manage Attendance
+            </a>
+        </div>
+    </div>
+
+    <div style="padding: 16px 20px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px;">
+            {% for item in low_attendance_students %}
+            <div style="background: #FFFFFF; border: 1px solid #FECACA; border-radius: var(--radius-md); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; box-shadow: 0 2px 6px rgba(239, 68, 68, 0.04);">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 34px; height: 34px; border-radius: 50%; background: {{ item.student.avatar_color }}; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0;">
+                        {{ item.student.initials }}
+                    </div>
+                    <div>
+                        <a href="{% url 'student_detail' item.student.id %}" style="font-weight: 700; font-size: 13px; color: var(--text-main); text-decoration: none;">
+                            {{ item.student.name }}
+                        </a>
+                        <div style="font-size: 11px; color: var(--text-dim); display: flex; align-items: center; gap: 6px; margin-top: 2px;">
+                            <code>{{ item.student.roll_number }}</code>
+                            <span>•</span>
+                            <span class="batch-chip" style="font-size: 9px; padding: 1px 5px;">{{ item.batch.code }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="text-align: right; flex-shrink: 0;">
+                    <div style="font-size: 15px; font-weight: 900; color: #DC2626; font-family: 'JetBrains Mono', monospace;">
+                        {{ item.attendance_pct }}%
+                    </div>
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 1px;">
+                        {{ item.present_count }}/{{ item.total_sessions }} Attended
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Location Breakdown (For Admin) -->
+{% if is_admin_user %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">
+            <i class="bi bi-geo-alt-fill text-primary"></i> Centers & Location Overview
+        </div>
+        <a href="{% url 'admin_locations' %}" class="btn btn-secondary btn-sm">
+            <i class="bi bi-gear-fill"></i> Manage Locations
+        </a>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+        {% for loc_data in locations_summary %}
+        <div style="background: var(--bg-subtle); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                <div>
+                    <h3 style="font-size: 16px; font-weight: 800; color: var(--text-main);">{{ loc_data.location.name }}</h3>
+                    <span style="font-size: 11px; font-family: monospace; color: var(--text-muted);">CODE: {{ loc_data.location.code }}</span>
+                </div>
+                <span class="location-badge">
+                    <i class="bi bi-building"></i> {{ loc_data.batch_count }} Batches
+                </span>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; background: var(--bg-surface); padding: 10px; border-radius: var(--radius-sm);">
+                <div>
+                    <div style="font-size: 11px; color: var(--text-muted);">Students</div>
+                    <div style="font-size: 18px; font-weight: 800; color: var(--text-main);">{{ loc_data.student_count }}</div>
+                </div>
+                <div>
+                    <div style="font-size: 11px; color: var(--text-muted);">Avg Score</div>
+                    <div style="font-size: 18px; font-weight: 800; color: var(--primary);">{{ loc_data.avg_score }}%</div>
+                </div>
+            </div>
+
+            <div style="font-size: 12px; color: var(--text-muted);">
+                <strong>Assigned Evaluators:</strong>
+                <div style="margin-top: 4px; display: flex; gap: 4px; flex-wrap: wrap;">
+                    {% for p in loc_data.evaluators %}
+                        <span style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 2px 8px; border-radius: var(--radius-sm); font-size: 11px;">
+                            {{ p.user.username }}
+                        </span>
+                    {% empty %}
+                        <span style="color: var(--text-dim); font-size: 11px;">No evaluators assigned</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Charts & Performance Row -->
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-bottom: 28px;">
+    <!-- Evaluation Trend Chart -->
+    <div class="card" style="margin-bottom: 0;">
+        <div class="card-header">
+            <div class="card-title">
+                <i class="bi bi-activity text-primary"></i> Daily Evaluation Trends (Last 7 Days)
+            </div>
+            <a href="{% url 'evaluation_history' %}" class="btn btn-secondary btn-sm">Full History</a>
+        </div>
+        <div style="height: 260px; position: relative;">
+            <canvas id="evalTrendsChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Top Students -->
+    <div class="card" style="margin-bottom: 0;">
+        <div class="card-header">
+            <div class="card-title">
+                <i class="bi bi-trophy-fill text-warning"></i> Top Performers
+            </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+            {% for stu in top_students %}
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; background: var(--bg-subtle); border-radius: var(--radius-md);">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 32px; height: 32px; border-radius: var(--radius-full); background: {{ stu.avatar_color }}; color: #FFF; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700;">
+                        {{ stu.initials }}
+                    </div>
+                    <div>
+                        <a href="{% url 'student_detail' stu.id %}" style="font-weight: 700; font-size: 13px; color: var(--text-main);">{{ stu.name }}</a>
+                        <div style="font-size: 11px; color: var(--text-muted);">{{ stu.batch.name|truncatechars:18 }}</div>
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <span class="badge-grade grade-aplus">{{ stu.overall_avg|floatformat:1 }}%</span>
+                </div>
+            </div>
+            {% empty %}
+            <div style="text-align: center; color: var(--text-dim); padding: 20px;">No evaluations recorded yet.</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Recent Daily Evaluations Feed -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">
+            <i class="bi bi-clock-history text-primary"></i> Recent Evaluations Log
+        </div>
+        <a href="{% url 'evaluation_history' %}" class="btn btn-secondary btn-sm">View Log</a>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+        {% for ev in recent_evaluations %}
+        <div style="background: var(--bg-subtle); border-radius: var(--radius-md); padding: 12px 14px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 34px; height: 34px; border-radius: var(--radius-full); background: {{ ev.student.avatar_color }}; color: #FFF; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700;">
+                    {{ ev.student.initials }}
+                </div>
+                <div>
+                    <div style="font-weight: 700; font-size: 13px; color: var(--text-main);">
+                        <a href="{% url 'student_detail' ev.student.id %}">{{ ev.student.name }}</a>
+                        <span style="font-size: 11px; color: var(--text-dim); font-weight: normal;">({{ ev.student.roll_number }})</span>
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-muted);">{{ ev.topic|truncatechars:32 }} • {{ ev.date|date:"M d" }}</div>
+                </div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-family: monospace; font-weight: 700; font-size: 13px;">{{ ev.total_score }}%</span>
+                <span class="badge-grade grade-{{ ev.grade|lower|slugify }}">{{ ev.grade }}</span>
+            </div>
+        </div>
+        {% empty %}
+        <div style="text-align: center; color: var(--text-dim); padding: 24px;">No evaluations recorded yet.</div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const dates = {{ chart_dates_json|safe }};
+    const evalCounts = {{ chart_eval_counts_json|safe }};
+    const avgScores = {{ chart_avg_scores_json|safe }};
+
+    const ctx = document.getElementById('evalTrendsChart');
+    if (ctx) {
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: dates,
+                datasets: [
+                    {
+                        label: 'Average Score (%)',
+                        data: avgScores,
+                        borderColor: '#4F46E5',
+                        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        yAxisID: 'y',
+                        pointBackgroundColor: '#4F46E5',
+                        pointRadius: 4,
+                    },
+                    {
+                        label: 'Evaluations Done',
+                        data: evalCounts,
+                        borderColor: '#06B6D4',
+                        backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                        type: 'bar',
+                        yAxisID: 'y1',
+                        borderRadius: 6,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        min: 0,
+                        max: 100,
+                        ticks: { callback: v => v + '%' }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        min: 0,
+                        grid: { drawOnChartArea: false },
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

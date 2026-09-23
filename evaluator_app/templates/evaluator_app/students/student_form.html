@@ -1,0 +1,252 @@
+{% extends 'evaluator_app/base.html' %}
+
+{% block title %}{{ title }} - Student Evaluator Portal{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+    <!-- Page Header -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <div>
+            <h2 style="font-size: 24px; font-weight: 800; color: var(--text-main); margin: 0; display: flex; align-items: center; gap: 12px; letter-spacing: -0.02em;">
+                <div style="width: 40px; height: 40px; border-radius: var(--radius-md); background: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 18px;">
+                    <i class="bi bi-person-plus-fill"></i>
+                </div>
+                {{ title }}
+            </h2>
+            <p style="margin: 4px 0 0 52px; font-size: 13px; color: var(--text-muted);">
+                Fill in the details below to add or update a student record.
+            </p>
+        </div>
+        <div>
+            {% if initial_batch %}
+                <a href="{% url 'batch_detail' initial_batch.id %}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Back to Batch
+                </a>
+            {% else %}
+                <a href="{% url 'batch_list' %}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Back
+                </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Main Form Card -->
+    <div class="card" style="box-shadow: var(--shadow-md); border-color: rgba(79, 70, 229, 0.1);">
+
+        <form method="post">
+            {% csrf_token %}
+            
+            {% if initial_batch %}
+                {{ form.batch }}
+                <!-- Contextual Batch Indicator -->
+                <div style="background: linear-gradient(135deg, rgba(79, 70, 229, 0.07), rgba(6, 182, 212, 0.07)); border: 1px solid rgba(79, 70, 229, 0.2); border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 22px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div style="width: 34px; height: 34px; border-radius: 50%; background: var(--primary); color: #FFF; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0;">
+                            <i class="bi bi-collection-play-fill"></i>
+                        </div>
+                        <div>
+                            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--primary);">Enrolling to Batch</div>
+                            <div style="font-size: 14px; font-weight: 800; color: var(--text-main);">
+                                {{ initial_batch.name }} 
+                                <span style="font-size: 12px; font-weight: 600; color: var(--text-muted);">({{ initial_batch.location.name }})</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="badge" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-muted); font-size: 11px; padding: 4px 10px; font-family: monospace;">
+                            Code: {{ initial_batch.code }}
+                        </span>
+                        <a href="{% url 'batch_student_import' initial_batch.id %}" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 10px; font-weight: 600;" title="Upload students via spreadsheet">
+                            <i class="bi bi-file-earmark-excel-fill" style="color: #10B981;"></i> Bulk Import
+                        </a>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
+                            <span>Roll Number <span style="font-weight: 500; font-size: 11px; color: var(--text-muted);">(Unique)</span></span>
+                            <span class="badge" style="background: rgba(79, 70, 229, 0.1); color: var(--primary); font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: var(--radius-full);">
+                                Default / Batch-Based
+                            </span>
+                        </label>
+                        {{ form.roll_number }}
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                            <i class="bi bi-shield-check text-primary me-1"></i> Auto-generated based on batch code.
+                        </div>
+                        {% if form.roll_number.errors %}<div style="color: var(--danger); font-size: 12px; margin-top: 4px;">{{ form.roll_number.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Full Name *</label>
+                        {{ form.name }}
+                        {% if form.name.errors %}<div style="color: var(--danger); font-size: 12px; margin-top: 4px;">{{ form.name.errors }}</div>{% endif %}
+                    </div>
+                </div>
+            {% else %}
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Batch Assignment *</label>
+                        {{ form.batch }}
+                        {% if form.batch.errors %}<div style="color: var(--danger); font-size: 12px; margin-top: 4px;">{{ form.batch.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
+                            <span>Roll Number <span style="font-weight: 500; font-size: 11px; color: var(--text-muted);">(Unique)</span></span>
+                            <span class="badge" style="background: rgba(79, 70, 229, 0.1); color: var(--primary); font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: var(--radius-full);">
+                                Default / Batch-Based
+                            </span>
+                        </label>
+                        {{ form.roll_number }}
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                            <i class="bi bi-shield-check text-primary me-1"></i> Auto-generated based on batch code.
+                        </div>
+                        {% if form.roll_number.errors %}<div style="color: var(--danger); font-size: 12px; margin-top: 4px;">{{ form.roll_number.errors }}</div>{% endif %}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Full Name *</label>
+                    {{ form.name }}
+                    {% if form.name.errors %}<div style="color: var(--danger); font-size: 12px; margin-top: 4px;">{{ form.name.errors }}</div>{% endif %}
+                </div>
+            {% endif %}
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    {{ form.email }}
+                    {% if form.email.errors %}<div style="color: var(--danger); font-size: 12px; margin-top: 4px;">{{ form.email.errors }}</div>{% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Phone / WhatsApp Number</label>
+                    {{ form.phone }}
+                    {% if form.phone.errors %}<div style="color: var(--danger); font-size: 12px; margin-top: 4px;">{{ form.phone.errors }}</div>{% endif %}
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Class</label>
+                    {{ form.student_class }}
+                    {% if form.student_class.errors %}<div style="color: var(--danger); font-size: 12px; margin-top: 4px;">{{ form.student_class.errors }}</div>{% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Academic Year</label>
+                    {{ form.academic_year }}
+                    {% if form.academic_year.errors %}<div style="color: var(--danger); font-size: 12px; margin-top: 4px;">{{ form.academic_year.errors }}</div>{% endif %}
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Enrollment Date</label>
+                    {{ form.join_date }}
+                    {% if form.join_date.errors %}
+                        <div style="color: var(--danger); font-size: 12px; margin-top: 4px;">{{ form.join_date.errors }}</div>
+                    {% endif %}
+                    <div id="enrollmentDateHelp" style="color: var(--text-dim); font-size: 11px; margin-top: 4px; display: flex; align-items: center; gap: 4px;">
+                        <i class="bi bi-calendar-event"></i>
+                        <span id="enrollmentDateHelpText">
+                            {% if initial_batch and initial_batch.start_date %}
+                                Cannot be earlier than Batch Start Date ({{ initial_batch.start_date|date:"d M, Y" }})
+                            {% else %}
+                                Must be on or after the batch start date.
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Student Status</label>
+                    {{ form.status }}
+                    {% if form.status.errors %}<div style="color: var(--danger); font-size: 12px; margin-top: 4px;">{{ form.status.errors }}</div>{% endif %}
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Payment Status</label>
+                    {{ form.payment_status }}
+                    {% if form.payment_status.errors %}<div style="color: var(--danger); font-size: 12px; margin-top: 4px;">{{ form.payment_status.errors }}</div>{% endif %}
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Notes & Background Info</label>
+                {{ form.notes }}
+                {% if form.notes.errors %}<div style="color: var(--danger); font-size: 12px; margin-top: 4px;">{{ form.notes.errors }}</div>{% endif %}
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-color);">
+                {% if initial_batch %}
+                    <a href="{% url 'batch_detail' initial_batch.id %}" class="btn btn-secondary">Cancel</a>
+                {% else %}
+                    <a href="{% url 'batch_list' %}" class="btn btn-secondary">Cancel</a>
+                {% endif %}
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check2-circle"></i> Save Student Record
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const batchSelect = document.getElementById('id_batch');
+    const joinDateInput = document.getElementById('id_join_date');
+    const helpText = document.getElementById('enrollmentDateHelpText');
+    const batchStartDates = {% if batch_start_dates_json %}{{ batch_start_dates_json|safe }}{% else %}{}{% endif %};
+
+    const rollNumberInput = document.getElementById('id_roll_number');
+
+    function updateMinDate(batchId) {
+        if (!joinDateInput) return;
+        const startDate = batchStartDates[batchId];
+        if (startDate) {
+            joinDateInput.min = startDate;
+            if (joinDateInput.value && joinDateInput.value < startDate) {
+                joinDateInput.value = startDate;
+            }
+            if (helpText) {
+                helpText.textContent = `Cannot be earlier than Batch Start Date (${startDate})`;
+            }
+        }
+    }
+
+    function updateRollNumber(batchId) {
+        if (!rollNumberInput || !batchId) return;
+        fetch(`/api/batches/${batchId}/next-roll-number/`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.next_roll_number) {
+                    rollNumberInput.value = data.next_roll_number;
+                }
+            })
+            .catch(err => console.error("Error fetching next roll number:", err));
+    }
+
+    if (batchSelect) {
+        batchSelect.addEventListener('change', (e) => {
+            updateMinDate(e.target.value);
+            updateRollNumber(e.target.value);
+        });
+        if (batchSelect.value) {
+            updateMinDate(batchSelect.value);
+            // If roll number input is empty on load, auto-populate with batch default
+            if (rollNumberInput && !rollNumberInput.value) {
+                updateRollNumber(batchSelect.value);
+            }
+        }
+    }
+});
+</script>
+{% endblock %}
+

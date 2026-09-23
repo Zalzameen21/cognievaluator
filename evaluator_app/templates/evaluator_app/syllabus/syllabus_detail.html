@@ -1,0 +1,396 @@
+{% extends 'evaluator_app/base.html' %}
+{% block title %}{{ syllabus.name }} — Syllabus{% endblock %}
+{% block page_title %}Syllabus Detail{% endblock %}
+
+{% block content %}
+<div style="max-width:1100px;margin:0 auto;">
+
+  <!-- Header -->
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:24px;">
+    <div>
+      <h2 style="font-size:22px;font-weight:800;color:var(--text-main);margin:0;display:flex;align-items:center;gap:10px;">
+        <i class="bi bi-journal-text text-primary"></i> {{ syllabus.name }}
+      </h2>
+      <div style="font-size:13px;color:var(--primary);font-weight:600;margin-top:4px;">Total Modules: {{ syllabus.total_modules }}</div>
+      {% if syllabus.description %}
+      <p style="font-size:13px;color:var(--text-muted);margin:6px 0 0;">{{ syllabus.description }}</p>
+      {% endif %}
+    </div>
+    <a href="{% url 'syllabus_list' %}" class="btn btn-secondary btn-sm"><i class="bi bi-arrow-left"></i> All Syllabi</a>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 340px;gap:24px;align-items:start;">
+
+    <!-- LEFT: Task List -->
+    <div>
+      <div class="card" style="overflow:hidden;">
+        <div class="card-header">
+          <div class="card-title"><i class="bi bi-list-ol text-primary"></i> Modules ({{ tasks.count }} / {{ syllabus.total_modules }})</div>
+          {% if is_admin_user %}
+            {% if tasks.count < syllabus.total_modules %}
+            <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('addTaskModal').style.display='flex'">
+              <i class="bi bi-plus-lg"></i> Add Module
+            </button>
+            {% else %}
+            <button type="button" class="btn btn-secondary btn-sm" disabled title="Total modules limit reached">
+              <i class="bi bi-check-all"></i> Limit Reached
+            </button>
+            {% endif %}
+          {% endif %}
+        </div>
+
+        {% if tasks %}
+        <div style="padding:0;">
+          <table style="width:100%;border-collapse:collapse;">
+            <thead>
+              <tr style="background:var(--bg-subtle);">
+                <th style="padding:10px 16px;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);text-align:left;white-space:nowrap;">#</th>
+                <th style="padding:10px 16px;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);text-align:left;">Module Name & Description</th>
+                <th style="padding:10px 16px;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);text-align:left;">Module Incharge</th>
+                {% if is_admin_user %}
+                <th style="padding:10px 16px;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);text-align:right;">Actions</th>
+                {% endif %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for task in tasks %}
+              <tr style="border-top:1px solid var(--border-subtle);">
+                <td style="padding:14px 16px;vertical-align:top;">
+                  <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;background:rgba(79,70,229,0.1);color:var(--primary);border-radius:50%;font-size:12px;font-weight:800;">{{ task.order }}</span>
+                </td>
+                <td style="padding:14px 16px;vertical-align:top;">
+                  <div style="font-weight:700;color:var(--text-main);font-size:14px;">{{ task.title }}</div>
+                  {% if task.description %}
+                  <div style="font-size:12px;color:var(--text-muted);margin-top:4px;line-height:1.5;">{{ task.description }}</div>
+                  {% endif %}
+                </td>
+                <td style="padding:14px 16px;vertical-align:top;">
+                  {% if task.default_assigner %}
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <div style="width:28px;height:28px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:800;flex-shrink:0;">
+                      {{ task.default_assigner.get_full_name|default:task.default_assigner.username|slice:":2"|upper }}
+                    </div>
+                    <span style="font-size:13px;color:var(--text-main);font-weight:600;">{{ task.default_assigner.get_full_name|default:task.default_assigner.username }}</span>
+                  </div>
+                  {% elif task.default_assigner_name %}
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <div style="width:28px;height:28px;border-radius:50%;background:var(--bg-subtle);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:11px;font-weight:800;flex-shrink:0;">
+                      {{ task.default_assigner_name|slice:":2"|upper }}
+                    </div>
+                    <span style="font-size:13px;color:var(--text-dim);font-style:italic;">{{ task.default_assigner_name }} (Unregistered)</span>
+                  </div>
+                  {% else %}
+                  <span style="font-size:12px;color:var(--text-muted);">Not assigned</span>
+                  {% endif %}
+                </td>
+                {% if is_admin_user %}
+                <td style="padding:14px 16px;vertical-align:top;text-align:right;white-space:nowrap;">
+                  <button type="button" class="btn btn-secondary btn-sm"
+                    onclick="openEditModal('{{ task.id }}','{{ task.title|escapejs }}',`{{ task.description|escapejs }}`,'{{ task.default_assigner_id|default:'' }}', '{{ task.default_assigner_name|escapejs|default:'' }}')">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <form method="post" action="{% url 'syllabus_task_delete' syllabus.id task.id %}" style="display:inline;"
+                    onsubmit="return confirm('Delete task #{{ task.order }}: {{ task.title }}? This will also update schedules for all assigned batches.')">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm" style="color:var(--danger);background:transparent;border:1px solid var(--border-color);">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
+                </td>
+                {% endif %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div style="padding:40px;text-align:center;color:var(--text-muted);">
+          <i class="bi bi-list-ul" style="font-size:36px;"></i>
+          <p style="margin:12px 0 0;">No modules yet.</p>
+          {% if is_admin_user %}
+          <button type="button" class="btn btn-primary btn-sm" style="margin-top:14px;" onclick="document.getElementById('addTaskModal').style.display='flex'">
+            <i class="bi bi-plus-lg"></i> Add First Module
+          </button>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- RIGHT: Assigned Batches + Assign New -->
+    <div style="display:flex;flex-direction:column;gap:16px;">
+
+      <!-- Assigned Batches -->
+      <div class="card" style="overflow:hidden;">
+        <div class="card-header">
+          <div class="card-title" style="font-size:13px;"><i class="bi bi-collection-play text-primary"></i> Assigned Batches ({{ batch_assignments.count }})</div>
+        </div>
+        {% if batch_assignments %}
+        <div style="padding:0;">
+          {% for ba in batch_assignments %}
+          <div style="padding:12px 16px;border-top:1px solid var(--border-subtle);display:flex;justify-content:space-between;align-items:center;gap:10px;">
+            <div>
+              <div style="font-weight:700;font-size:13px;color:var(--text-main);">{{ ba.batch.name }}</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">
+                <i class="bi bi-geo-alt"></i> {{ ba.batch.location.name }} &bull;
+                <i class="bi bi-calendar3"></i> Started {{ ba.start_date|date:"M d, Y" }}
+              </div>
+            </div>
+            <a href="{% url 'batch_schedule_view' ba.batch.id %}" class="btn btn-secondary btn-sm" style="font-size:11px;white-space:nowrap;">
+              <i class="bi bi-calendar3"></i> View Schedule
+            </a>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px;">
+          <i class="bi bi-collection-play" style="font-size:28px;display:block;margin-bottom:8px;"></i>
+          No batches assigned yet.<br>Use the panel below to assign this syllabus to a batch.
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Assign to Batch Panel (Admin only) -->
+      {% if is_admin_user %}
+      <div class="card" style="overflow:hidden;">
+        <div class="card-header">
+          <div class="card-title" style="font-size:13px;"><i class="bi bi-plus-circle text-primary"></i> Assign to Batches</div>
+        </div>
+        <div style="padding:16px;">
+          {% if unassigned_batches %}
+          <form method="post" action="{% url 'syllabus_assign_batches' syllabus.id %}">
+            {% csrf_token %}
+            <div class="form-group" style="margin-bottom:12px; position:relative;" id="batchDropdownContainer">
+              <label class="form-label" style="font-size:12px;display:block;margin-bottom:6px;">Select Batch(es)</label>
+              <button type="button" id="batchDropdownBtn" class="form-input" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;background:var(--bg-surface);cursor:pointer;color:var(--text-main);">
+                <span id="batchDropdownText">Select Batches...</span>
+                <i class="bi bi-chevron-down text-muted"></i>
+              </button>
+              <div id="batchDropdownMenu" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:200px;overflow-y:auto;border:1px solid var(--border-color);border-radius:var(--radius-md);padding:8px;background:var(--bg-surface);z-index:1000;box-shadow:var(--shadow-md);margin-top:4px;">
+                <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid var(--border-color); cursor:pointer; font-size:13px; font-weight:700; color:var(--primary);">
+                  <input type="checkbox" id="selectAllBatches" style="cursor:pointer;">
+                  Select All Batches
+                </label>
+
+                {% if accessible_groups %}
+                <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase;">Batch Groups</div>
+                {% for g in accessible_groups %}
+                <label style="display:flex; align-items:center; gap:8px; margin-bottom:6px; cursor:pointer; font-size:13px; color:var(--text-main); font-weight: 600;">
+                  <input type="checkbox" class="group-checkbox" data-batches="{% for b in g.batches.all %}{{ b.id }}{% if not forloop.last %},{% endif %}{% endfor %}" style="cursor:pointer;">
+                  [GROUP] {{ g.name }}
+                </label>
+                {% endfor %}
+                <div style="height: 1px; background: var(--border-color); margin: 8px 0;"></div>
+                {% endif %}
+
+                <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase;">Individual Batches</div>
+                {% for b in unassigned_batches %}
+                <label style="display:flex; align-items:center; gap:8px; margin-bottom:6px; cursor:pointer; font-size:13px; color:var(--text-main);">
+                  <input type="checkbox" name="batch_ids" value="{{ b.id }}" class="batch-checkbox" style="cursor:pointer;">
+                  {{ b.name }} ({{ b.location.name }})
+                </label>
+                {% endfor %}
+              </div>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:12px;">
+              Modules will be scheduled automatically starting from each selected batch's start date.
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm" style="width:100%;" id="assignBatchBtn" disabled>
+              <i class="bi bi-check2-circle"></i> Assign & Generate Schedule
+            </button>
+          </form>
+
+          <script>
+          var dropdownBtn = document.getElementById('batchDropdownBtn');
+          var dropdownMenu = document.getElementById('batchDropdownMenu');
+          var dropdownText = document.getElementById('batchDropdownText');
+          var dropdownContainer = document.getElementById('batchDropdownContainer');
+
+          dropdownBtn.addEventListener('click', function(e) {
+              e.preventDefault();
+              dropdownMenu.style.display = dropdownMenu.style.display === 'none' ? 'block' : 'none';
+          });
+
+          // Close dropdown when clicking outside
+          document.addEventListener('click', function(e) {
+              if (dropdownContainer && !dropdownContainer.contains(e.target)) {
+                  dropdownMenu.style.display = 'none';
+              }
+          });
+
+          // Enable button when at least one batch is selected
+          function validateForm() {
+            var checkboxes = document.querySelectorAll('.batch-checkbox');
+            var checkedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+            var btn = document.getElementById('assignBatchBtn');
+            btn.disabled = (checkedCount === 0);
+            
+            // Sync the "Select All" checkbox state
+            var selectAll = document.getElementById('selectAllBatches');
+            var isAllChecked = (checkedCount === checkboxes.length);
+            if (selectAll) {
+                selectAll.checked = (checkedCount > 0) && isAllChecked;
+            }
+
+            // Update dropdown text
+            if (checkedCount === 0) {
+                dropdownText.textContent = "Select Batches...";
+            } else if (checkedCount === checkboxes.length) {
+                dropdownText.textContent = "All Batches Selected";
+            } else {
+                dropdownText.textContent = checkedCount + " Batch(es) Selected";
+            }
+          }
+          
+          document.querySelectorAll('.batch-checkbox').forEach(function(cb) {
+              cb.addEventListener('change', validateForm);
+          });
+          
+          var selectAllBtn = document.getElementById('selectAllBatches');
+          if (selectAllBtn) {
+              selectAllBtn.addEventListener('change', function(e) {
+                  var checkboxes = document.querySelectorAll('.batch-checkbox');
+                  checkboxes.forEach(function(cb) {
+                      cb.checked = e.target.checked;
+                  });
+                  var groupCheckboxes = document.querySelectorAll('.group-checkbox');
+                  groupCheckboxes.forEach(function(cb) {
+                      cb.checked = e.target.checked;
+                  });
+                  validateForm();
+              });
+          }
+
+          document.querySelectorAll('.group-checkbox').forEach(function(groupCb) {
+              groupCb.addEventListener('change', function(e) {
+                  var batchIds = e.target.dataset.batches.split(',');
+                  var checkboxes = document.querySelectorAll('.batch-checkbox');
+                  checkboxes.forEach(function(cb) {
+                      if (batchIds.includes(cb.value)) {
+                          cb.checked = e.target.checked;
+                      }
+                  });
+                  validateForm();
+              });
+          });
+          </script>
+          {% else %}
+          <div style="font-size:13px;color:var(--text-muted);text-align:center;padding:12px 0;">
+            <i class="bi bi-check-circle-fill text-success"></i><br>
+            All accessible batches have already been assigned this syllabus.
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+
+<!-- Add Task Modal -->
+{% if is_admin_user %}
+<div id="addTaskModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:var(--bg-surface);border-radius:var(--radius-xl);padding:28px;width:100%;max-width:560px;box-shadow:var(--shadow-xl);max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <div style="font-size:16px;font-weight:800;color:var(--text-main);"><i class="bi bi-plus-circle text-primary"></i> Add Syllabus Module</div>
+      <button onclick="document.getElementById('addTaskModal').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted);">×</button>
+    </div>
+    <form method="post" action="{% url 'syllabus_task_add' syllabus.id %}">
+      {% csrf_token %}
+      <div class="form-group">
+        <label class="form-label">Module Name <span class="form-label-required">*</span></label>
+        <input type="text" name="title" class="form-input" placeholder="e.g. Introduction to Python & Environment Setup" required autofocus>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea name="description" class="form-textarea" rows="4" placeholder="Task instructions, learning goals, resources, expected outcome..."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Module Incharge / Assigner</label>
+        <select name="default_assigner" id="addAssignerSelect" class="form-select" onchange="document.getElementById('addAssignerNameBox').style.display = this.value === 'UNREGISTERED' ? 'block' : 'none';">
+          <option value="">— None (unassigned) —</option>
+          {% for ev in all_evaluators %}
+          <option value="{{ ev.id }}">{{ ev.get_full_name|default:ev.username }}{% if ev.profile.designation %} — {{ ev.profile.designation }}{% endif %}</option>
+          {% endfor %}
+          <option value="UNREGISTERED">Other (Unregistered User)</option>
+        </select>
+        <div id="addAssignerNameBox" style="display:none; margin-top:10px;">
+          <input type="text" name="default_assigner_name" class="form-input" placeholder="Enter name of unregistered assigner">
+        </div>
+        <div class="form-help-text">Select who is responsible for this task.</div>
+      </div>
+      {% if batch_assignments %}
+      <div style="padding:10px 14px;background:rgba(79,70,229,0.06);border:1px solid rgba(79,70,229,0.2);border-radius:var(--radius-md);font-size:13px;color:var(--text-muted);margin-bottom:16px;">
+        <i class="bi bi-info-circle text-primary"></i>
+        After adding this task, the schedule will be automatically regenerated for <strong>{{ batch_assignments.count }}</strong> assigned batch{{ batch_assignments.count|pluralize:"es" }}.
+      </div>
+      {% endif %}
+      <div style="display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border-color);padding-top:16px;margin-top:8px;">
+        <button type="button" onclick="document.getElementById('addTaskModal').style.display='none'" class="btn btn-secondary">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check2-circle"></i> Add Module</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Task Modal -->
+<div id="editTaskModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:var(--bg-surface);border-radius:var(--radius-xl);padding:28px;width:100%;max-width:560px;box-shadow:var(--shadow-xl);max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <div style="font-size:16px;font-weight:800;color:var(--text-main);"><i class="bi bi-pencil text-primary"></i> Edit Module</div>
+      <button onclick="document.getElementById('editTaskModal').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted);">×</button>
+    </div>
+    <form method="post" id="editTaskForm" action="">
+      {% csrf_token %}
+      <div class="form-group">
+        <label class="form-label">Module Name <span class="form-label-required">*</span></label>
+        <input type="text" name="title" id="editTitle" class="form-input" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea name="description" id="editDesc" class="form-textarea" rows="4"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Module Incharge / Assigner</label>
+        <select name="default_assigner" id="editAssigner" class="form-select" onchange="document.getElementById('editAssignerNameBox').style.display = this.value === 'UNREGISTERED' ? 'block' : 'none';">
+          <option value="">— None (unassigned) —</option>
+          {% for ev in all_evaluators %}
+          <option value="{{ ev.id }}">{{ ev.get_full_name|default:ev.username }}{% if ev.profile.designation %} — {{ ev.profile.designation }}{% endif %}</option>
+          {% endfor %}
+          <option value="UNREGISTERED">Other (Unregistered User)</option>
+        </select>
+        <div id="editAssignerNameBox" style="display:none; margin-top:10px;">
+          <input type="text" name="default_assigner_name" id="editAssignerName" class="form-input" placeholder="Enter name of unregistered assigner">
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border-color);padding-top:16px;margin-top:8px;">
+        <button type="button" onclick="document.getElementById('editTaskModal').style.display='none'" class="btn btn-secondary">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check2-circle"></i> Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openEditModal(taskId, title, desc, assignerId, assignerName) {
+  document.getElementById('editTitle').value = title;
+  document.getElementById('editDesc').value = desc;
+  
+  const editAssigner = document.getElementById('editAssigner');
+  if (assignerName && !assignerId) {
+      editAssigner.value = 'UNREGISTERED';
+      document.getElementById('editAssignerNameBox').style.display = 'block';
+      document.getElementById('editAssignerName').value = assignerName;
+  } else {
+      editAssigner.value = assignerId || '';
+      document.getElementById('editAssignerNameBox').style.display = 'none';
+      document.getElementById('editAssignerName').value = '';
+  }
+  
+  document.getElementById('editTaskForm').action = '/syllabus/{{ syllabus.id }}/tasks/' + taskId + '/edit/';
+  document.getElementById('editTaskModal').style.display = 'flex';
+}
+</script>
+{% endif %}
+{% endblock %}

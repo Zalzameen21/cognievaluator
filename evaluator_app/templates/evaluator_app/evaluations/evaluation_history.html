@@ -1,0 +1,130 @@
+{% extends 'evaluator_app/base.html' %}
+
+{% block title %}Evaluation Logs & History - Student Evaluator Portal{% endblock %}
+{% block page_title %}Evaluation History Log{% endblock %}
+
+{% block content %}
+<!-- Filters Bar -->
+<div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-xl); padding: 18px 24px; margin-bottom: 24px; box-shadow: var(--shadow-sm);">
+    <form method="get" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+        <input type="text" name="q" value="{{ search_query }}" class="form-input" style="width: 220px;" placeholder="Search student / topic...">
+
+        <select name="batch" class="form-select" style="width: 220px;" onchange="this.form.submit()">
+            <option value="">All Batches</option>
+            {% for b in accessible_batches %}
+                <option value="{{ b.id }}" {% if selected_batch == b.id|stringformat:"s" %}selected{% endif %}>
+                    {{ b.name }} ({{ b.location.name }})
+                </option>
+            {% endfor %}
+        </select>
+
+        <input type="date" name="date" value="{{ selected_date }}" class="form-input" style="width: 160px;" onchange="this.form.submit()">
+
+        <select name="grade" class="form-select" style="width: 140px;" onchange="this.form.submit()">
+            <option value="">All Grades</option>
+            <option value="A+" {% if selected_grade == 'A+' %}selected{% endif %}>Grade A+</option>
+            <option value="A" {% if selected_grade == 'A' %}selected{% endif %}>Grade A</option>
+            <option value="B+" {% if selected_grade == 'B+' %}selected{% endif %}>Grade B+</option>
+            <option value="B" {% if selected_grade == 'B' %}selected{% endif %}>Grade B</option>
+            <option value="C" {% if selected_grade == 'C' %}selected{% endif %}>Grade C</option>
+            <option value="NI" {% if selected_grade == 'NI' %}selected{% endif %}>Needs Impr.</option>
+        </select>
+
+        <button type="submit" class="btn btn-secondary btn-sm"><i class="bi bi-funnel"></i> Filter</button>
+        {% if search_query or selected_batch or selected_date or selected_grade %}
+            <a href="{% url 'evaluation_history' %}" class="btn btn-secondary btn-sm"><i class="bi bi-x-circle"></i> Clear</a>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Evaluation Table -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">
+            <i class="bi bi-clock-history text-primary"></i> Assessment Log Records ({{ evaluations|length }})
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Student</th>
+                    <th>Batch</th>
+                    <th>Topic Evaluated</th>
+                    <th>Engagement & Tasks</th>
+                    <th>Project & PPT</th>
+                    <th>Comm & Feedback</th>
+                    <th>Score</th>
+                    <th>Grade</th>
+                    <th>Mentor Remarks</th>
+                    <th style="text-align: right;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ev in evaluations %}
+                <tr>
+                    <td style="white-space: nowrap; font-weight: 700;">{{ ev.date|date:"d M Y" }}</td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 32px; height: 32px; border-radius: var(--radius-full); background: {{ ev.student.avatar_color }}; color: #FFF; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700;">
+                                {{ ev.student.initials }}
+                            </div>
+                            <div>
+                                <a href="{% url 'student_detail' ev.student.id %}" style="font-weight: 700; color: var(--text-main);">{{ ev.student.name }}</a>
+                                <div style="font-size: 11px; color: var(--text-muted);">{{ ev.student.roll_number }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span style="font-size: 12px; font-weight: 600;">{{ ev.batch.name }}</span>
+                        <div style="font-size: 10px; color: var(--text-muted);">{{ ev.batch.location.name }}</div>
+                    </td>
+                    <td style="max-width: 180px;">
+                        <div style="font-size: 13px; font-weight: 600; color: var(--text-main);">{{ ev.topic }}</div>
+                    </td>
+                    <td style="font-size: 11px;">
+                        <div>Punct: <strong>{{ ev.punctuality_score|floatformat:0 }}</strong> • Tasks: <strong>{{ ev.tasks_completed }}/{{ ev.tasks_given }}</strong></div>
+                        <div style="color: var(--text-muted);">Tutor: {{ ev.tutor_interaction_score|floatformat:0 }} • Peer: {{ ev.classmate_interaction_score|floatformat:0 }}</div>
+                    </td>
+                    <td style="font-size: 11px;">
+                        <div>Pres: <strong>{{ ev.presentation_score|floatformat:0 }}</strong> • Prob: <strong>{{ ev.problem_solving_score|floatformat:0 }}</strong></div>
+                        <div style="color: var(--text-muted);">PPT: {{ ev.ppt_evaluation_score|floatformat:0 }} ({{ ev.ppt_slide_count }} slides)</div>
+                    </td>
+                    <td style="font-size: 11px;">
+                        <div>Comm: <strong>{{ ev.communication_score|floatformat:0 }}</strong></div>
+                        <div style="color: var(--text-muted);">Sugg: {{ ev.suggestion_implementation_score|floatformat:0 }} • Doubts: {{ ev.doubt_clearing_score|floatformat:0 }}</div>
+                    </td>
+                    <td>
+                        <strong style="font-size: 14px; color: var(--primary);">{{ ev.total_score }}%</strong>
+                    </td>
+                    <td>
+                        <span class="badge-grade grade-{{ ev.grade|lower|slugify }}">{{ ev.grade }}</span>
+                    </td>
+                    <td style="max-width: 220px; font-size: 11px; color: var(--text-muted);">
+                        {% if ev.strongest_areas %}<div><strong style="color: #065F46;">Strongest:</strong> {{ ev.strongest_areas|truncatechars:35 }}</div>{% endif %}
+                        {% if ev.areas_for_improvement %}<div><strong style="color: #92400E;">Improve:</strong> {{ ev.areas_for_improvement|truncatechars:35 }}</div>{% endif %}
+                    </td>
+                    <td style="text-align: right;">
+                        {% if request.user.profile.is_admin %}
+                        <a href="{% url 'student_evaluate' ev.student.id %}?date={{ ev.date|date:'Y-m-d' }}" class="btn btn-secondary btn-sm" title="Edit Evaluation">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" style="text-align: center; color: var(--text-dim); padding: 36px;">
+                        No evaluation records found matching your filters.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Dedicated evaluation page used instead of modal -->
+{% endblock %}

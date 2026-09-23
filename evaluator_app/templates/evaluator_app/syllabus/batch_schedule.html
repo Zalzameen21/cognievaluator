@@ -1,0 +1,285 @@
+{% extends 'evaluator_app/base.html' %}
+{% block title %}{{ batch.name }} — Task Schedule{% endblock %}
+{% block page_title %}Batch Schedule{% endblock %}
+
+{% block content %}
+<div style="max-width:1100px;margin:0 auto;">
+
+  <!-- Header -->
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:24px;">
+    <div>
+      <h2 style="font-size:22px;font-weight:800;color:var(--text-main);margin:0;display:flex;align-items:center;gap:10px;">
+        <i class="bi bi-calendar3 text-primary"></i> Task Schedule — {{ batch.name }}
+      </h2>
+      <p style="font-size:13px;color:var(--text-muted);margin:4px 0 0;">
+        {{ batch.location.name }} &bull;
+        {% if batch_syllabus %}
+          Syllabus: <strong>{{ batch_syllabus.syllabus.name }}</strong> (started {{ batch_syllabus.start_date|date:"M d, Y" }})
+        {% else %}
+          No syllabus assigned yet
+        {% endif %}
+      </p>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <a href="{% url 'batch_detail' batch.id %}" class="btn btn-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to Batch</a>
+      {% if is_admin_user %}
+      <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('assignSyllabusModal').style.display='flex'">
+        <i class="bi bi-journal-text"></i> {% if batch_syllabus %}Change Syllabus{% else %}Assign Syllabus{% endif %}
+      </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 320px;gap:24px;align-items:start;">
+
+    <!-- LEFT: Timeline Table -->
+    <div class="card" style="overflow:hidden;">
+      <div class="card-header">
+        <div class="card-title"><i class="bi bi-calendar2-week text-primary"></i> Weekly Task Timeline</div>
+        <div style="display:flex;gap:10px;">
+          <a href="{% url 'batch_schedule_download' batch.id %}" class="btn btn-secondary btn-sm" title="Download Report">
+            <i class="bi bi-download"></i> Download CSV
+          </a>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('rescheduleModal').style.display='flex'">
+            <i class="bi bi-arrow-repeat"></i> Reschedule a Day
+          </button>
+        </div>
+      </div>
+      {% if schedules %}
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="background:var(--bg-subtle);">
+              <th style="padding:10px 16px;font-size:11.5px;font-weight:700;text-transform:uppercase;color:var(--text-muted);text-align:left;">Date</th>
+              <th style="padding:10px 16px;font-size:11.5px;font-weight:700;text-transform:uppercase;color:var(--text-muted);text-align:left;">Task</th>
+              <th style="padding:10px 16px;font-size:11.5px;font-weight:700;text-transform:uppercase;color:var(--text-muted);text-align:left;">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in schedules %}
+            {% with today=request.user|default:0 %}
+            <tr style="border-top:1px solid var(--border-subtle);{% if s.date == today %}background:rgba(79,70,229,0.04);{% endif %}">
+              <td style="padding:13px 16px;vertical-align:top;white-space:nowrap;">
+                <div style="font-weight:700;color:var(--text-main);font-size:13px;">{{ s.date|date:"D, M d" }}</div>
+                <div style="font-size:11px;color:var(--text-muted);">{{ s.date|date:"Y" }}</div>
+              </td>
+              <td style="padding:13px 16px;vertical-align:top;">
+                {% if s.syllabus_task %}
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;background:rgba(79,70,229,0.1);color:var(--primary);border-radius:50%;font-size:10px;font-weight:800;flex-shrink:0;">{{ s.syllabus_task.order }}</span>
+                  <div>
+                    <div style="font-weight:700;color:var(--text-main);font-size:13px;">{{ s.syllabus_task.title }}</div>
+                    {% if s.syllabus_task.description %}
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">{{ s.syllabus_task.description|truncatechars:80 }}</div>
+                    {% endif %}
+                  </div>
+                </div>
+                {% elif s.custom_task_title %}
+                <div>
+                  <div style="font-weight:700;color:var(--text-main);font-size:13px;">{{ s.custom_task_title }}</div>
+                  {% if s.custom_task_description %}
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">{{ s.custom_task_description|truncatechars:80 }}</div>
+                  {% endif %}
+                  <span style="font-size:10px;background:rgba(245,158,11,0.1);color:#D97706;padding:1px 6px;border-radius:50px;font-weight:600;">Custom Task</span>
+                </div>
+                {% else %}
+                <span style="color:var(--text-muted);font-size:13px;">—</span>
+                {% endif %}
+              </td>
+              <td style="padding:13px 16px;vertical-align:top;">
+                {% if s.is_rescheduled %}
+                <span style="font-size:11px;background:rgba(245,158,11,0.1);color:#D97706;padding:3px 8px;border-radius:50px;font-weight:600;white-space:nowrap;"><i class="bi bi-arrow-repeat"></i> Rescheduled</span>
+                {% else %}
+                <span style="font-size:11px;background:rgba(16,185,129,0.1);color:var(--success);padding:3px 8px;border-radius:50px;font-weight:600;white-space:nowrap;"><i class="bi bi-journal-check"></i> Syllabus</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endwith %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div style="padding:40px;text-align:center;color:var(--text-muted);">
+        <i class="bi bi-calendar-x" style="font-size:40px;"></i>
+        <p style="margin:14px 0 0;">No schedule generated yet. Assign a syllabus to auto-generate the task timeline.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- RIGHT: Syllabus Info -->
+    <div>
+      {% if batch_syllabus %}
+      <div class="card" style="overflow:hidden;margin-bottom:16px;">
+        <div class="card-header">
+          <div class="card-title" style="font-size:13px;"><i class="bi bi-journal-text text-primary"></i> Current Syllabus</div>
+        </div>
+        <div style="padding:16px;">
+          <div style="font-weight:800;color:var(--text-main);font-size:15px;margin-bottom:4px;">{{ batch_syllabus.syllabus.name }}</div>
+          {% if batch_syllabus.syllabus.target_course %}
+          <div style="font-size:12px;color:var(--primary);font-weight:600;margin-bottom:8px;">{{ batch_syllabus.syllabus.target_course }}</div>
+          {% endif %}
+          <div style="font-size:12px;color:var(--text-muted);">
+            <i class="bi bi-list-ol"></i> {{ batch_syllabus.syllabus.tasks.count }} tasks
+            &bull; started {{ batch_syllabus.start_date|date:"M d, Y" }}
+          </div>
+          <a href="{% url 'syllabus_detail' batch_syllabus.syllabus.id %}" class="btn btn-secondary btn-sm" style="margin-top:12px;width:100%;text-align:center;">
+            <i class="bi bi-eye"></i> View Full Syllabus
+          </a>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Syllabus Task Quick View -->
+      {% if syllabus_tasks %}
+      <div class="card" style="overflow:hidden;">
+        <div class="card-header">
+          <div class="card-title" style="font-size:13px;"><i class="bi bi-list-ol text-primary"></i> Task Order</div>
+        </div>
+        <div style="padding:0;">
+          {% for t in syllabus_tasks %}
+          <div style="padding:10px 16px;border-top:1px solid var(--border-subtle);display:flex;gap:10px;align-items:flex-start;">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;background:rgba(79,70,229,0.1);color:var(--primary);border-radius:50%;font-size:10px;font-weight:800;flex-shrink:0;margin-top:1px;">{{ t.order }}</span>
+            <div>
+              <div style="font-size:13px;font-weight:700;color:var(--text-main);">{{ t.title }}</div>
+              {% if t.default_assigner %}
+              <div style="font-size:11px;color:var(--text-muted);">{{ t.default_assigner.get_full_name|default:t.default_assigner.username }}</div>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Assign Syllabus Modal -->
+{% if is_admin_user %}
+<div id="assignSyllabusModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:var(--bg-surface);border-radius:var(--radius-xl);padding:28px;width:100%;max-width:480px;box-shadow:var(--shadow-xl);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <div style="font-size:16px;font-weight:800;color:var(--text-main);"><i class="bi bi-journal-text text-primary"></i> Assign Syllabus</div>
+      <button onclick="document.getElementById('assignSyllabusModal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted);">×</button>
+    </div>
+    <form method="post" action="{% url 'batch_syllabus_assign' batch.id %}">
+      {% csrf_token %}
+      <div class="form-group">
+        <label class="form-label">Select Syllabus <span class="form-label-required">*</span></label>
+        <select name="syllabus_id" class="form-select" required>
+          <option value="">— Choose Syllabus —</option>
+          {% for s in all_syllabi %}
+          <option value="{{ s.id }}" {% if batch_syllabus and batch_syllabus.syllabus.id == s.id %}selected{% endif %}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
+        {% if not all_syllabi %}<div style="font-size:12px;color:var(--warning);margin-top:6px;"><i class="bi bi-exclamation-triangle"></i> No syllabi available. <a href="{% url 'syllabus_create' %}">Create one first.</a></div>{% endif %}
+      </div>
+      <div class="form-group">
+        <label class="form-label">Syllabus Start Date <span class="form-label-required">*</span></label>
+        <input type="date" name="start_date" class="form-input" value="{{ batch_syllabus.start_date|date:'Y-m-d'|default:'' }}" required>
+        <div class="form-help-text">Tasks will be scheduled weekly starting from this date, based on the batch's class days.</div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border-color);padding-top:16px;margin-top:8px;">
+        <button type="button" onclick="document.getElementById('assignSyllabusModal').style.display='none'" class="btn btn-secondary">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check2-circle"></i> Assign & Generate Schedule</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Reschedule Modal -->
+<div id="rescheduleModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:var(--bg-surface);border-radius:var(--radius-xl);padding:28px;width:100%;max-width:520px;box-shadow:var(--shadow-xl);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <div style="font-size:16px;font-weight:800;color:var(--text-main);"><i class="bi bi-arrow-repeat text-primary"></i> Reschedule a Task</div>
+      <button onclick="document.getElementById('rescheduleModal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted);">×</button>
+    </div>
+    <form method="post" action="{% url 'batch_schedule_reschedule' batch.id %}">
+      {% csrf_token %}
+      <div class="form-group">
+        <label class="form-label">Date <span class="form-label-required">*</span></label>
+        <input type="date" name="date" class="form-input" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Task from Syllabus</label>
+        <select name="syllabus_task_id" class="form-select" id="reschedSyllabusTask">
+          <option value="">— Custom task (not from syllabus) —</option>
+          {% for t in syllabus_tasks %}
+          <option value="{{ t.id }}">Task {{ t.order }}: {{ t.title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div id="customTaskFields">
+        <div class="form-group">
+          <label class="form-label">Custom Task Title</label>
+          <input type="text" name="custom_task_title" class="form-input" placeholder="Enter custom task title if not from syllabus">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Custom Task Description</label>
+          <textarea name="custom_task_description" class="form-textarea" rows="2" placeholder="Task details..."></textarea>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border-color);padding-top:16px;margin-top:8px;">
+        <button type="button" onclick="document.getElementById('rescheduleModal').style.display='none'" class="btn btn-secondary">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check2-circle"></i> Save Reschedule</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% else %}
+<!-- Evaluators can still reschedule -->
+<div id="rescheduleModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:var(--bg-surface);border-radius:var(--radius-xl);padding:28px;width:100%;max-width:520px;box-shadow:var(--shadow-xl);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <div style="font-size:16px;font-weight:800;color:var(--text-main);"><i class="bi bi-arrow-repeat text-primary"></i> Reschedule a Task</div>
+      <button onclick="document.getElementById('rescheduleModal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted);">×</button>
+    </div>
+    <form method="post" action="{% url 'batch_schedule_reschedule' batch.id %}">
+      {% csrf_token %}
+      <div class="form-group">
+        <label class="form-label">Date <span class="form-label-required">*</span></label>
+        <input type="date" name="date" class="form-input" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Task from Syllabus</label>
+        <select name="syllabus_task_id" class="form-select" id="reschedSyllabusTask2">
+          <option value="">— Custom task (not from syllabus) —</option>
+          {% for t in syllabus_tasks %}
+          <option value="{{ t.id }}">Task {{ t.order }}: {{ t.title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div id="customTaskFields2">
+        <div class="form-group">
+          <label class="form-label">Custom Task Title</label>
+          <input type="text" name="custom_task_title" class="form-input" placeholder="Enter custom task title if not from syllabus">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Custom Task Description</label>
+          <textarea name="custom_task_description" class="form-textarea" rows="2" placeholder="Task details..."></textarea>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border-color);padding-top:16px;margin-top:8px;">
+        <button type="button" onclick="document.getElementById('rescheduleModal').style.display='none'" class="btn btn-secondary">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check2-circle"></i> Save Reschedule</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<script>
+// Toggle custom task fields based on syllabus task selection
+['reschedSyllabusTask', 'reschedSyllabusTask2'].forEach(function(id) {
+  var sel = document.getElementById(id);
+  if (!sel) return;
+  var fieldsId = id === 'reschedSyllabusTask' ? 'customTaskFields' : 'customTaskFields2';
+  function toggle() {
+    document.getElementById(fieldsId).style.display = sel.value ? 'none' : 'block';
+  }
+  sel.addEventListener('change', toggle);
+  toggle();
+});
+</script>
+{% endblock %}

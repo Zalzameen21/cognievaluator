@@ -1,0 +1,142 @@
+{% extends 'evaluator_app/base.html' %}
+{% load static %}
+
+{% block title %}Evaluate Task: {{ task.title }} - Evaluator Portal{% endblock %}
+{% block page_title %}Evaluate Student Task{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+        <a href="{% url 'task_evaluation_hub' %}" class="btn btn-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Back to Task Evaluations
+        </a>
+        <span class="badge" style="background: var(--bg-subtle); color: var(--text-muted);">
+            Task ID: #{{ task.id }}
+        </span>
+    </div>
+
+    <!-- Student & Task Overview -->
+    <div class="card" style="margin-bottom: 20px;">
+        <div class="card-header">
+            <div class="card-title">
+                <i class="bi bi-person-badge text-primary"></i> Assignment & Student Context
+            </div>
+            <span class="batch-chip">{{ task.batch.code }} - {{ task.batch.location.name }}</span>
+        </div>
+        <div style="padding: 20px;">
+            <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 16px;">
+                <div class="student-cell-avatar" style="background-color: {{ task.student.avatar_color }}; width: 44px; height: 44px; font-size: 16px;">
+                    {{ task.student.initials }}
+                </div>
+                <div>
+                    <h3 style="font-size: 16px; font-weight: 800; color: var(--text-main);">
+                        {{ task.student.name }}
+                    </h3>
+                    <div style="font-size: 12px; color: var(--text-muted);">
+                        Roll: {{ task.student.roll_number }} &bull; Batch: {{ task.batch.name }}
+                    </div>
+                </div>
+            </div>
+
+            <div style="background: var(--bg-subtle); padding: 14px 18px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                <div style="font-weight: 800; font-size: 15px; color: var(--text-main); margin-bottom: 4px;">
+                    {{ task.title }}
+                </div>
+                {% if task.description %}
+                    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">
+                        {{ task.description }}
+                    </p>
+                {% endif %}
+                <div style="display: flex; gap: 16px; font-size: 12px; color: var(--text-dim); flex-wrap: wrap;">
+                    <span><i class="bi bi-calendar"></i> Given: {{ task.assigned_date|date:"M d, Y" }}</span>
+                    {% if task.due_date %}
+                        <span><i class="bi bi-alarm"></i> Deadline: {{ task.due_date|date:"M d, Y" }}</span>
+                    {% endif %}
+                    {% if task.completed_at %}
+                        <span class="text-success"><i class="bi bi-check-circle"></i> Completed: {{ task.completed_at|date:"M d, Y - h:i A" }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Evaluation Form Card -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">
+                <i class="bi bi-patch-check-fill text-primary"></i> Evaluator Rubric & Assessment
+            </div>
+        </div>
+
+        <form method="POST" action="{% url 'task_evaluate' task.id %}" enctype="multipart/form-data" style="padding: 24px;">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{% url 'task_evaluation_hub' %}">
+
+            <!-- Rubric Scores -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px;">
+                <div class="form-group">
+                    <label class="form-label" style="font-weight: 700;">Code Quality Score (0-100) [35%]</label>
+                    {{ form.code_quality_score }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="font-weight: 700;">Problem Solving Score (0-100) [35%]</label>
+                    {{ form.problem_solving_score }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="font-weight: 700;">Timeliness Score (0-100) [15%]</label>
+                    {{ form.timeliness_score }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="font-weight: 700;">Presentation Score (0-100) [15%]</label>
+                    {{ form.presentation_score }}
+                </div>
+            </div>
+
+            <!-- Overall Score & Status -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px;">
+                <div class="form-group">
+                    <label class="form-label" style="font-weight: 700;">Evaluation Outcome *</label>
+                    {{ form.evaluation_status }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="font-weight: 700;">Task Status</label>
+                    {{ form.status }}
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 18px;">
+                <label class="form-label">Submission Link (GitHub, PR, Demo)</label>
+                {{ form.submission_url }}
+            </div>
+
+            <div class="form-group" style="margin-bottom: 18px;">
+                <label class="form-label">Upload Document (PPT/PDF/Image) - Optional</label>
+                {{ form.document_upload }}
+            </div>
+
+            <div class="form-group" style="margin-bottom: 18px;">
+                <label class="form-label" style="font-weight: 700;">Evaluator Feedback & Code Review *</label>
+                {{ form.evaluator_feedback }}
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+                <div class="form-group">
+                    <label class="form-label">Key Strengths</label>
+                    {{ form.strengths }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Areas to Improve</label>
+                    {{ form.areas_for_improvement }}
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                <a href="{% url 'task_evaluation_hub' %}" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check2-circle"></i> Submit Evaluation
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
