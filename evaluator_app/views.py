@@ -636,6 +636,49 @@ def student_detail_view(request, student_id):
 
 
 @evaluator_required
+def student_report_download_view(request, student_id):
+    student = get_object_or_404(Student, id=student_id)
+    if not can_user_access_batch(request.user, student.batch):
+        messages.error(request, 'Permission denied.')
+        return redirect('student_list')
+        
+    format_type = request.GET.get('format', 'pdf')
+    
+    attendance_records = student.attendance_records.all().order_by('-date')
+    eval_stats = student.evaluations.aggregate(
+        avg_pres=Avg('presentation_score'),
+        avg_prob=Avg('problem_solving_score'),
+        avg_comm=Avg('communication_score'),
+        avg_punct=Avg('punctuality_score'),
+        avg_tutor_int=Avg('tutor_interaction_score'),
+        avg_peer_int=Avg('classmate_interaction_score'),
+        avg_study_ten=Avg('tendency_to_study_score'),
+        avg_ppt=Avg('ppt_evaluation_score'),
+        avg_tasks_given=Avg('tasks_given'),
+        avg_tasks_completed=Avg('tasks_completed'),
+    )
+    evaluations = student.evaluations.all().order_by('-date')
+    tasks = student.tasks.all().order_by('-assigned_date')
+    
+    from .reports import generate_student_pdf_report, generate_student_docx_report, generate_student_excel_report
+    
+    if format_type == 'xlsx':
+        output = generate_student_excel_report(student, attendance_records, eval_stats, evaluations, tasks)
+        response = HttpResponse(output, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = f'attachment; filename="Report_{student.roll_number}.xlsx"'
+        return response
+    elif format_type == 'docx':
+        output = generate_student_docx_report(student, attendance_records, eval_stats, evaluations, tasks)
+        response = HttpResponse(output, content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+        response['Content-Disposition'] = f'attachment; filename="Report_{student.roll_number}.docx"'
+        return response
+    else: # pdf
+        output = generate_student_pdf_report(student, attendance_records, eval_stats, evaluations, tasks)
+        response = HttpResponse(output, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="Report_{student.roll_number}.pdf"'
+        return response
+
+@evaluator_required
 def student_edit_view(request, student_id):
     user = request.user
     student = get_object_or_404(Student, id=student_id)

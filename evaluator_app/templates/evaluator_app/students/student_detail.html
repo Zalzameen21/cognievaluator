@@ -4,6 +4,43 @@
 {% block page_title %}{{ student.name }} - 360° Scorecard{% endblock %}
 
 {% block content %}
+<style>
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+.dropdown-content {
+    display: none;
+    position: absolute;
+    right: 0;
+    background-color: white;
+    min-width: 180px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.1);
+    z-index: 100;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+.dropdown-content a {
+    color: var(--text-main);
+    padding: 10px 16px;
+    text-decoration: none;
+    display: block;
+    font-size: 13px;
+    transition: background 0.2s;
+}
+.dropdown-content a:hover {
+    background-color: var(--bg-hover);
+}
+.dropdown:hover .dropdown-content {
+    display: block;
+}
+.dropdown-content i {
+    margin-right: 8px;
+    font-size: 15px;
+    vertical-align: middle;
+}
+</style>
 <!-- Student Profile Header Banner -->
 <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-xl); padding: 24px 28px; margin-bottom: 24px; box-shadow: var(--shadow-sm); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
     <div style="display: flex; align-items: center; gap: 20px;">
@@ -27,6 +64,17 @@
 
     <!-- Actions -->
     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <div class="dropdown">
+            <button type="button" class="btn btn-secondary dropdown-btn">
+                <i class="bi bi-download"></i> Download Report <i class="bi bi-chevron-down" style="font-size: 10px;"></i>
+            </button>
+            <div class="dropdown-content">
+                <a href="{% url 'student_report_download' student.id %}?format=pdf"><i class="bi bi-file-earmark-pdf" style="color: #EF4444;"></i> PDF Report</a>
+                <a href="{% url 'student_report_download' student.id %}?format=xlsx"><i class="bi bi-file-earmark-excel" style="color: #10B981;"></i> Excel Report</a>
+                <a href="{% url 'student_report_download' student.id %}?format=docx"><i class="bi bi-file-earmark-word" style="color: #3B82F6;"></i> Word Document</a>
+            </div>
+        </div>
+
         {% if has_evaluated_today and not request.user.profile.is_admin %}
         <span class="btn btn-secondary" style="opacity: 0.6; cursor: not-allowed;" title="Already Evaluated Today">
             <i class="bi bi-award-fill"></i> Evaluated Today
