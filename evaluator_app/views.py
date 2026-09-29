@@ -539,8 +539,53 @@ def student_detail_view(request, student_id):
         return redirect('batch_list')
         
     evaluations = student.evaluations.all()
-    attendance_records = student.attendance_records.all()[:30]
     
+    # Calculate historical attendance points
+    history_records = []
+    batch = student.batch
+    if batch and batch.start_date:
+        DAYS_MAP = {
+            'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
+            'friday': 4, 'saturday': 5, 'sunday': 6
+        }
+        class_days_str = batch.class_days.lower()
+        valid_weekdays = [v for k, v in DAYS_MAP.items() if k in class_days_str]
+        
+        today = timezone.now().date()
+        check_date = batch.start_date
+        
+        past_dates = []
+        while check_date <= today:
+            if check_date.weekday() in valid_weekdays:
+                past_dates.append(check_date)
+            check_date += timedelta(days=1)
+            
+        past_dates = sorted(past_dates, reverse=True)[:30] # take last 30 class days
+        
+        # apply class exceptions
+        actual_dates = []
+        exceptions = BatchScheduleException.objects.filter(batch=batch, original_date__in=past_dates)
+        ex_map = {ex.original_date: ex for ex in exceptions}
+        for d in past_dates:
+            ex = ex_map.get(d)
+            if ex:
+                if ex.rescheduled_date and ex.rescheduled_date <= today:
+                    actual_dates.append(ex.rescheduled_date)
+            else:
+                actual_dates.append(d)
+                
+        actual_dates = sorted(actual_dates, reverse=True)[:30]
+        
+        existing_att = Attendance.objects.filter(student=student, date__in=actual_dates)
+        att_map = {att.date: att.status for att in existing_att}
+        
+        for d in actual_dates:
+            status = att_map.get(d, 'Not Marked/Absent')
+            history_records.append({'date': d, 'status': status})
+    else:
+        # Fallback if no start_date
+        history_records = [{'date': a.date, 'status': a.status} for a in student.attendance_records.all().order_by('-date')[:30]]
+
     # Calculate performance metrics averages
     eval_stats = evaluations.aggregate(
         avg_punct=Avg('punctuality_score'),
@@ -629,7 +674,7 @@ def student_detail_view(request, student_id):
         'student': student,
         'has_evaluated_today': has_evaluated_today,
         'evaluations': evaluations,
-        'attendance_records': attendance_records,
+        'attendance_records': history_records,
         'eval_stats': eval_stats,
         'att_present': att_present,
         'att_late': att_late,

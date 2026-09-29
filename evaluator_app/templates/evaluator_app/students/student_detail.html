@@ -648,7 +648,11 @@
         {% for att in attendance_records %}
         <div style="background: var(--bg-subtle); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 12px; display: flex; align-items: center; gap: 6px;">
             <span style="font-weight: 700;">{{ att.date|date:"d M" }}:</span>
-            <span class="badge-status status-{{ att.status|lower }}">{{ att.status }}</span>
+            {% if att.status == 'Not Marked/Absent' %}
+                <span class="badge-status status-absent" style="background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2);">Not Marked / Absent</span>
+            {% else %}
+                <span class="badge-status status-{{ att.status|lower }}">{{ att.status }}</span>
+            {% endif %}
         </div>
         {% empty %}
         <div style="color: var(--text-dim); font-size: 13px;">No attendance entries recorded yet.</div>
