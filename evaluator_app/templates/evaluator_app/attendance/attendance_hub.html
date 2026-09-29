@@ -47,7 +47,7 @@
 
         <div>
             <label class="form-label" style="margin-bottom: 4px; font-size: 11px; text-transform: uppercase;">Attendance Date</label>
-            <input type="date" name="date" value="{{ selected_date }}" class="form-input" style="width: 170px;" onchange="this.form.submit()">
+            <input type="date" name="date" value="{{ selected_date }}" {% if min_date %}min="{{ min_date }}"{% endif %} class="form-input" style="width: 170px;" onchange="this.form.submit()">
         </div>
 
         <div style="align-self: flex-end;">

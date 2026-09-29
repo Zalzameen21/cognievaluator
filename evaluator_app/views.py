@@ -2155,8 +2155,18 @@ def attendance_hub_view(request):
                     'batch': stu.batch,
                 })
     low_attendance_students.sort(key=lambda x: x['attendance_pct'])
+    
+    # Calculate min_date for the date picker based on batch/group start_date
+    min_date = None
+    if selected_group:
+        group_start_dates = [b.start_date for b in selected_group.batches.all() if b.start_date]
+        if group_start_dates:
+            min_date = min(group_start_dates)
+    elif selected_batch and selected_batch.start_date:
+        min_date = selected_batch.start_date
 
     context = {
+        'min_date': min_date.strftime('%Y-%m-%d') if min_date else None,
         'accessible_batches': accessible_batches,
         'accessible_groups': accessible_groups,
         'selected_batch': selected_batch,
