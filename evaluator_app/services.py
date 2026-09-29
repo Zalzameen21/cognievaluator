@@ -145,7 +145,7 @@ def auto_mark_absent_for_past_days(user_batches=None):
     If a student was supposed to have a class but has no attendance record, 
     they are automatically marked as ABSENT.
     """
-    from .models import Batch, Attendance, ClassException
+    from .models import Batch, Attendance, BatchScheduleException
     import datetime
     from django.utils import timezone
 
@@ -185,7 +185,7 @@ def auto_mark_absent_for_past_days(user_batches=None):
         while check_date < today:
             if check_date.weekday() in valid_weekdays:
                 actual_date = check_date
-                exception = ClassException.objects.filter(batch=batch, original_date=check_date).first()
+                exception = BatchScheduleException.objects.filter(batch=batch, original_date=check_date).first()
                 if exception:
                     if exception.rescheduled_date:
                         actual_date = exception.rescheduled_date
