@@ -1418,28 +1418,41 @@ def task_create_view(request):
                 # Assign to all active students in all selected batches
                 for batch in batches:
                     # Also reflect this in the Batch's Task Schedule
-                    if module_id and syllabus_module:
-                        BatchTaskSchedule.objects.update_or_create(
-                            batch=batch,
-                            date=assigned_date,
-                            defaults={
-                                'syllabus_task': syllabus_module,
-                                'custom_task_title': '',
-                                'custom_task_description': '',
-                                'is_rescheduled': True,
-                            }
-                        )
+                    existing_sched = BatchTaskSchedule.objects.filter(batch=batch, date=assigned_date).first()
+                    if existing_sched:
+                        if module_id and syllabus_module:
+                            if existing_sched.syllabus_task:
+                                existing_sched.custom_task_title = f"{existing_sched.custom_task_title} + {syllabus_module.title}".strip(' +')
+                            else:
+                                existing_sched.syllabus_task = syllabus_module
+                        else:
+                            if existing_sched.custom_task_title:
+                                existing_sched.custom_task_title = f"{existing_sched.custom_task_title} + {title}"
+                                existing_sched.custom_task_description = f"{existing_sched.custom_task_description}\n\n{desc}".strip()
+                            else:
+                                existing_sched.custom_task_title = title
+                                existing_sched.custom_task_description = desc
+                        existing_sched.is_rescheduled = True
+                        existing_sched.save()
                     else:
-                        BatchTaskSchedule.objects.update_or_create(
-                            batch=batch,
-                            date=assigned_date,
-                            defaults={
-                                'syllabus_task': None,
-                                'custom_task_title': title,
-                                'custom_task_description': desc,
-                                'is_rescheduled': True,
-                            }
-                        )
+                        if module_id and syllabus_module:
+                            BatchTaskSchedule.objects.create(
+                                batch=batch,
+                                date=assigned_date,
+                                syllabus_task=syllabus_module,
+                                custom_task_title='',
+                                custom_task_description='',
+                                is_rescheduled=True
+                            )
+                        else:
+                            BatchTaskSchedule.objects.create(
+                                batch=batch,
+                                date=assigned_date,
+                                syllabus_task=None,
+                                custom_task_title=title,
+                                custom_task_description=desc,
+                                is_rescheduled=True
+                            )
 
                     active_students = batch.students.filter(status='ACTIVE')
                     for stu in active_students:
