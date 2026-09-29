@@ -3505,6 +3505,24 @@ def syllabus_assign_batches_view(request, syllabus_id):
 
 
 @evaluator_required
+def batch_schedule_regenerate_view(request, batch_id):
+    from .services import generate_batch_schedule
+    user = request.user
+    batch = get_object_or_404(Batch, id=batch_id)
+    if not can_user_access_batch(user, batch):
+        messages.error(request, 'Permission denied.')
+        return redirect('batch_list')
+
+    if request.method == 'POST':
+        batch_syllabus = getattr(batch, 'syllabus_assignment', None)
+        if batch_syllabus:
+            generate_batch_schedule(batch_syllabus)
+            messages.success(request, 'Task schedule generated successfully.')
+        else:
+            messages.error(request, 'No syllabus assigned to this batch.')
+    return redirect('batch_schedule_view', batch_id=batch_id)
+
+@evaluator_required
 def batch_syllabus_assign_view(request, batch_id):
     from .services import generate_batch_schedule
     user = request.user

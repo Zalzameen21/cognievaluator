@@ -94,6 +94,7 @@ urlpatterns = [
     # Batch Schedule / Syllabus Assignment
     path('batches/<int:batch_id>/schedule/', views.batch_schedule_view, name='batch_schedule_view'),
     path('batches/<int:batch_id>/schedule/assign-syllabus/', views.batch_syllabus_assign_view, name='batch_syllabus_assign'),
+    path('batches/<int:batch_id>/schedule/regenerate/', views.batch_schedule_regenerate_view, name='batch_schedule_regenerate'),
     path('batches/<int:batch_id>/schedule/reschedule/', views.batch_schedule_reschedule_view, name='batch_schedule_reschedule'),
     path('batches/schedule/<int:schedule_id>/toggle-status/', views.batch_schedule_toggle_status_view, name='batch_schedule_toggle_status'),
     path('batches/schedule/<int:schedule_id>/delete/', views.batch_schedule_delete_view, name='batch_schedule_delete'),

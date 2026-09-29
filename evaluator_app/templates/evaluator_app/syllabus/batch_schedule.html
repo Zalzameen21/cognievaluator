@@ -124,7 +124,15 @@
       {% else %}
       <div style="padding:40px;text-align:center;color:var(--text-muted);">
         <i class="bi bi-calendar-x" style="font-size:40px;"></i>
-        <p style="margin:14px 0 0;">No schedule generated yet. Assign a syllabus to auto-generate the task timeline.</p>
+        {% if batch_syllabus %}
+            <p style="margin:14px 0 0;">The schedule is empty. You can manually regenerate it based on the assigned syllabus.</p>
+            <form method="post" action="{% url 'batch_schedule_regenerate' batch.id %}" style="margin-top: 16px;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary"><i class="bi bi-arrow-repeat"></i> Regenerate Schedule</button>
+            </form>
+        {% else %}
+            <p style="margin:14px 0 0;">No schedule generated yet. Assign a syllabus to auto-generate the task timeline.</p>
+        {% endif %}
       </div>
       {% endif %}
     </div>
