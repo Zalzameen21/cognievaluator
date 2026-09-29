@@ -26,13 +26,14 @@
                     {% endif %}
                 {% endfor %}
                 
-                <input type="hidden" name="force_replace" value="true">
-                
                 <div style="display: flex; gap: 12px; justify-content: flex-end;">
                     <a href="{% url 'batch_schedule_view' batch.id %}" class="btn btn-secondary">
                         <i class="bi bi-x-circle"></i> Cancel
                     </a>
-                    <button type="submit" class="btn btn-danger">
+                    <button type="submit" name="action" value="keep_both" class="btn btn-primary" style="background:var(--primary);">
+                        <i class="bi bi-plus-circle"></i> Keep Existing + Add Second Task
+                    </button>
+                    <button type="submit" name="action" value="replace" class="btn btn-danger">
                         <i class="bi bi-check2-circle"></i> {{ btn_text|default:"Replace Task" }}
                     </button>
                 </div>

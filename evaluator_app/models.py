@@ -841,6 +841,7 @@ class BatchTaskSchedule(models.Model):
     is_rescheduled = models.BooleanField(default=False)
     status = models.CharField(max_length=20, choices=[('PENDING', 'Pending'), ('COMPLETED', 'Completed')], default='PENDING')
     incharge = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='batch_task_schedules')
+    incharge_name = models.CharField(max_length=150, blank=True, help_text="For unregistered incharges")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

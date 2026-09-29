@@ -3621,6 +3621,7 @@ def batch_schedule_reschedule_view(request, batch_id):
             return redirect('batch_schedule_view', batch_id=batch_id)
 
         incharge_id = request.POST.get('incharge_id', '')
+        incharge_name = request.POST.get('incharge_name', '').strip()
         status = request.POST.get('status', 'PENDING')
 
         syllabus_task = None
@@ -3633,8 +3634,10 @@ def batch_schedule_reschedule_view(request, batch_id):
         else:
             if incharge_id:
                 incharge_user = User.objects.filter(id=incharge_id).first()
+                incharge_name = ''
 
-        force_replace = request.POST.get('force_replace') == 'true'
+        action = request.POST.get('action', 'replace')
+        force_replace = action in ['replace', 'keep_both']
 
         dest_sched = BatchTaskSchedule.objects.filter(batch=batch, date=sched_date).first()
         source_sched = None
@@ -3649,7 +3652,7 @@ def batch_schedule_reschedule_view(request, batch_id):
 
             if syllabus_task_id and dest_sched.syllabus_task:
                 # Case 2: Syllabus + Syllabus = SWAP
-                if source_sched:
+                if source_sched and action != 'keep_both':
                     with transaction.atomic():
                         old_date = source_sched.date
                         # Swap dates directly
@@ -3661,7 +3664,7 @@ def batch_schedule_reschedule_view(request, batch_id):
                         dest_sched.save()
                     messages.success(request, f'Swapped tasks between {old_date.strftime("%d/%m/%Y")} and {sched_date.strftime("%d/%m/%Y")}.')
                     return redirect('batch_schedule_view', batch_id=batch_id)
-                # If source_sched doesn't exist for some reason, we fall through to replace logic
+                # If source_sched doesn't exist for some reason, we fall through
 
             if not force_replace:
                 # Cases 3, 4, and Custom+Custom
@@ -3684,27 +3687,61 @@ def batch_schedule_reschedule_view(request, batch_id):
 
         # Apply move or creation
         with transaction.atomic():
-            if dest_sched:
-                dest_sched.delete()
-
-            if source_sched:
-                source_sched.date = sched_date
-                source_sched.is_rescheduled = True
+            if dest_sched and action == 'keep_both':
+                # We merge the incoming task into the existing one
+                if syllabus_task:
+                    # Incoming is syllabus task, existing is custom or syllabus
+                    if dest_sched.syllabus_task:
+                        dest_sched.custom_task_title = f"{dest_sched.custom_task_title} + {syllabus_task.title}".strip(' +')
+                    else:
+                        dest_sched.syllabus_task = syllabus_task
+                else:
+                    # Incoming is custom task
+                    if dest_sched.custom_task_title:
+                        dest_sched.custom_task_title = f"{dest_sched.custom_task_title} + {custom_title}"
+                        dest_sched.custom_task_description = f"{dest_sched.custom_task_description}\n\n{custom_desc}".strip()
+                    else:
+                        dest_sched.custom_task_title = custom_title
+                        dest_sched.custom_task_description = custom_desc
+                
+                dest_sched.is_rescheduled = True
                 if incharge_user:
-                    source_sched.incharge = incharge_user
-                source_sched.status = status
-                source_sched.save()
+                    dest_sched.incharge = incharge_user
+                    dest_sched.incharge_name = ''
+                elif incharge_name:
+                    dest_sched.incharge_name = incharge_name
+                dest_sched.save()
+                
+                # Delete source if we moved a syllabus task
+                if source_sched:
+                    source_sched.delete()
+
             else:
-                BatchTaskSchedule.objects.create(
-                    batch=batch,
-                    date=sched_date,
-                    syllabus_task=syllabus_task,
-                    custom_task_title=custom_title if not syllabus_task else '',
-                    custom_task_description=custom_desc if not syllabus_task else '',
-                    is_rescheduled=True,
-                    incharge=incharge_user,
-                    status=status
-                )
+                if dest_sched:
+                    dest_sched.delete()
+
+                if source_sched:
+                    source_sched.date = sched_date
+                    source_sched.is_rescheduled = True
+                    if incharge_user:
+                        source_sched.incharge = incharge_user
+                        source_sched.incharge_name = ''
+                    elif incharge_name:
+                        source_sched.incharge_name = incharge_name
+                    source_sched.status = status
+                    source_sched.save()
+                else:
+                    BatchTaskSchedule.objects.create(
+                        batch=batch,
+                        date=sched_date,
+                        syllabus_task=syllabus_task,
+                        custom_task_title=custom_title if not syllabus_task else '',
+                        custom_task_description=custom_desc if not syllabus_task else '',
+                        is_rescheduled=True,
+                        incharge=incharge_user,
+                        incharge_name=incharge_name,
+                        status=status
+                    )
         
         messages.success(request, f'Task rescheduled for {sched_date.strftime("%d/%m/%Y")}.')
         return redirect('batch_schedule_view', batch_id=batch_id)

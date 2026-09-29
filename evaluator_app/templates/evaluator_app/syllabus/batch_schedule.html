@@ -75,16 +75,28 @@
                     {% endif %}
                   </div>
                 </div>
+                </div>
                 {% elif s.custom_task_title %}
                 <div>
                   <div style="font-weight:700;color:var(--text-main);font-size:13px;">{{ s.custom_task_title }}</div>
                   {% if s.custom_task_description %}
                   <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">{{ s.custom_task_description|truncatechars:80 }}</div>
                   {% endif %}
-                  <span style="font-size:10px;background:rgba(245,158,11,0.1);color:#D97706;padding:1px 6px;border-radius:50px;font-weight:600;">Custom Task</span>
+                  <span style="font-size:10px;background:rgba(245,158,11,0.1);color:#D97706;padding:1px 6px;border-radius:50px;font-weight:600;display:inline-block;margin-top:4px;">Custom Task</span>
                 </div>
                 {% else %}
                 <span style="color:var(--text-muted);font-size:13px;">—</span>
+                {% endif %}
+                
+                {% if s.incharge or s.incharge_name %}
+                <div style="font-size:11px;color:var(--text-muted);margin-top:6px;display:flex;align-items:center;gap:4px;">
+                  <i class="bi bi-person-circle"></i>
+                  {% if s.incharge %}
+                    {{ s.incharge.get_full_name|default:s.incharge.username }}
+                  {% else %}
+                    {{ s.incharge_name }} <span style="font-size:9px;opacity:0.7;">(Unregistered)</span>
+                  {% endif %}
+                </div>
                 {% endif %}
               </td>
               <td style="padding:13px 16px;vertical-align:top;">
@@ -250,13 +262,16 @@
           <textarea name="custom_task_description" class="form-textarea" rows="2" placeholder="Task details..."></textarea>
         </div>
         <div class="form-group">
-          <label class="form-label">Incharge Evaluator</label>
-          <select name="incharge_id" class="form-select">
-            <option value="">— Select Evaluator —</option>
-            {% for ev in all_evaluators %}
-            <option value="{{ ev.id }}">{{ ev.get_full_name|default:ev.username }}</option>
-            {% endfor %}
-          </select>
+          <label class="form-label" style="font-weight: 700;">Incharge Evaluator</label>
+          <div style="display:flex;gap:10px;">
+            <select name="incharge_id" class="form-select" style="flex:1;">
+              <option value="">— Select Registered User —</option>
+              {% for ev in all_evaluators %}
+              <option value="{{ ev.id }}">{{ ev.get_full_name|default:ev.username }}</option>
+              {% endfor %}
+            </select>
+            <input type="text" name="incharge_name" class="form-input" placeholder="Or type Unregistered Name" style="flex:1;">
+          </div>
         </div>
         <div class="form-group">
           <label class="form-label">Status</label>
