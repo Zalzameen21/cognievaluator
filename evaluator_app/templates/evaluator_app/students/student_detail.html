@@ -280,6 +280,36 @@ function toggleAnalytics() {
         btn.style.background = 'var(--bg-surface)';
     }
 }
+
+function toggleProjects() {
+    const container = document.getElementById('projectsContainer');
+    const chevron = document.getElementById('projectsChevron');
+    const btn = document.getElementById('toggleProjectsBtn');
+    if (container.style.display === 'none') {
+        container.style.display = 'block';
+        chevron.style.transform = 'rotate(180deg)';
+        btn.style.background = 'var(--bg-subtle)';
+    } else {
+        container.style.display = 'none';
+        chevron.style.transform = 'rotate(0deg)';
+        btn.style.background = 'var(--bg-surface)';
+    }
+}
+
+function toggleHistory() {
+    const container = document.getElementById('historyContainer');
+    const chevron = document.getElementById('historyChevron');
+    const btn = document.getElementById('toggleHistoryBtn');
+    if (container.style.display === 'none') {
+        container.style.display = 'block';
+        chevron.style.transform = 'rotate(180deg)';
+        btn.style.background = 'var(--bg-subtle)';
+    } else {
+        container.style.display = 'none';
+        chevron.style.transform = 'rotate(0deg)';
+        btn.style.background = 'var(--bg-surface)';
+    }
+}
 </script>
 
 <!-- Student Profile Insights & Latest Remarks Banner -->
@@ -495,7 +525,15 @@ function toggleAnalytics() {
     </div>
 </div>
 
-<!-- Student Projects & Capstones Section -->
+<!-- Projects & Capstones Toggle Button -->
+<div style="margin-bottom: 24px;">
+    <button type="button" id="toggleProjectsBtn" onclick="toggleProjects()" style="width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; font-weight: 700; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); border-radius: var(--radius-md); box-shadow: 0 2px 5px rgba(0,0,0,0.02); transition: all 0.2s ease; cursor: pointer; font-size: 15px;">
+        <span><i class="bi bi-kanban-fill text-primary" style="margin-right: 10px; font-size: 18px;"></i> Projects & Capstones ({{ student_projects.count }} Total)</span>
+        <i class="bi bi-chevron-down" id="projectsChevron" style="transition: transform 0.3s ease; font-size: 18px; color: var(--text-dim);"></i>
+    </button>
+</div>
+
+<div id="projectsContainer" style="display: none;">
 <div class="card mb-4">
     <div class="card-header" style="flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center;">
         <div>
@@ -583,8 +621,17 @@ function toggleAnalytics() {
         {% endif %}
     </div>
 </div>
+</div> <!-- End of projectsContainer -->
 
-<!-- Detailed Evaluation History Timeline Table -->
+<!-- Daily Evaluation History Toggle Button -->
+<div style="margin-bottom: 24px;">
+    <button type="button" id="toggleHistoryBtn" onclick="toggleHistory()" style="width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; font-weight: 700; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); border-radius: var(--radius-md); box-shadow: 0 2px 5px rgba(0,0,0,0.02); transition: all 0.2s ease; cursor: pointer; font-size: 15px;">
+        <span><i class="bi bi-clock-history text-primary" style="margin-right: 10px; font-size: 18px;"></i> Daily Evaluation History ({{ evaluations.count }} sessions)</span>
+        <i class="bi bi-chevron-down" id="historyChevron" style="transition: transform 0.3s ease; font-size: 18px; color: var(--text-dim);"></i>
+    </button>
+</div>
+
+<div id="historyContainer" style="display: none;">
 <div class="card">
     <div class="card-header">
         <div class="card-title">
@@ -662,6 +709,7 @@ function toggleAnalytics() {
         </table>
     </div>
 </div>
+</div> <!-- End of historyContainer -->
 
 <!-- Attendance Record Log -->
 <div class="card">
