@@ -2150,21 +2150,19 @@ def attendance_register_view(request, batch_id=None, group_id=None):
         
     today = timezone.now().date()
     
-    # Generate past 14 active class days
-    days_count = 14
+    earliest_start = min([b.start_date for b in group.batches.all()]) if group else batch.start_date
+    if hasattr(earliest_start, 'date'):
+        earliest_start = earliest_start.date()
+        
     dates = []
-    current_date = today
+    current_date = earliest_start
     
     # Pre-fetch exceptions for performance
     cancelled_dates = set(e.original_date for e in exceptions)
     makeup_dates = set(e.rescheduled_date for e in exceptions if e.rescheduled_date)
     
-    # Search backwards until we find 14 valid class days
-    # To prevent infinite loops if batch_days is somehow invalid, limit iterations
-    max_iterations = 100 
-    iterations = 0
-    
-    while len(dates) < days_count and iterations < max_iterations:
+    # Generate all active class days from start date to today
+    while current_date <= today:
         is_regular = (not batch_days or current_date.strftime('%A') in batch_days)
         is_cancelled = current_date in cancelled_dates
         is_makeup = current_date in makeup_dates
@@ -2172,10 +2170,7 @@ def attendance_register_view(request, batch_id=None, group_id=None):
         if (is_regular and not is_cancelled) or is_makeup:
             dates.append(current_date)
             
-        current_date -= timedelta(days=1)
-        iterations += 1
-        
-    dates.reverse() # Sort chronological (oldest to newest)    
+        current_date += timedelta(days=1)
     # Pre-fetch attendance records for these dates
     if group:
         attendance_records = Attendance.objects.filter(batch__in=group.batches.all(), date__in=dates)
