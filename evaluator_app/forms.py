@@ -408,6 +408,8 @@ class QuickTaskAssignForm(forms.Form):
         }),
         required=False
     )
+    incharge_name = forms.CharField(max_length=150, required=False, widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Incharge Name (Registered or Custom)'}))
+    problem_document = forms.FileField(required=False, widget=forms.FileInput(attrs={'class': 'form-input'}))
     assigned_date = forms.DateField(widget=forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}), initial=timezone.now)
     due_date = forms.DateField(widget=forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}), required=False)
     priority = forms.ChoiceField(choices=StudentTask.PRIORITY_CHOICES, initial='NORMAL', widget=forms.Select(attrs={'class': 'form-select'}))

@@ -1358,13 +1358,15 @@ def task_hub_view(request):
 def task_create_view(request):
     user = request.user
     if request.method == 'POST':
-        form = QuickTaskAssignForm(request.POST, user=user)
+        form = QuickTaskAssignForm(request.POST, request.FILES, user=user)
         if form.is_valid():
             target_type = form.cleaned_data.get('target_type', 'STUDENT')
             batch_ids = request.POST.getlist('batch_ids')
             student = form.cleaned_data.get('student')
             title = form.cleaned_data.get('title')
             desc = form.cleaned_data.get('description', '')
+            incharge_name = form.cleaned_data.get('incharge_name', '')
+            problem_document = request.FILES.get('problem_document')
             assigned_date = form.cleaned_data.get('assigned_date')
             due_date = form.cleaned_data.get('due_date')
             priority = form.cleaned_data.get('priority', 'NORMAL')
@@ -1399,18 +1401,22 @@ def task_create_view(request):
                 for batch in batches:
                     active_students = batch.students.filter(status='ACTIVE')
                     for stu in active_students:
-                        StudentTask.objects.create(
+                        task = StudentTask(
                             student=stu,
                             batch=batch,
                             assigned_by=user,
                             title=title,
                             description=desc,
+                            incharge_name=incharge_name,
                             assigned_date=assigned_date,
                             due_date=due_date,
                             priority=priority,
                             evaluator_remarks=evaluator_remarks,
                             status='PENDING'
                         )
+                        if problem_document:
+                            task.problem_document = problem_document
+                        task.save()
                         created_count += 1
                 messages.success(request, f"Task '{title}' assigned to {created_count} active students across {len(batches)} batch(es)!")
             else:
@@ -1423,18 +1429,22 @@ def task_create_view(request):
                     messages.error(request, "Please select a student for assignment.")
                     return redirect('task_hub')
                 
-                StudentTask.objects.create(
+                task = StudentTask(
                     student=student,
                     batch=batch,
                     assigned_by=user,
                     title=title,
                     description=desc,
+                    incharge_name=incharge_name,
                     assigned_date=assigned_date,
                     due_date=due_date,
                     priority=priority,
                     evaluator_remarks=evaluator_remarks,
                     status='PENDING'
                 )
+                if problem_document:
+                    task.problem_document = problem_document
+                task.save()
                 messages.success(request, f"Task '{title}' assigned to {student.name} successfully!")
 
             next_url = request.POST.get('next') or 'task_hub'

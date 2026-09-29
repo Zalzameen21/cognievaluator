@@ -548,6 +548,8 @@ class StudentTask(models.Model):
     
     title = models.CharField(max_length=255, help_text="Title or description of the task assigned")
     description = models.TextField(blank=True, help_text="Detailed task instructions or requirements")
+    incharge_name = models.CharField(max_length=150, blank=True, null=True, help_text="Name of the person in charge (registered or unregistered)")
+    problem_document = models.FileField(upload_to='student_tasks/problems/', blank=True, null=True, help_text="Upload problem statement (PDF, Word, etc.)")
     assigned_date = models.DateField(default=timezone.now, help_text="The date that specific task is given")
     due_date = models.DateField(null=True, blank=True, help_text="Expected completion deadline date")
     completed_at = models.DateTimeField(null=True, blank=True, help_text="Date and time when the student completed the task")
