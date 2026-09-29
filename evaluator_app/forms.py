@@ -173,18 +173,6 @@ class StudentForm(forms.ModelForm):
 
         self.fields['join_date'].required = False
 
-    def clean_join_date(self):
-        join_date = self.cleaned_data.get('join_date')
-        batch = self.cleaned_data.get('batch') or self.initial_batch
-        
-        # If no date was provided, default to batch start date or today
-        if not join_date:
-            if batch and batch.start_date:
-                join_date = batch.start_date.date() if hasattr(batch.start_date, 'hour') else batch.start_date
-            else:
-                join_date = timezone.now().date()
-        return join_date
-
         # Target batch determination
         target_batch = initial_batch or getattr(self.instance, 'batch', None)
 
@@ -205,11 +193,27 @@ class StudentForm(forms.ModelForm):
         if target_batch and target_batch.start_date:
             min_date_str = target_batch.start_date.strftime('%Y-%m-%d')
             self.fields['join_date'].widget.attrs['min'] = min_date_str
-            initial_val = self.initial.get('join_date') or timezone.now().date()
-            if hasattr(initial_val, 'date'):
-                initial_val = initial_val.date()
-            if initial_val < target_batch.start_date:
+            # Default to batch start date if not provided (e.g. for new students)
+            if not self.initial.get('join_date'):
                 self.initial['join_date'] = target_batch.start_date
+            else:
+                initial_val = self.initial.get('join_date')
+                if hasattr(initial_val, 'date'):
+                    initial_val = initial_val.date()
+                if initial_val < target_batch.start_date:
+                    self.initial['join_date'] = target_batch.start_date
+
+    def clean_join_date(self):
+        join_date = self.cleaned_data.get('join_date')
+        batch = self.cleaned_data.get('batch') or self.initial_batch
+        
+        # If no date was provided, default to batch start date or today
+        if not join_date:
+            if batch and batch.start_date:
+                join_date = batch.start_date.date() if hasattr(batch.start_date, 'hour') else batch.start_date
+            else:
+                join_date = timezone.now().date()
+        return join_date
 
     def clean_batch(self):
         batch = self.cleaned_data.get('batch')
