@@ -3778,6 +3778,36 @@ def batch_schedule_delete_view(request, schedule_id):
 
 
 @evaluator_required
+def batch_schedule_edit_view(request, schedule_id):
+    if request.method == 'POST':
+        schedule = get_object_or_404(BatchTaskSchedule, id=schedule_id)
+        batch_id = schedule.batch.id
+        if not can_user_access_batch(request.user, schedule.batch):
+            messages.error(request, "Permission denied.")
+            return redirect('batch_schedule_view', batch_id=batch_id)
+
+        custom_title = request.POST.get('custom_task_title', '').strip()
+        custom_desc = request.POST.get('custom_task_description', '').strip()
+        incharge_id = request.POST.get('incharge_id', '')
+        incharge_name = request.POST.get('incharge_name', '').strip()
+
+        schedule.custom_task_title = custom_title
+        schedule.custom_task_description = custom_desc
+
+        if incharge_id:
+            schedule.incharge_id = incharge_id
+            schedule.incharge_name = ''
+        else:
+            schedule.incharge = None
+            schedule.incharge_name = incharge_name
+
+        schedule.save()
+        messages.success(request, "Task schedule updated successfully.")
+        return redirect('batch_schedule_view', batch_id=batch_id)
+    return redirect('dashboard')
+
+
+@evaluator_required
 def batch_schedule_toggle_status_view(request, schedule_id):
     if request.method == 'POST':
         schedule = get_object_or_404(BatchTaskSchedule, id=schedule_id)

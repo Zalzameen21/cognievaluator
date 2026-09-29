@@ -124,6 +124,9 @@
                         {% if s.status == 'COMPLETED' %}<i class="bi bi-arrow-counterclockwise"></i> Mark Pending{% else %}<i class="bi bi-check2-all"></i> Mark Completed{% endif %}
                     </button>
                 </form>
+                <button type="button" class="btn btn-secondary btn-sm" style="padding:4px 8px;font-size:11px; margin-left: 4px;" title="Edit Task" onclick="openEditModal('{{ s.id }}', '{{ s.custom_task_title|escapejs }}', '{{ s.custom_task_description|escapejs }}', '{{ s.incharge.id|default:'' }}', '{{ s.incharge_name|escapejs }}')">
+                    <i class="bi bi-pencil"></i>
+                </button>
                 <form method="post" action="{% url 'batch_schedule_delete' s.id %}" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this schedule entry?');">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-danger btn-sm" style="padding:4px 8px;font-size:11px; margin-left: 4px;" title="Delete Task Schedule">
@@ -350,6 +353,43 @@
 </div>
 {% endif %}
 
+<!-- Edit Modal -->
+<div id="editModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:var(--bg-surface);border-radius:var(--radius-xl);padding:28px;width:100%;max-width:520px;box-shadow:var(--shadow-xl);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <div style="font-size:16px;font-weight:800;color:var(--text-main);"><i class="bi bi-pencil text-primary"></i> Edit Task Schedule</div>
+      <button onclick="document.getElementById('editModal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted);">×</button>
+    </div>
+    <form method="post" id="editForm" action="">
+      {% csrf_token %}
+      <div class="form-group">
+        <label class="form-label">Custom Task Title</label>
+        <input type="text" name="custom_task_title" id="edit_custom_task_title" class="form-input" placeholder="Custom additions">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Custom Task Description</label>
+        <textarea name="custom_task_description" id="edit_custom_task_description" class="form-textarea" rows="2" placeholder="Task details..."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="font-weight: 700;">Incharge Evaluator</label>
+        <div style="display:flex;gap:10px;">
+          <select name="incharge_id" id="edit_incharge_id" class="form-select" style="flex:1;">
+            <option value="">— Select Registered User —</option>
+            {% for ev in all_evaluators %}
+            <option value="{{ ev.id }}">{{ ev.get_full_name|default:ev.username }}</option>
+            {% endfor %}
+          </select>
+          <input type="text" name="incharge_name" id="edit_incharge_name" class="form-input" placeholder="Or type Unregistered Name" style="flex:1;">
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border-color);padding-top:16px;margin-top:8px;">
+        <button type="button" onclick="document.getElementById('editModal').style.display='none'" class="btn btn-secondary">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check2-circle"></i> Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 // Toggle custom task fields based on syllabus task selection
 ['reschedSyllabusTask', 'reschedSyllabusTask2'].forEach(function(id) {
@@ -362,5 +402,14 @@
   sel.addEventListener('change', toggle);
   toggle();
 });
+
+function openEditModal(id, title, desc, inchargeId, inchargeName) {
+    document.getElementById('editForm').action = "/batches/schedule/" + id + "/edit/";
+    document.getElementById('edit_custom_task_title').value = title;
+    document.getElementById('edit_custom_task_description').value = desc;
+    document.getElementById('edit_incharge_id').value = inchargeId;
+    document.getElementById('edit_incharge_name').value = inchargeName;
+    document.getElementById('editModal').style.display = 'flex';
+}
 </script>
 {% endblock %}
