@@ -660,20 +660,36 @@ def student_report_download_view(request, student_id):
     evaluations = student.evaluations.all().order_by('-date')
     tasks = student.tasks.all().order_by('-assigned_date')
     
+    batch_students = student.batch.students.filter(status='ACTIVE')
+    
+    from .models import Attendance, StudentTask
+    batch_att_total = Attendance.objects.filter(student__in=batch_students).count()
+    batch_att_present = Attendance.objects.filter(student__in=batch_students, status__in=['PRESENT', 'LATE']).count()
+    batch_avg_att = round((batch_att_present / batch_att_total * 100), 1) if batch_att_total else 0
+    
+    batch_task_total = StudentTask.objects.filter(student__in=batch_students).count()
+    batch_task_completed = StudentTask.objects.filter(student__in=batch_students, status='COMPLETED').count()
+    batch_avg_task = round((batch_task_completed / batch_task_total * 100), 1) if batch_task_total else 0
+    
+    batch_comparison = {
+        'avg_attendance': batch_avg_att,
+        'avg_task_completion': batch_avg_task
+    }
+    
     from .reports import generate_student_pdf_report, generate_student_docx_report, generate_student_excel_report
     
     if format_type == 'xlsx':
-        output = generate_student_excel_report(student, attendance_records, eval_stats, evaluations, tasks)
+        output = generate_student_excel_report(student, attendance_records, eval_stats, evaluations, tasks, batch_comparison)
         response = HttpResponse(output, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         response['Content-Disposition'] = f'attachment; filename="Report_{student.roll_number}.xlsx"'
         return response
     elif format_type == 'docx':
-        output = generate_student_docx_report(student, attendance_records, eval_stats, evaluations, tasks)
+        output = generate_student_docx_report(student, attendance_records, eval_stats, evaluations, tasks, batch_comparison)
         response = HttpResponse(output, content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
         response['Content-Disposition'] = f'attachment; filename="Report_{student.roll_number}.docx"'
         return response
     else: # pdf
-        output = generate_student_pdf_report(student, attendance_records, eval_stats, evaluations, tasks)
+        output = generate_student_pdf_report(student, attendance_records, eval_stats, evaluations, tasks, batch_comparison)
         response = HttpResponse(output, content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="Report_{student.roll_number}.pdf"'
         return response

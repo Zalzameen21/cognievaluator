@@ -10,7 +10,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet
 
-def generate_student_excel_report(student, attendance_records, eval_stats, evaluations, tasks):
+def generate_student_excel_report(student, attendance_records, eval_stats, evaluations, tasks, batch_comparison=None):
     wb = Workbook()
     
     # 1. Summary Sheet
@@ -44,6 +44,9 @@ def generate_student_excel_report(student, attendance_records, eval_stats, evalu
     ws_summary['A11'] = "Attendance %:"
     ws_summary['B11'] = f"{pct}%"
     
+    if batch_comparison:
+        ws_summary['C11'] = f"(Batch Avg: {batch_comparison['avg_attendance']}%)"
+    
     ws_summary['A13'] = "Task Report"
     ws_summary['A13'].font = header_font
     
@@ -58,10 +61,23 @@ def generate_student_excel_report(student, attendance_records, eval_stats, evalu
     ws_summary['A17'] = "Completion %:"
     ws_summary['B17'] = f"{task_pct}%"
     
-    ws_summary['A19'] = "Recent Evaluator Remarks"
+    if batch_comparison:
+        ws_summary['C17'] = f"(Batch Avg: {batch_comparison['avg_task_completion']}%)"
+        
+    ws_summary['A19'] = "Overall Progress / Performance Trend"
     ws_summary['A19'].font = header_font
     
     row = 21
+    evals_asc = list(evaluations)[::-1]
+    for idx, ev in enumerate(evals_asc):
+        ws_summary[f'A{row}'] = f"Evaluation {idx+1} ({ev.date}):"
+        ws_summary[f'B{row}'] = f"{ev.total_score}%"
+        row += 1
+        
+    row += 2
+    ws_summary[f'A{row}'] = "Recent Evaluator Remarks"
+    ws_summary[f'A{row}'].font = header_font
+    row += 2
     for ev in evaluations[:5]:
         ws_summary[f'A{row}'] = f"Date: {ev.date}"
         ws_summary[f'A{row}'].font = label_font
@@ -121,7 +137,7 @@ def generate_student_excel_report(student, attendance_records, eval_stats, evalu
     return output
 
 
-def generate_student_docx_report(student, attendance_records, eval_stats, evaluations, tasks):
+def generate_student_docx_report(student, attendance_records, eval_stats, evaluations, tasks, batch_comparison=None):
     doc = Document()
     doc.add_heading(f"Performance Report: {student.name}", 0)
     
@@ -138,6 +154,9 @@ def generate_student_docx_report(student, attendance_records, eval_stats, evalua
     doc.add_paragraph(f"Total Days: {total_att}")
     doc.add_paragraph(f"Days Present: {present_att}")
     doc.add_paragraph(f"Attendance %: {pct}%")
+    
+    if batch_comparison:
+        doc.add_paragraph(f"Batch Average Attendance: {batch_comparison['avg_attendance']}%")
     
     doc.add_heading('Detailed Attendance', level=2)
     table_att = doc.add_table(rows=1, cols=3)
@@ -164,6 +183,9 @@ def generate_student_docx_report(student, attendance_records, eval_stats, evalua
     doc.add_paragraph(f"Tasks Completed: {completed_tasks}")
     doc.add_paragraph(f"Completion %: {task_pct}%")
     
+    if batch_comparison:
+        doc.add_paragraph(f"Batch Average Task Completion: {batch_comparison['avg_task_completion']}%")
+    
     # Specific Tasks Table
     doc.add_heading('Specific Task Details', level=2)
     table = doc.add_table(rows=1, cols=4)
@@ -180,6 +202,12 @@ def generate_student_docx_report(student, attendance_records, eval_stats, evalua
         row_cells[1].text = task.assigned_date.strftime('%Y-%m-%d') if task.assigned_date else '-'
         row_cells[2].text = task.status
         row_cells[3].text = task.completed_at.strftime('%Y-%m-%d') if task.completed_at else '-'
+        
+    # Performance Trend
+    doc.add_heading('Overall Progress / Performance Trend', level=1)
+    evals_asc = list(evaluations)[::-1]
+    for idx, ev in enumerate(evals_asc):
+        doc.add_paragraph(f"Evaluation {idx+1} ({ev.date}) → {ev.total_score}%")
         
     # Evaluations
     doc.add_heading('Evaluator Insights', level=1)
@@ -202,7 +230,7 @@ def generate_student_docx_report(student, attendance_records, eval_stats, evalua
     return output
 
 
-def generate_student_pdf_report(student, attendance_records, eval_stats, evaluations, tasks):
+def generate_student_pdf_report(student, attendance_records, eval_stats, evaluations, tasks, batch_comparison=None):
     output = io.BytesIO()
     doc = SimpleDocTemplate(output, pagesize=letter)
     styles = getSampleStyleSheet()
@@ -218,11 +246,14 @@ def generate_student_pdf_report(student, attendance_records, eval_stats, evaluat
     total_att = attendance_records.count()
     present_att = attendance_records.filter(status__in=['PRESENT', 'LATE']).count()
     pct = round((present_att / total_att * 100) if total_att else 0, 1)
+    
+    batch_att_str = f" ({batch_comparison['avg_attendance']}% Batch Avg)" if batch_comparison else ""
+    
     att_data = [
         ["Total Days", "Days Present", "Attendance %"],
-        [str(total_att), str(present_att), f"{pct}%"]
+        [str(total_att), str(present_att), f"{pct}%{batch_att_str}"]
     ]
-    t_att = Table(att_data, colWidths=[100, 100, 100])
+    t_att = Table(att_data, colWidths=[100, 100, 150])
     t_att.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.grey),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -257,11 +288,14 @@ def generate_student_pdf_report(student, attendance_records, eval_stats, evaluat
     total_tasks = tasks.count()
     completed_tasks = tasks.filter(status='COMPLETED').count()
     task_pct = round((completed_tasks / total_tasks * 100) if total_tasks else 0, 1)
+    
+    batch_task_str = f" ({batch_comparison['avg_task_completion']}% Batch Avg)" if batch_comparison else ""
+    
     task_data = [
         ["Total Tasks Given", "Tasks Completed", "Completion %"],
-        [str(total_tasks), str(completed_tasks), f"{task_pct}%"]
+        [str(total_tasks), str(completed_tasks), f"{task_pct}%{batch_task_str}"]
     ]
-    t_task = Table(task_data, colWidths=[120, 120, 100])
+    t_task = Table(task_data, colWidths=[120, 120, 150])
     t_task.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.grey),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -296,6 +330,13 @@ def generate_student_pdf_report(student, attendance_records, eval_stats, evaluat
     ]))
     elements.append(t_task_details)
     elements.append(Spacer(1, 24))
+    
+    # Performance Trend
+    elements.append(Paragraph("Overall Progress / Performance Trend", styles['Heading2']))
+    evals_asc = list(evaluations)[::-1]
+    for idx, ev in enumerate(evals_asc):
+        elements.append(Paragraph(f"<b>Evaluation {idx+1} ({ev.date}) &rarr; {ev.total_score}%</b>", styles['Normal']))
+    elements.append(Spacer(1, 16))
     
     # Evaluator Remarks
     elements.append(Paragraph("Evaluator Insights & Remarks", styles['Heading2']))
