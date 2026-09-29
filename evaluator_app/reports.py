@@ -107,10 +107,10 @@ def generate_student_excel_report(student, attendance_records, eval_stats, evalu
     for task in tasks:
         ws_tasks.append([
             task.title,
-            task.assigned_date.strftime('%Y-%m-%d') if task.assigned_date else '',
-            task.due_date.strftime('%Y-%m-%d') if task.due_date else '',
+            task.assigned_date.strftime('%a, %Y-%m-%d') if task.assigned_date else '',
+            task.due_date.strftime('%a, %Y-%m-%d') if task.due_date else '',
             task.status,
-            task.completed_at.strftime('%Y-%m-%d %H:%M') if task.completed_at else '',
+            task.completed_at.strftime('%a, %Y-%m-%d %H:%M') if task.completed_at else '',
             task.evaluator_remarks
         ])
         
@@ -199,9 +199,9 @@ def generate_student_docx_report(student, attendance_records, eval_stats, evalua
     for task in tasks:
         row_cells = table.add_row().cells
         row_cells[0].text = task.title
-        row_cells[1].text = task.assigned_date.strftime('%Y-%m-%d') if task.assigned_date else '-'
+        row_cells[1].text = task.assigned_date.strftime('%a, %Y-%m-%d') if task.assigned_date else '-'
         row_cells[2].text = task.status
-        row_cells[3].text = task.completed_at.strftime('%Y-%m-%d') if task.completed_at else '-'
+        row_cells[3].text = task.completed_at.strftime('%a, %Y-%m-%d') if task.completed_at else '-'
         
     # Performance Trend
     doc.add_heading('Overall Progress / Performance Trend', level=1)
@@ -313,9 +313,9 @@ def generate_student_pdf_report(student, attendance_records, eval_stats, evaluat
     for task in tasks:
         task_table_data.append([
             Paragraph(task.title, styles['Normal']),
-            task.assigned_date.strftime('%Y-%m-%d') if task.assigned_date else '-',
+            task.assigned_date.strftime('%a, %Y-%m-%d') if task.assigned_date else '-',
             task.status,
-            task.completed_at.strftime('%Y-%m-%d') if task.completed_at else '-'
+            task.completed_at.strftime('%a, %Y-%m-%d') if task.completed_at else '-'
         ])
         
     t_task_details = Table(task_table_data, colWidths=[200, 80, 80, 100])
