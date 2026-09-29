@@ -3782,6 +3782,12 @@ def batch_schedule_edit_view(request, schedule_id):
     if request.method == 'POST':
         schedule = get_object_or_404(BatchTaskSchedule, id=schedule_id)
         batch_id = schedule.batch.id
+        
+        profile, _ = UserProfile.objects.get_or_create(user=request.user)
+        if not profile.is_admin:
+            messages.error(request, "Only admins can edit task schedules.")
+            return redirect('batch_schedule_view', batch_id=batch_id)
+
         if not can_user_access_batch(request.user, schedule.batch):
             messages.error(request, "Permission denied.")
             return redirect('batch_schedule_view', batch_id=batch_id)

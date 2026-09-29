@@ -124,6 +124,7 @@
                         {% if s.status == 'COMPLETED' %}<i class="bi bi-arrow-counterclockwise"></i> Mark Pending{% else %}<i class="bi bi-check2-all"></i> Mark Completed{% endif %}
                     </button>
                 </form>
+                {% if request.user.profile.is_admin %}
                 <button type="button" class="btn btn-secondary btn-sm" style="padding:4px 8px;font-size:11px; margin-left: 4px;" title="Edit Task" onclick="openEditModal('{{ s.id }}', '{{ s.custom_task_title|escapejs }}', '{{ s.custom_task_description|escapejs }}', '{{ s.incharge.id|default:'' }}', '{{ s.incharge_name|escapejs }}')">
                     <i class="bi bi-pencil"></i>
                 </button>
@@ -133,6 +134,7 @@
                         <i class="bi bi-trash"></i>
                     </button>
                 </form>
+                {% endif %}
               </td>
             </tr>
             {% endwith %}
