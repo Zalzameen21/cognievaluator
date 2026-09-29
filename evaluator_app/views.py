@@ -1417,6 +1417,30 @@ def task_create_view(request):
             if target_type == 'BATCH':
                 # Assign to all active students in all selected batches
                 for batch in batches:
+                    # Also reflect this in the Batch's Task Schedule
+                    if module_id and syllabus_module:
+                        BatchTaskSchedule.objects.update_or_create(
+                            batch=batch,
+                            date=assigned_date,
+                            defaults={
+                                'syllabus_task': syllabus_module,
+                                'custom_task_title': '',
+                                'custom_task_description': '',
+                                'is_rescheduled': True,
+                            }
+                        )
+                    else:
+                        BatchTaskSchedule.objects.update_or_create(
+                            batch=batch,
+                            date=assigned_date,
+                            defaults={
+                                'syllabus_task': None,
+                                'custom_task_title': title,
+                                'custom_task_description': desc,
+                                'is_rescheduled': True,
+                            }
+                        )
+
                     active_students = batch.students.filter(status='ACTIVE')
                     for stu in active_students:
                         task = StudentTask(
