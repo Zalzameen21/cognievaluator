@@ -1,0 +1,43 @@
+{% extends 'evaluator_app/base.html' %}
+
+{% block title %}Confirm Reschedule{% endblock %}
+{% block page_title %}Confirm Reschedule{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 40px auto;">
+    <div class="card" style="box-shadow: var(--shadow-lg);">
+        <div class="card-header" style="background: rgba(239, 68, 68, 0.1); border-bottom: 1px solid rgba(239, 68, 68, 0.2);">
+            <div class="card-title" style="color: var(--danger);">
+                <i class="bi bi-exclamation-triangle-fill"></i> Scheduling Conflict
+            </div>
+        </div>
+        <div class="card-body" style="padding: 30px;">
+            <p style="font-size: 15px; color: var(--text-main); margin-bottom: 24px; line-height: 1.6;">
+                {{ message }}
+            </p>
+            
+            <form method="post" action="{% url 'batch_schedule_reschedule' batch.id %}">
+                {% csrf_token %}
+                
+                <!-- Hidden inputs to preserve original form data -->
+                {% for key, value in post_data.items %}
+                    {% if key != 'csrfmiddlewaretoken' %}
+                        <input type="hidden" name="{{ key }}" value="{{ value }}">
+                    {% endif %}
+                {% endfor %}
+                
+                <input type="hidden" name="force_replace" value="true">
+                
+                <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                    <a href="{% url 'batch_schedule_view' batch.id %}" class="btn btn-secondary">
+                        <i class="bi bi-x-circle"></i> Cancel
+                    </a>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-check2-circle"></i> {{ btn_text|default:"Replace Task" }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
