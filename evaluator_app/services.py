@@ -138,3 +138,76 @@ def sync_student_tasks_for_batch(batch, user=None):
                     task.due_date = due_date
                 task.save()
 
+
+def auto_mark_absent_for_past_days(user_batches=None):
+    """
+    Checks past class days up to yesterday for the given batches.
+    If a student was supposed to have a class but has no attendance record, 
+    they are automatically marked as ABSENT.
+    """
+    from .models import Batch, Attendance, ClassException
+    import datetime
+    from django.utils import timezone
+
+    today = timezone.now().date()
+    
+    if user_batches is not None:
+        batches = user_batches.filter(status='ACTIVE')
+    else:
+        batches = Batch.objects.filter(status='ACTIVE')
+        
+    for batch in batches:
+        start_date = batch.start_date
+        if not start_date:
+            continue
+            
+        DAYS_MAP = {
+            'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
+            'friday': 4, 'saturday': 5, 'sunday': 6
+        }
+        class_days_str = batch.class_days.lower()
+        valid_weekdays = [v for k, v in DAYS_MAP.items() if k in class_days_str]
+        
+        if not valid_weekdays:
+            continue
+            
+        students = list(batch.students.filter(status='ACTIVE'))
+        if not students:
+            continue
+            
+        check_date = start_date
+        
+        # Prevent massive loop if start date is extremely old, cap to 60 days
+        limit_date = today - datetime.timedelta(days=60)
+        if check_date < limit_date:
+            check_date = limit_date
+            
+        while check_date < today:
+            if check_date.weekday() in valid_weekdays:
+                actual_date = check_date
+                exception = ClassException.objects.filter(batch=batch, original_date=check_date).first()
+                if exception:
+                    if exception.rescheduled_date:
+                        actual_date = exception.rescheduled_date
+                    else:
+                        actual_date = None
+                        
+                if actual_date and actual_date < today:
+                    existing_student_ids = set(Attendance.objects.filter(batch=batch, date=actual_date).values_list('student_id', flat=True))
+                    
+                    missing_students = [s for s in students if s.id not in existing_student_ids]
+                    
+                    if missing_students:
+                        Attendance.objects.bulk_create([
+                            Attendance(
+                                student=student,
+                                batch=batch,
+                                date=actual_date,
+                                status='ABSENT',
+                                remarks='Auto-marked absent (End of day)'
+                            ) for student in missing_students
+                        ])
+            
+            check_date += datetime.timedelta(days=1)
+
+

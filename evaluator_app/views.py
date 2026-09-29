@@ -97,6 +97,11 @@ def dashboard_view(request):
     user = request.user
     profile, _ = UserProfile.objects.get_or_create(user=user)
     accessible_batches = get_user_batches(user)
+    
+    # Auto-mark missing attendance for past days
+    from .services import auto_mark_absent_for_past_days
+    auto_mark_absent_for_past_days(accessible_batches)
+    
     accessible_students = get_user_students(user)
     today = timezone.now().date()
     
@@ -1888,6 +1893,11 @@ def batch_reschedule_class_view(request):
 def attendance_hub_view(request):
     user = request.user
     accessible_batches = get_user_batches(user)
+    
+    # Auto-mark missing attendance for past days
+    from .services import auto_mark_absent_for_past_days
+    auto_mark_absent_for_past_days(accessible_batches)
+    
     is_admin = request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.role == 'ADMIN')
     
     batch_id = request.GET.get('batch_id')
