@@ -21,6 +21,9 @@
     </div>
 
     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <a href="{% url 'task_hub_sync_deadlines' %}" class="btn btn-secondary" style="background: rgba(16, 185, 129, 0.2); color: #FFFFFF; border-color: rgba(16, 185, 129, 0.4);" title="Force update task due dates based on latest class schedules">
+            <i class="bi bi-arrow-repeat"></i> Sync Deadlines
+        </a>
         <a href="{% url 'task_evaluation_hub' %}" class="btn btn-secondary" style="background: rgba(99, 102, 241, 0.2); color: #FFFFFF; border-color: rgba(99, 102, 241, 0.4);">
             <i class="bi bi-patch-check-fill"></i> Task Evaluation Section
         </a>

@@ -48,6 +48,7 @@ urlpatterns = [
 
     # Student Task Management & Deliverables
     path('tasks/', views.task_hub_view, name='task_hub'),
+    path('tasks/sync-deadlines/', views.task_hub_sync_deadlines_view, name='task_hub_sync_deadlines'),
     path('tasks/create/', views.task_create_view, name='task_create'),
     path('tasks/evaluations/', views.task_evaluation_hub_view, name='task_evaluation_hub'),
     path('tasks/<int:task_id>/evaluate/', views.task_evaluate_view, name='task_evaluate'),

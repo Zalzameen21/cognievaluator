@@ -1194,6 +1194,15 @@ def batch_bulk_evaluate_view(request, batch_id):
 # ==============================================================================
 
 @evaluator_required
+def task_hub_sync_deadlines_view(request):
+    from .models import Batch
+    from .services import sync_student_tasks_for_batch
+    for batch in Batch.objects.filter(status='ACTIVE'):
+        sync_student_tasks_for_batch(batch)
+    messages.success(request, "Task deadlines synchronized successfully across all active batches based on their schedules!")
+    return redirect('task_hub')
+
+@evaluator_required
 def task_hub_view(request):
     user = request.user
     accessible_batches = get_user_batches(user)
