@@ -84,13 +84,39 @@ def get_task_for_batch_date(batch, date):
 
 def sync_student_tasks_for_batch(batch, user=None):
     from .models import StudentTask, BatchTaskSchedule
-    students = batch.students.all()
-    schedules = BatchTaskSchedule.objects.filter(batch=batch)
+    import datetime
     
-    for schedule in schedules:
+    students = batch.students.all()
+    # Order schedules by date so we can find the next date easily
+    schedules = list(BatchTaskSchedule.objects.filter(batch=batch).order_by('date'))
+    
+    # Parse class days for fallback (last task)
+    DAYS_MAP = {
+        'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
+        'friday': 4, 'saturday': 5, 'sunday': 6
+    }
+    class_days_str = batch.class_days.lower()
+    valid_weekdays = sorted([v for k, v in DAYS_MAP.items() if k in class_days_str])
+    if not valid_weekdays:
+        valid_weekdays = [0, 1, 2, 3, 4]
+        
+    for i, schedule in enumerate(schedules):
         title = schedule.syllabus_task.title if schedule.syllabus_task else schedule.custom_task_title
         description = schedule.syllabus_task.description if schedule.syllabus_task else schedule.custom_task_description
         date = schedule.date
+        
+        # Calculate due_date as the date of the next scheduled task
+        if i + 1 < len(schedules):
+            due_date = schedules[i+1].date
+        else:
+            # For the last task, find the next class date
+            due_date = date
+            check_date = date + datetime.timedelta(days=1)
+            for _ in range(14):
+                if check_date.weekday() in valid_weekdays:
+                    due_date = check_date
+                    break
+                check_date += datetime.timedelta(days=1)
         
         for student in students:
             task, created = StudentTask.objects.get_or_create(
@@ -100,15 +126,15 @@ def sync_student_tasks_for_batch(batch, user=None):
                 defaults={
                     'description': description,
                     'assigned_date': date,
-                    'due_date': date,
+                    'due_date': due_date,
                     'assigned_by': user,
                     'status': 'PENDING'
                 }
             )
             # If the schedule changed (e.g. date shifted), update the student's task date
-            if not created and task.assigned_date != date:
+            if not created and (task.assigned_date != date or task.due_date != due_date):
                 task.assigned_date = date
                 if not task.completed_at:  # Only update due date if not yet completed
-                    task.due_date = date
+                    task.due_date = due_date
                 task.save()
 
