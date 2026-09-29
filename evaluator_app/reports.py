@@ -96,7 +96,7 @@ def generate_student_excel_report(student, attendance_records, eval_stats, evalu
 
     # 2. Tasks Sheet
     ws_tasks = wb.create_sheet(title="Specific Task Details")
-    task_headers = ["Task Title", "Date Given", "Due Date", "Status", "Completed At", "Evaluator Remarks"]
+    task_headers = ["Task Title", "Day Given", "Date Given", "Due Date", "Status", "Completed At", "Evaluator Remarks"]
     ws_tasks.append(task_headers)
     
     for c in range(1, len(task_headers)+1):
@@ -107,10 +107,11 @@ def generate_student_excel_report(student, attendance_records, eval_stats, evalu
     for task in tasks:
         ws_tasks.append([
             task.title,
-            task.assigned_date.strftime('%a, %Y-%m-%d') if task.assigned_date else '',
-            task.due_date.strftime('%a, %Y-%m-%d') if task.due_date else '',
+            task.assigned_date.strftime('%A') if task.assigned_date else '',
+            task.assigned_date.strftime('%Y-%m-%d') if task.assigned_date else '',
+            task.due_date.strftime('%Y-%m-%d') if task.due_date else '',
             task.status,
-            task.completed_at.strftime('%a, %Y-%m-%d %H:%M') if task.completed_at else '',
+            task.completed_at.strftime('%Y-%m-%d %H:%M') if task.completed_at else '',
             task.evaluator_remarks
         ])
         
@@ -188,20 +189,22 @@ def generate_student_docx_report(student, attendance_records, eval_stats, evalua
     
     # Specific Tasks Table
     doc.add_heading('Specific Task Details', level=2)
-    table = doc.add_table(rows=1, cols=4)
+    table = doc.add_table(rows=1, cols=5)
     table.style = 'Table Grid'
     hdr_cells = table.rows[0].cells
     hdr_cells[0].text = 'Task'
-    hdr_cells[1].text = 'Given Date'
-    hdr_cells[2].text = 'Status'
-    hdr_cells[3].text = 'Completed Date'
+    hdr_cells[1].text = 'Day'
+    hdr_cells[2].text = 'Given Date'
+    hdr_cells[3].text = 'Status'
+    hdr_cells[4].text = 'Completed Date'
     
     for task in tasks:
         row_cells = table.add_row().cells
         row_cells[0].text = task.title
-        row_cells[1].text = task.assigned_date.strftime('%a, %Y-%m-%d') if task.assigned_date else '-'
-        row_cells[2].text = task.status
-        row_cells[3].text = task.completed_at.strftime('%a, %Y-%m-%d') if task.completed_at else '-'
+        row_cells[1].text = task.assigned_date.strftime('%A') if task.assigned_date else '-'
+        row_cells[2].text = task.assigned_date.strftime('%Y-%m-%d') if task.assigned_date else '-'
+        row_cells[3].text = task.status
+        row_cells[4].text = task.completed_at.strftime('%Y-%m-%d') if task.completed_at else '-'
         
     # Performance Trend
     doc.add_heading('Overall Progress / Performance Trend', level=1)
@@ -309,16 +312,17 @@ def generate_student_pdf_report(student, attendance_records, eval_stats, evaluat
     
     # Task Details Table
     elements.append(Paragraph("Specific Task Details", styles['Heading2']))
-    task_table_data = [["Task Title", "Given Date", "Status", "Completed Date"]]
+    task_table_data = [["Task Title", "Day", "Given Date", "Status", "Completed Date"]]
     for task in tasks:
         task_table_data.append([
             Paragraph(task.title, styles['Normal']),
-            task.assigned_date.strftime('%a, %Y-%m-%d') if task.assigned_date else '-',
+            task.assigned_date.strftime('%A') if task.assigned_date else '-',
+            task.assigned_date.strftime('%Y-%m-%d') if task.assigned_date else '-',
             task.status,
-            task.completed_at.strftime('%a, %Y-%m-%d') if task.completed_at else '-'
+            task.completed_at.strftime('%Y-%m-%d') if task.completed_at else '-'
         ])
         
-    t_task_details = Table(task_table_data, colWidths=[200, 80, 80, 100])
+    t_task_details = Table(task_table_data, colWidths=[150, 70, 70, 70, 90])
     t_task_details.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
         ('TEXTCOLOR', (0,0), (-1,0), colors.black),
