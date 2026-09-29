@@ -54,7 +54,7 @@
             </div>
             <div style="font-size: 13px; color: var(--text-muted); display: flex; gap: 16px; flex-wrap: wrap;">
                 <span><strong>Roll No:</strong> <code>{{ student.roll_number }}</code></span>
-                <span><strong>Batch:</strong> <a href="{% url 'batch_detail' student.batch.id %}">{{ student.batch.name }}</a></span>
+                <span><strong>Batch:</strong> <a href="{% url 'batch_detail' student.batch.id %}">{{ student.batch.name }} ({{ student.batch.class_days }})</a></span>
                 <span><strong>Center:</strong> {{ student.batch.location.name }}</span>
                 <span><strong>Phone:</strong> {{ student.phone|default:"-" }}</span>
                 <span><strong>Email:</strong> {{ student.email|default:"-" }}</span>
