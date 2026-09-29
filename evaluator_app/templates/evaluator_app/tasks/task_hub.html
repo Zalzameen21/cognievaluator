@@ -124,12 +124,26 @@
                     <option value="{{ b.id }}" {% if selected_batch == b.id|stringformat:"s" %}selected{% endif %}>{{ b.name }} ({{ b.location.code }})</option>
                 {% endfor %}
             </select>
+            
+            <select name="date" class="form-select" style="height: 36px; font-size: 13px; width: auto;" onchange="this.form.submit()">
+                <option value="">All Dates</option>
+                {% for d in unique_dates %}
+                    <option value="{{ d|date:'Y-m-d' }}" {% if selected_date == d|date:'Y-m-d' %}selected{% endif %}>{{ d|date:"M d, Y" }}</option>
+                {% endfor %}
+            </select>
+
+            <select name="task_title" class="form-select" style="height: 36px; font-size: 13px; width: auto; max-width: 250px;" onchange="this.form.submit()">
+                <option value="">All Tasks</option>
+                {% for t in unique_task_titles %}
+                    <option value="{{ t }}" {% if selected_task_title == t %}selected{% endif %}>{{ t }}</option>
+                {% endfor %}
+            </select>
 
             <button type="submit" class="btn btn-secondary btn-sm" style="height: 36px;">
                 <i class="bi bi-funnel-fill"></i> Filter
             </button>
             
-            {% if search_query or selected_batch or selected_status != 'ALL' %}
+            {% if search_query or selected_batch or selected_date or selected_task_title or selected_status != 'ALL' %}
                 <a href="{% url 'task_hub' %}" class="btn btn-secondary btn-sm" style="height: 36px;" title="Reset filters">
                     <i class="bi bi-x-circle"></i> Reset
                 </a>

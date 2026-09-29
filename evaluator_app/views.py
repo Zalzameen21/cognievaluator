@@ -1168,6 +1168,19 @@ def task_hub_view(request):
             Q(description__icontains=search_q)
         )
         
+    unique_task_titles = tasks_qs.values_list('title', flat=True).distinct().order_by('title')
+    unique_dates = tasks_qs.values_list('assigned_date', flat=True).distinct().order_by('-assigned_date')
+    
+    # Filter by Date
+    date_filter = request.GET.get('date')
+    if date_filter:
+        tasks_qs = tasks_qs.filter(assigned_date=date_filter)
+
+    # Filter by Task Title
+    task_title_filter = request.GET.get('task_title')
+    if task_title_filter:
+        tasks_qs = tasks_qs.filter(title=task_title_filter)
+        
     # Global Task Metrics for Filter Bar
     all_scoped_tasks = StudentTask.objects.filter(batch__in=accessible_batches)
     total_count = all_scoped_tasks.count()
@@ -1194,6 +1207,10 @@ def task_hub_view(request):
         'selected_batch': batch_id,
         'selected_status': status_filter or 'ALL',
         'search_query': search_q or '',
+        'selected_date': date_filter or '',
+        'selected_task_title': task_title_filter or '',
+        'unique_task_titles': unique_task_titles,
+        'unique_dates': unique_dates,
         'total_count': total_count,
         'pending_count': pending_count,
         'completed_count': completed_count,
