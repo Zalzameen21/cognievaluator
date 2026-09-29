@@ -596,11 +596,26 @@ def student_detail_view(request, student_id):
     ]
 
     # Student tasks
-    student_tasks = student.tasks.all().select_related('assigned_by')
-    tasks_pending_count = student_tasks.filter(status='PENDING').count()
-    tasks_completed_count = student_tasks.filter(status__in=['COMPLETED', 'LATE']).count()
-    tasks_late_count = student_tasks.filter(status='LATE').count()
-    tasks_overdue_count = student_tasks.filter(status='PENDING', due_date__lt=timezone.now().date()).count()
+    student_tasks_qs = student.tasks.all().select_related('assigned_by')
+    tasks_pending_count = student_tasks_qs.filter(status='PENDING').count()
+    tasks_completed_count = student_tasks_qs.filter(status__in=['COMPLETED', 'LATE']).count()
+    tasks_late_count = student_tasks_qs.filter(status='LATE').count()
+    tasks_overdue_count = student_tasks_qs.filter(status='PENDING', due_date__lt=timezone.now().date()).count()
+
+    student_tasks = list(student_tasks_qs)
+    task_dates = [t.assigned_date for t in student_tasks if t.assigned_date]
+    attendances = Attendance.objects.filter(student=student, date__in=task_dates)
+    attendance_map = {att.date: att.status for att in attendances}
+    
+    today = timezone.now().date()
+    for task in student_tasks:
+        if task.assigned_date:
+            if task.assigned_date > today:
+                task.attendance_status = 'UPCOMING'
+            else:
+                task.attendance_status = attendance_map.get(task.assigned_date, 'NOT MARKED')
+        else:
+            task.attendance_status = 'N/A'
 
     # Student projects
     student_projects = student.projects.all().prefetch_related('students', 'batch').order_by('-updated_at')

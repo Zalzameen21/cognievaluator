@@ -346,6 +346,7 @@
                     <th style="min-width: 250px;">Task Deliverable</th>
                     <th style="min-width: 130px;">Date Given</th>
                     <th style="min-width: 130px;">Due Date</th>
+                    <th style="min-width: 140px;">Attendance</th>
                     <th style="min-width: 140px;">Status</th>
                     <th style="min-width: 160px;">Completed Date & Time</th>
                     <th style="min-width: 180px;">Evaluator Remarks</th>
@@ -377,6 +378,22 @@
                             </span>
                         {% else %}
                             <span style="color: var(--text-dim); font-size: 11px;">—</span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if task.attendance_status == 'UPCOMING' %}
+                            <span class="badge" style="background: rgba(59, 130, 246, 0.1); color: var(--info); border: 1px solid rgba(59, 130, 246, 0.2);">Upcoming</span>
+                        {% elif task.attendance_status == 'PRESENT' %}
+                            <span class="badge" style="background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2);">Present</span>
+                        {% elif task.attendance_status == 'LATE' %}
+                            <span class="badge" style="background: rgba(245, 158, 11, 0.1); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.2);">Late</span>
+                        {% elif task.attendance_status == 'ABSENT' %}
+                            <span class="badge" style="background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2);">Absent</span>
+                        {% elif task.attendance_status == 'EXCUSED' %}
+                            <span class="badge" style="background: rgba(139, 92, 246, 0.1); color: #8b5cf6; border: 1px solid rgba(139, 92, 246, 0.2);">Excused</span>
+                        {% else %}
+                            <span style="color: var(--text-dim); font-size: 11px;">Not Marked</span>
                         {% endif %}
                     </td>
 
