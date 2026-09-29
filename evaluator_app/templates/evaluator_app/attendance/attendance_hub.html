@@ -482,40 +482,70 @@
     }
 
     function toggleAllCheckboxes(source) {
-        checkboxes = document.querySelectorAll('.student-cb');
-        for(var i=0, n=checkboxes.length;i<n;i++) {
+        const checkboxes = document.querySelectorAll('.student-cb');
+        for(let i=0, n=checkboxes.length; i<n; i++) {
             checkboxes[i].checked = source.checked;
         }
     }
 
-    function markSelectedStudents(statusValue) {
-        const checkboxes = document.querySelectorAll('.student-cb:checked');
-        if(checkboxes.length === 0) {
-            alert('Please select at least one student.');
-            return;
-        }
-
+    window.markSelectedStudents = function(statusValue) {
+        const checkboxes = document.querySelectorAll('.student-cb');
+        let selectedCount = 0;
+        
         checkboxes.forEach(cb => {
-            const row = cb.closest('.att-student-row');
-            const targetInput = row.querySelector(`input[type="radio"][value="${statusValue}"]`);
-            if(targetInput) {
-                targetInput.checked = true;
-                if (typeof highlightSelectedAtt === 'function') {
-                    highlightSelectedAtt(row, statusValue);
-                } else {
-                    // Fallback
-                    const labels = row.querySelectorAll('.att-radio-btn');
-                    labels.forEach(label => label.classList.remove('active', 'present', 'late', 'absent', 'excused'));
+            if(cb.checked) {
+                selectedCount++;
+                const row = cb.closest('.att-student-row');
+                if(!row) return;
+                
+                // Uncheck all radios in this row first
+                row.querySelectorAll('input[type="radio"]').forEach(r => r.checked = false);
+                // Remove all active classes from labels
+                row.querySelectorAll('.att-radio-btn').forEach(l => l.classList.remove('active', 'present', 'late', 'absent', 'excused'));
+                
+                // Find the target radio
+                const targetInput = row.querySelector(`input[type="radio"][value="${statusValue}"]`);
+                if(targetInput) {
+                    targetInput.checked = true;
                     const targetLabel = targetInput.closest('.att-radio-btn');
-                    targetLabel.classList.add('active', statusValue.toLowerCase());
+                    if(targetLabel) {
+                        targetLabel.classList.add('active', statusValue.toLowerCase());
+                    }
                 }
             }
         });
         
+        if(selectedCount === 0) {
+            alert('Please select at least one student by checking the box next to their name.');
+            return;
+        }
+        
+        // Update stats
         if (typeof recalculateAttendanceStats === 'function') {
             recalculateAttendanceStats();
+        } else {
+            // Fallback manual calculation if main.js is not loaded
+            const rows = document.querySelectorAll('.att-student-row');
+            let p = 0, l = 0, a = 0, e = 0;
+            rows.forEach(r => {
+                const checked = r.querySelector('input[type="radio"]:checked');
+                if (checked) {
+                    if (checked.value === 'PRESENT') p++;
+                    else if (checked.value === 'LATE') l++;
+                    else if (checked.value === 'ABSENT') a++;
+                    else if (checked.value === 'EXCUSED') e++;
+                }
+            });
+            const t = rows.length;
+            if(document.getElementById('livePresentCount')) document.getElementById('livePresentCount').innerText = p;
+            if(document.getElementById('liveAbsentCount')) document.getElementById('liveAbsentCount').innerText = a;
+            if(document.getElementById('liveLateCount')) document.getElementById('liveLateCount').innerText = l;
+            if(document.getElementById('liveExcusedCount')) document.getElementById('liveExcusedCount').innerText = e;
+            if(document.getElementById('liveAttendanceRate') && t > 0) {
+                document.getElementById('liveAttendanceRate').innerText = (((p + l) / t) * 100).toFixed(1) + '%';
+            }
         }
-    }
+    };
 </script>
 {% endif %}
 
