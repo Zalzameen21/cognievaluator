@@ -296,13 +296,22 @@
 
             <!-- Quick Bulk Actions (Only active when editable) -->
             {% if can_edit_attendance %}
-            <div style="display: flex; gap: 8px;">
+            <div style="display: flex; gap: 8px; align-items: center; background: var(--bg-subtle); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); flex-wrap: wrap;">
+                <span style="font-size: 12px; font-weight: 700; color: var(--text-muted); margin-right: 8px;">QUICK:</span>
                 <button type="button" id="markAllPresentBtn" class="btn btn-success btn-sm">
                     <i class="bi bi-check-all"></i> Mark All Present
                 </button>
                 <button type="button" id="markAllAbsentBtn" class="btn btn-danger btn-sm">
                     <i class="bi bi-x"></i> Mark All Absent
                 </button>
+                
+                <div style="width: 1px; height: 24px; background: var(--border-color); margin: 0 8px;"></div>
+                
+                <span style="font-size: 12px; font-weight: 700; color: var(--text-muted); margin-right: 4px;">SELECTED:</span>
+                <button type="button" class="btn btn-sm" style="background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3);" onclick="markSelectedStudents('PRESENT')">Present</button>
+                <button type="button" class="btn btn-sm" style="background: rgba(245, 158, 11, 0.1); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.3);" onclick="markSelectedStudents('LATE')">Late</button>
+                <button type="button" class="btn btn-sm" style="background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3);" onclick="markSelectedStudents('ABSENT')">Absent</button>
+                <button type="button" class="btn btn-sm" style="background: rgba(59, 130, 246, 0.1); color: var(--info); border: 1px solid rgba(59, 130, 246, 0.3);" onclick="markSelectedStudents('EXCUSED')">Excused</button>
             </div>
             {% endif %}
         </div>
@@ -311,6 +320,11 @@
             <table class="data-table">
                 <thead>
                     <tr>
+                        {% if can_edit_attendance %}
+                        <th style="width: 40px; text-align: center;">
+                            <input type="checkbox" id="selectAllCb" onchange="toggleAllCheckboxes(this)">
+                        </th>
+                        {% endif %}
                         <th>#</th>
                         <th>Student Details</th>
                         <th>Roll Number</th>
@@ -322,6 +336,11 @@
                 <tbody>
                     {% for item in students_data %}
                     <tr class="att-student-row">
+                        {% if can_edit_attendance %}
+                        <td style="text-align: center;">
+                            <input type="checkbox" class="student-cb" data-student-id="{{ item.student.id }}">
+                        </td>
+                        {% endif %}
                         <td>{{ forloop.counter }}</td>
                         <td>
                             <div style="display: flex; align-items: center; gap: 10px;">
@@ -460,6 +479,42 @@
     }
     function closeRescheduleModal() {
         document.getElementById('rescheduleModal').style.display = 'none';
+    }
+
+    function toggleAllCheckboxes(source) {
+        checkboxes = document.querySelectorAll('.student-cb');
+        for(var i=0, n=checkboxes.length;i<n;i++) {
+            checkboxes[i].checked = source.checked;
+        }
+    }
+
+    function markSelectedStudents(statusValue) {
+        const checkboxes = document.querySelectorAll('.student-cb:checked');
+        if(checkboxes.length === 0) {
+            alert('Please select at least one student.');
+            return;
+        }
+
+        checkboxes.forEach(cb => {
+            const row = cb.closest('.att-student-row');
+            const targetInput = row.querySelector(`input[type="radio"][value="${statusValue}"]`);
+            if(targetInput) {
+                targetInput.checked = true;
+                if (typeof highlightSelectedAtt === 'function') {
+                    highlightSelectedAtt(row, statusValue);
+                } else {
+                    // Fallback
+                    const labels = row.querySelectorAll('.att-radio-btn');
+                    labels.forEach(label => label.classList.remove('active', 'present', 'late', 'absent', 'excused'));
+                    const targetLabel = targetInput.closest('.att-radio-btn');
+                    targetLabel.classList.add('active', statusValue.toLowerCase());
+                }
+            }
+        });
+        
+        if (typeof recalculateAttendanceStats === 'function') {
+            recalculateAttendanceStats();
+        }
     }
 </script>
 {% endif %}
