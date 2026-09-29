@@ -108,6 +108,12 @@
                         {% if s.status == 'COMPLETED' %}<i class="bi bi-arrow-counterclockwise"></i> Mark Pending{% else %}<i class="bi bi-check2-all"></i> Mark Completed{% endif %}
                     </button>
                 </form>
+                <form method="post" action="{% url 'batch_schedule_delete' s.id %}" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this schedule entry?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-sm" style="padding:4px 8px;font-size:11px; margin-left: 4px;" title="Delete Task Schedule">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </form>
               </td>
             </tr>
             {% endwith %}
