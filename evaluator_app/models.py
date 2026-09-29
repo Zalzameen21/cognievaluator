@@ -848,3 +848,15 @@ class BatchTaskSchedule(models.Model):
         task_name = self.syllabus_task.title if self.syllabus_task else self.custom_task_title
         return f"{self.batch.name} - {self.date}: {task_name}"
 
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+@receiver(post_save, sender=Student)
+def student_post_save(sender, instance, created, **kwargs):
+    if created and instance.batch:
+        try:
+            from .services import sync_student_tasks_for_batch
+            sync_student_tasks_for_batch(instance.batch)
+        except Exception:
+            pass
+

@@ -72,9 +72,43 @@ def generate_batch_schedule(batch_syllabus):
             }
         )
 
+    # Automatically generate/sync student tasks based on the generated schedule
+    sync_student_tasks_for_batch(batch, batch_syllabus.assigned_by)
+
 
 def get_task_for_batch_date(batch, date):
     """
     Returns the BatchTaskSchedule for a batch on a specific date, or None.
     """
     return BatchTaskSchedule.objects.filter(batch=batch, date=date).first()
+
+def sync_student_tasks_for_batch(batch, user=None):
+    from .models import StudentTask, BatchTaskSchedule
+    students = batch.students.all()
+    schedules = BatchTaskSchedule.objects.filter(batch=batch)
+    
+    for schedule in schedules:
+        title = schedule.syllabus_task.title if schedule.syllabus_task else schedule.custom_task_title
+        description = schedule.syllabus_task.description if schedule.syllabus_task else schedule.custom_task_description
+        date = schedule.date
+        
+        for student in students:
+            task, created = StudentTask.objects.get_or_create(
+                student=student,
+                batch=batch,
+                title=title,
+                defaults={
+                    'description': description,
+                    'assigned_date': date,
+                    'due_date': date,
+                    'assigned_by': user,
+                    'status': 'PENDING'
+                }
+            )
+            # If the schedule changed (e.g. date shifted), update the student's task date
+            if not created and task.assigned_date != date:
+                task.assigned_date = date
+                if not task.completed_at:  # Only update due date if not yet completed
+                    task.due_date = date
+                task.save()
+
