@@ -1418,41 +1418,24 @@ def task_create_view(request):
                 # Assign to all active students in all selected batches
                 for batch in batches:
                     # Also reflect this in the Batch's Task Schedule
-                    existing_sched = BatchTaskSchedule.objects.filter(batch=batch, date=assigned_date).first()
-                    if existing_sched:
-                        if module_id and syllabus_module:
-                            if existing_sched.syllabus_task:
-                                existing_sched.custom_task_title = f"{existing_sched.custom_task_title} + {syllabus_module.title}".strip(' +')
-                            else:
-                                existing_sched.syllabus_task = syllabus_module
-                        else:
-                            if existing_sched.custom_task_title:
-                                existing_sched.custom_task_title = f"{existing_sched.custom_task_title} + {title}"
-                                existing_sched.custom_task_description = f"{existing_sched.custom_task_description}\n\n{desc}".strip()
-                            else:
-                                existing_sched.custom_task_title = title
-                                existing_sched.custom_task_description = desc
-                        existing_sched.is_rescheduled = True
-                        existing_sched.save()
+                    if module_id and syllabus_module:
+                        BatchTaskSchedule.objects.create(
+                            batch=batch,
+                            date=assigned_date,
+                            syllabus_task=syllabus_module,
+                            custom_task_title='',
+                            custom_task_description='',
+                            is_rescheduled=True
+                        )
                     else:
-                        if module_id and syllabus_module:
-                            BatchTaskSchedule.objects.create(
-                                batch=batch,
-                                date=assigned_date,
-                                syllabus_task=syllabus_module,
-                                custom_task_title='',
-                                custom_task_description='',
-                                is_rescheduled=True
-                            )
-                        else:
-                            BatchTaskSchedule.objects.create(
-                                batch=batch,
-                                date=assigned_date,
-                                syllabus_task=None,
-                                custom_task_title=title,
-                                custom_task_description=desc,
-                                is_rescheduled=True
-                            )
+                        BatchTaskSchedule.objects.create(
+                            batch=batch,
+                            date=assigned_date,
+                            syllabus_task=None,
+                            custom_task_title=title,
+                            custom_task_description=desc,
+                            is_rescheduled=True
+                        )
 
                     active_students = batch.students.filter(status='ACTIVE')
                     for stu in active_students:
@@ -3701,29 +3684,18 @@ def batch_schedule_reschedule_view(request, batch_id):
         # Apply move or creation
         with transaction.atomic():
             if dest_sched and action == 'keep_both':
-                # We merge the incoming task into the existing one
-                if syllabus_task:
-                    # Incoming is syllabus task, existing is custom or syllabus
-                    if dest_sched.syllabus_task:
-                        dest_sched.custom_task_title = f"{dest_sched.custom_task_title} + {syllabus_task.title}".strip(' +')
-                    else:
-                        dest_sched.syllabus_task = syllabus_task
-                else:
-                    # Incoming is custom task
-                    if dest_sched.custom_task_title:
-                        dest_sched.custom_task_title = f"{dest_sched.custom_task_title} + {custom_title}"
-                        dest_sched.custom_task_description = f"{dest_sched.custom_task_description}\n\n{custom_desc}".strip()
-                    else:
-                        dest_sched.custom_task_title = custom_title
-                        dest_sched.custom_task_description = custom_desc
-                
-                dest_sched.is_rescheduled = True
-                if incharge_user:
-                    dest_sched.incharge = incharge_user
-                    dest_sched.incharge_name = ''
-                elif incharge_name:
-                    dest_sched.incharge_name = incharge_name
-                dest_sched.save()
+                # We create a new schedule row on the same date instead of merging
+                BatchTaskSchedule.objects.create(
+                    batch=batch,
+                    date=sched_date,
+                    syllabus_task=syllabus_task,
+                    custom_task_title=custom_title if not syllabus_task else '',
+                    custom_task_description=custom_desc if not syllabus_task else '',
+                    incharge=incharge_user,
+                    incharge_name=incharge_name if not incharge_user else '',
+                    status=status,
+                    is_rescheduled=True
+                )
                 
                 # Delete source if we moved a syllabus task
                 if source_sched:

@@ -69,18 +69,8 @@
                 <div style="display:flex;align-items:center;gap:8px;">
                   <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;background:rgba(79,70,229,0.1);color:var(--primary);border-radius:50%;font-size:10px;font-weight:800;flex-shrink:0;">{{ s.syllabus_task.order }}</span>
                   <div>
-                    <div style="font-weight:700;color:var(--text-main);font-size:13px;">
-                      {% if s.syllabus_task and s.custom_task_title %}
-                        {{ s.syllabus_task.title }} + {{ s.custom_task_title }}
-                      {% elif s.custom_task_title %}
-                        {{ s.custom_task_title }}
-                      {% else %}
-                        {{ s.syllabus_task.title }}
-                      {% endif %}
-                    </div>
-                    {% if s.custom_task_description %}
-                    <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">{{ s.custom_task_description|truncatechars:80 }}</div>
-                    {% elif s.syllabus_task.description %}
+                    <div style="font-weight:700;color:var(--text-main);font-size:13px;">{{ s.syllabus_task.title }}</div>
+                    {% if s.syllabus_task.description %}
                     <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">{{ s.syllabus_task.description|truncatechars:80 }}</div>
                     {% endif %}
                   </div>

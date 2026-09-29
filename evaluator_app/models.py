@@ -847,7 +847,6 @@ class BatchTaskSchedule(models.Model):
 
     class Meta:
         ordering = ['batch', 'date']
-        unique_together = ('batch', 'date')
 
     def __str__(self):
         task_name = self.syllabus_task.title if self.syllabus_task else self.custom_task_title
