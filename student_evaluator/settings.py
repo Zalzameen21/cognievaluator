@@ -76,12 +76,13 @@ WSGI_APPLICATION = 'student_evaluator.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+import os
+import dj_database_url
+
+db_url = os.environ.get('POSTGRES_URL') or os.environ.get('DATABASE_URL') or 'postgres://postgres:21112002@localhost:5432/cognievaluate'
 
 DATABASES = {
-    'default': dj_database_url.config(
-        default='postgres://postgres:21112002@localhost:5432/cognievaluate',
-        conn_max_age=600
-    )
+    'default': dj_database_url.parse(db_url, conn_max_age=600)
 }
 
 # Password validation
