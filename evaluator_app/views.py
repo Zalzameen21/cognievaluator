@@ -3390,9 +3390,19 @@ def batch_schedule_reschedule_view(request, batch_id):
             messages.error(request, 'Invalid date.')
             return redirect('batch_schedule_view', batch_id=batch_id)
 
+        incharge_id = request.POST.get('incharge_id', '')
+        status = request.POST.get('status', 'PENDING')
+
         syllabus_task = None
+        incharge_user = None
+        
         if syllabus_task_id:
             syllabus_task = SyllabusTask.objects.filter(id=syllabus_task_id).first()
+            if syllabus_task and syllabus_task.default_assigner:
+                incharge_user = syllabus_task.default_assigner
+        else:
+            if incharge_id:
+                incharge_user = User.objects.filter(id=incharge_id).first()
 
         BatchTaskSchedule.objects.update_or_create(
             batch=batch,
@@ -3402,11 +3412,36 @@ def batch_schedule_reschedule_view(request, batch_id):
                 'custom_task_title': custom_title if not syllabus_task else '',
                 'custom_task_description': custom_desc if not syllabus_task else '',
                 'is_rescheduled': True,
+                'incharge': incharge_user,
+                'status': status,
             }
         )
         messages.success(request, f'Task rescheduled for {sched_date.strftime("%b %d, %Y")}.')
     return redirect('batch_schedule_view', batch_id=batch_id)
 
+
+@evaluator_required
+def batch_schedule_toggle_status_view(request, schedule_id):
+    if request.method == 'POST':
+        schedule = get_object_or_404(BatchTaskSchedule, id=schedule_id)
+        if can_user_access_batch(request.user, schedule.batch):
+            new_status = request.POST.get('status')
+            if new_status in ['PENDING', 'COMPLETED']:
+                schedule.status = new_status
+                schedule.save()
+                
+                # Update all corresponding student tasks
+                title = schedule.syllabus_task.title if schedule.syllabus_task else schedule.custom_task_title
+                from .models import StudentTask
+                student_tasks = StudentTask.objects.filter(batch=schedule.batch, title=title)
+                
+                if new_status == 'COMPLETED':
+                    student_tasks.update(status='COMPLETED', completed_at=timezone.now())
+                else:
+                    student_tasks.update(status='PENDING', completed_at=None)
+
+                messages.success(request, f"Task status updated to {new_status}")
+    return redirect(request.META.get('HTTP_REFERER', 'batch_list'))
 
 @evaluator_required
 def ajax_get_batch_syllabus_modules(request):

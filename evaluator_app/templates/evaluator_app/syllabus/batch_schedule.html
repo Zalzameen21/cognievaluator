@@ -53,6 +53,7 @@
               <th style="padding:10px 16px;font-size:11.5px;font-weight:700;text-transform:uppercase;color:var(--text-muted);text-align:left;">Date</th>
               <th style="padding:10px 16px;font-size:11.5px;font-weight:700;text-transform:uppercase;color:var(--text-muted);text-align:left;">Task</th>
               <th style="padding:10px 16px;font-size:11.5px;font-weight:700;text-transform:uppercase;color:var(--text-muted);text-align:left;">Status</th>
+              <th style="padding:10px 16px;font-size:11.5px;font-weight:700;text-transform:uppercase;color:var(--text-muted);text-align:right;">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -87,11 +88,26 @@
                 {% endif %}
               </td>
               <td style="padding:13px 16px;vertical-align:top;">
+                {% if s.status == 'COMPLETED' %}
+                <span style="font-size:11px;background:rgba(16,185,129,0.1);color:var(--success);padding:3px 8px;border-radius:50px;font-weight:600;white-space:nowrap;margin-bottom:4px;display:inline-block;"><i class="bi bi-check-circle-fill"></i> Completed</span>
+                {% else %}
+                <span style="font-size:11px;background:rgba(245,158,11,0.1);color:#D97706;padding:3px 8px;border-radius:50px;font-weight:600;white-space:nowrap;margin-bottom:4px;display:inline-block;"><i class="bi bi-hourglass-split"></i> Pending</span>
+                {% endif %}
+                <br>
                 {% if s.is_rescheduled %}
                 <span style="font-size:11px;background:rgba(245,158,11,0.1);color:#D97706;padding:3px 8px;border-radius:50px;font-weight:600;white-space:nowrap;"><i class="bi bi-arrow-repeat"></i> Rescheduled</span>
                 {% else %}
                 <span style="font-size:11px;background:rgba(16,185,129,0.1);color:var(--success);padding:3px 8px;border-radius:50px;font-weight:600;white-space:nowrap;"><i class="bi bi-journal-check"></i> Syllabus</span>
                 {% endif %}
+              </td>
+              <td style="padding:13px 16px;vertical-align:top;text-align:right;">
+                <form method="post" action="{% url 'batch_schedule_toggle_status' s.id %}" style="display:inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="status" value="{% if s.status == 'COMPLETED' %}PENDING{% else %}COMPLETED{% endif %}">
+                    <button type="submit" class="btn {% if s.status == 'COMPLETED' %}btn-secondary{% else %}btn-primary{% endif %} btn-sm" style="padding:4px 8px;font-size:11px;">
+                        {% if s.status == 'COMPLETED' %}<i class="bi bi-arrow-counterclockwise"></i> Mark Pending{% else %}<i class="bi bi-check2-all"></i> Mark Completed{% endif %}
+                    </button>
+                </form>
               </td>
             </tr>
             {% endwith %}
@@ -219,6 +235,22 @@
           <label class="form-label">Custom Task Description</label>
           <textarea name="custom_task_description" class="form-textarea" rows="2" placeholder="Task details..."></textarea>
         </div>
+        <div class="form-group">
+          <label class="form-label">Incharge Evaluator</label>
+          <select name="incharge_id" class="form-select">
+            <option value="">— Select Evaluator —</option>
+            {% for ev in all_evaluators %}
+            <option value="{{ ev.id }}">{{ ev.get_full_name|default:ev.username }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select name="status" class="form-select">
+            <option value="PENDING">Pending</option>
+            <option value="COMPLETED">Completed</option>
+          </select>
+        </div>
       </div>
       <div style="display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border-color);padding-top:16px;margin-top:8px;">
         <button type="button" onclick="document.getElementById('rescheduleModal').style.display='none'" class="btn btn-secondary">Cancel</button>
@@ -258,6 +290,22 @@
         <div class="form-group">
           <label class="form-label">Custom Task Description</label>
           <textarea name="custom_task_description" class="form-textarea" rows="2" placeholder="Task details..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Incharge Evaluator</label>
+          <select name="incharge_id" class="form-select">
+            <option value="">— Select Evaluator —</option>
+            {% for ev in all_evaluators %}
+            <option value="{{ ev.id }}">{{ ev.get_full_name|default:ev.username }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select name="status" class="form-select">
+            <option value="PENDING">Pending</option>
+            <option value="COMPLETED">Completed</option>
+          </select>
         </div>
       </div>
       <div style="display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border-color);padding-top:16px;margin-top:8px;">

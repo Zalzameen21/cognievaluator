@@ -837,6 +837,8 @@ class BatchTaskSchedule(models.Model):
     custom_task_title = models.CharField(max_length=255, blank=True, help_text="Used if scheduled outside syllabus")
     custom_task_description = models.TextField(blank=True)
     is_rescheduled = models.BooleanField(default=False)
+    status = models.CharField(max_length=20, choices=[('PENDING', 'Pending'), ('COMPLETED', 'Completed')], default='PENDING')
+    incharge = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='batch_task_schedules')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
