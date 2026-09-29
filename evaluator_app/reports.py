@@ -103,15 +103,17 @@ def generate_student_excel_report(student, attendance_records, eval_stats, evalu
 
     # 3. Attendance Sheet
     ws_att = wb.create_sheet(title="Attendance Dates")
-    ws_att.append(["Date", "Status"])
-    for c in range(1, 3):
+    ws_att.append(["Date", "Status", "Marked By"])
+    for c in range(1, 4):
         ws_att.cell(row=1, column=c).font = Font(bold=True)
     
     for att in attendance_records:
-        ws_att.append([att.date.strftime('%Y-%m-%d'), att.status])
+        marked_by = att.marked_by.get_full_name() or att.marked_by.username if att.marked_by else "System"
+        ws_att.append([att.date.strftime('%Y-%m-%d'), att.status, marked_by])
         
     ws_att.column_dimensions['A'].width = 15
     ws_att.column_dimensions['B'].width = 15
+    ws_att.column_dimensions['C'].width = 25
 
     output = io.BytesIO()
     wb.save(output)
@@ -136,6 +138,21 @@ def generate_student_docx_report(student, attendance_records, eval_stats, evalua
     doc.add_paragraph(f"Total Days: {total_att}")
     doc.add_paragraph(f"Days Present: {present_att}")
     doc.add_paragraph(f"Attendance %: {pct}%")
+    
+    doc.add_heading('Detailed Attendance', level=2)
+    table_att = doc.add_table(rows=1, cols=3)
+    table_att.style = 'Table Grid'
+    hdr_att = table_att.rows[0].cells
+    hdr_att[0].text = 'Date'
+    hdr_att[1].text = 'Status'
+    hdr_att[2].text = 'Marked By'
+    
+    for att in attendance_records:
+        row = table_att.add_row().cells
+        marked_by = att.marked_by.get_full_name() or att.marked_by.username if att.marked_by else "System"
+        row[0].text = att.date.strftime('%Y-%m-%d')
+        row[1].text = att.status
+        row[2].text = marked_by
     
     # Tasks Summary
     doc.add_heading('Task Report Summary', level=1)
@@ -216,6 +233,24 @@ def generate_student_pdf_report(student, attendance_records, eval_stats, evaluat
     ]))
     elements.append(t_att)
     elements.append(Spacer(1, 12))
+    
+    elements.append(Paragraph("Detailed Attendance", styles['Heading2']))
+    att_detail_data = [["Date", "Status", "Marked By"]]
+    for att in attendance_records:
+        marked_by = att.marked_by.get_full_name() or att.marked_by.username if att.marked_by else "System"
+        att_detail_data.append([att.date.strftime('%Y-%m-%d'), att.status, marked_by])
+        
+    t_att_detail = Table(att_detail_data, colWidths=[100, 100, 150])
+    t_att_detail.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.black),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0,0), (-1,0), 8),
+        ('GRID', (0,0), (-1,-1), 1, colors.black),
+    ]))
+    elements.append(t_att_detail)
+    elements.append(Spacer(1, 24))
     
     # Tasks Summary
     elements.append(Paragraph("Task Report Summary", styles['Heading2']))
