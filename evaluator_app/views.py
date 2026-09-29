@@ -1302,7 +1302,25 @@ def task_hub_view(request):
         )
         
     unique_task_titles = tasks_qs.values_list('title', flat=True).distinct().order_by('title')
-    unique_dates = tasks_qs.values_list('assigned_date', flat=True).distinct().order_by('-assigned_date')
+    
+    if batch_id:
+        try:
+            batch = Batch.objects.get(id=batch_id)
+            if batch.start_date:
+                start_d = batch.start_date
+                if hasattr(start_d, 'date'):
+                    start_d = start_d.date()
+                num_days = (today - start_d).days
+                if num_days >= 0:
+                    unique_dates = [today - timedelta(days=x) for x in range(num_days + 1)]
+                else:
+                    unique_dates = [today]
+            else:
+                unique_dates = tasks_qs.values_list('assigned_date', flat=True).distinct().order_by('-assigned_date')
+        except Batch.DoesNotExist:
+            unique_dates = tasks_qs.values_list('assigned_date', flat=True).distinct().order_by('-assigned_date')
+    else:
+        unique_dates = tasks_qs.values_list('assigned_date', flat=True).distinct().order_by('-assigned_date')
     
     # Filter by Date
     date_filter = request.GET.get('date')
