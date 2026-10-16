@@ -64,15 +64,61 @@
 
     <!-- Actions -->
     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-        <div class="dropdown">
-            <button type="button" class="btn btn-secondary dropdown-btn">
-                <i class="bi bi-download"></i> Download Report <i class="bi bi-chevron-down" style="font-size: 10px;"></i>
-            </button>
-            <div class="dropdown-content">
-                <a href="{% url 'student_report_download' student.id %}?format=pdf"><i class="bi bi-file-earmark-pdf" style="color: #EF4444;"></i> PDF Report</a>
-                <a href="{% url 'student_report_download' student.id %}?format=xlsx"><i class="bi bi-file-earmark-excel" style="color: #10B981;"></i> Excel Report</a>
-                <a href="{% url 'student_report_download' student.id %}?format=docx"><i class="bi bi-file-earmark-word" style="color: #3B82F6;"></i> Word Document</a>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="month" id="studentDetailMonth" class="form-control" style="max-width: 160px; padding: 6px 12px; font-size: 13px;" placeholder="Optional Month">
+            <div class="dropdown">
+                <button type="button" class="btn btn-secondary dropdown-btn">
+                    <i class="bi bi-download"></i> Download Report <i class="bi bi-chevron-down" style="font-size: 10px;"></i>
+                </button>
+                <div class="dropdown-content">
+                    <div style="padding: 6px 16px; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Performance Report</div>
+                    <a href="#" onclick="downloadReport('pdf')"><i class="bi bi-file-earmark-pdf" style="color: #EF4444;"></i> Full PDF Scorecard</a>
+                    <a href="#" onclick="downloadReport('xlsx')"><i class="bi bi-file-earmark-excel" style="color: #10B981;"></i> Excel Report</a>
+                    <a href="#" onclick="downloadReport('docx')"><i class="bi bi-file-earmark-word" style="color: #3B82F6;"></i> Word Document</a>
+                    <div style="border-top: 1px solid var(--border-color); margin: 4px 0;"></div>
+                    <div style="padding: 6px 16px; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Attendance Only</div>
+                    <a href="#" onclick="downloadAttendancePdf()"><i class="bi bi-file-earmark-pdf-fill" style="color: #4F46E5;"></i> Attendance Statement (PDF)</a>
+                    <a href="#" onclick="downloadCollegeAttendancePdf()"><i class="bi bi-mortarboard-fill" style="color: #0891B2;"></i> College Format (PDF)</a>
+                    <a href="#" onclick="downloadAttendanceExcel()"><i class="bi bi-file-earmark-excel-fill" style="color: #059669;"></i> Attendance (Excel)</a>
+                </div>
             </div>
+            <script>
+                function downloadReport(format) {
+                    let url = "{% url 'student_report_download' student.id %}?format=" + format;
+                    let month = document.getElementById("studentDetailMonth").value;
+                    if (month) {
+                        url += "&month=" + encodeURIComponent(month);
+                    }
+                    window.location.href = url;
+                }
+
+                function downloadAttendancePdf(cardMonth) {
+                    let month = cardMonth || (document.getElementById("studentDetailMonth") ? document.getElementById("studentDetailMonth").value : "");
+                    let url = "{% url 'student_attendance_pdf' student.id %}";
+                    if (month) {
+                        url += "?month=" + encodeURIComponent(month);
+                    }
+                    window.location.href = url;
+                }
+
+                function downloadCollegeAttendancePdf(cardMonth) {
+                    let month = cardMonth || (document.getElementById("studentDetailMonth") ? document.getElementById("studentDetailMonth").value : "");
+                    let url = "{% url 'student_college_attendance_pdf' student.id %}";
+                    if (month) {
+                        url += "?month=" + encodeURIComponent(month);
+                    }
+                    window.location.href = url;
+                }
+
+                function downloadAttendanceExcel(cardMonth) {
+                    let month = cardMonth || (document.getElementById("studentDetailMonth") ? document.getElementById("studentDetailMonth").value : "");
+                    let url = "{% url 'export_student_attendance' student.id %}";
+                    if (month) {
+                        url += "?month=" + encodeURIComponent(month);
+                    }
+                    window.location.href = url;
+                }
+            </script>
         </div>
 
         {% if has_evaluated_today and not request.user.profile.is_admin %}
@@ -713,9 +759,24 @@ function toggleHistory() {
 
 <!-- Attendance Record Log -->
 <div class="card">
-    <div class="card-header">
-        <div class="card-title">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+        <div class="card-title" style="margin: 0; display: flex; align-items: center; gap: 10px;">
             <i class="bi bi-calendar-check text-primary"></i> Attendance History
+            <span style="font-size: 12px; font-weight: 600; color: var(--text-muted); background: var(--bg-subtle); padding: 3px 10px; border-radius: 20px; border: 1px solid var(--border-color);">
+                {{ att_present }} Present &bull; {{ att_absent }} Absent ({{ att_percentage }}%)
+            </span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <input type="month" id="attendanceCardMonth" class="form-control" style="width: auto; padding: 5px 10px; font-size: 12px; height: 32px;" title="Filter Attendance by Month (Optional)">
+            <button type="button" class="btn btn-sm btn-primary" onclick="downloadAttendancePdf(document.getElementById('attendanceCardMonth').value)" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;" title="Download Standard Executive Attendance PDF">
+                <i class="bi bi-file-earmark-pdf-fill"></i> Attendance PDF
+            </button>
+            <button type="button" class="btn btn-sm" onclick="downloadCollegeAttendancePdf(document.getElementById('attendanceCardMonth').value)" style="background: linear-gradient(135deg, #0891B2, #0E7490); color: #FFF; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; border: none; padding: 6px 12px; border-radius: 6px; box-shadow: 0 2px 8px rgba(8, 145, 178, 0.25);" title="Download Official College Format Attendance Letter">
+                <i class="bi bi-mortarboard-fill"></i> College Format (PDF)
+            </button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="downloadAttendanceExcel(document.getElementById('attendanceCardMonth').value)" title="Download Excel (.xlsx)" style="display: inline-flex; align-items: center; gap: 6px;">
+                <i class="bi bi-file-earmark-excel"></i> Excel
+            </button>
         </div>
     </div>
 

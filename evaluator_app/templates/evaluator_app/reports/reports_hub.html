@@ -279,6 +279,11 @@
                         {% endfor %}
                     </select>
                 </div>
+                <div class="custom-input-group" style="margin-top: 10px;">
+                    <i class="bi bi-calendar-month"></i>
+                    <input type="month" id="batchMonth" placeholder="Select Month (Optional)">
+                    <small style="margin-left: 10px; color: var(--text-muted);">(Optional filter)</small>
+                </div>
             </div>
 
             <div class="reports-grid">
@@ -331,6 +336,11 @@
                         {% endfor %}
                     </datalist>
                     <input type="hidden" id="studentSelect" value="">
+                </div>
+                <div class="custom-input-group" style="margin-top: 10px;">
+                    <i class="bi bi-calendar-month"></i>
+                    <input type="month" id="studentMonth" placeholder="Select Month (Optional)">
+                    <small style="margin-left: 10px; color: var(--text-muted);">(Optional filter)</small>
                 </div>
             </div>
 
@@ -406,14 +416,21 @@
                         url = `/batches/${batchId}/export-tasks/`;
                     }
                     
-                    if (url) window.location.href = url;
+                    if (url) {
+                        const month = document.getElementById('batchMonth').value;
+                        if (month) url += `?month=${month}`;
+                        window.location.href = url;
+                    }
                 } 
                 else if (type.startsWith('student_')) {
                     const studentId = studentSelect.value;
                     if (!studentId) return;
                     
                     if (type === 'student_attendance') {
-                        window.location.href = `/students/${studentId}/export-attendance/`;
+                        let url = `/students/${studentId}/export-attendance/`;
+                        const month = document.getElementById('studentMonth').value;
+                        if (month) url += `?month=${month}`;
+                        window.location.href = url;
                     }
                 }
             });

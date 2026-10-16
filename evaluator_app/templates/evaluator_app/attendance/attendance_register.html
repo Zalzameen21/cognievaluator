@@ -28,6 +28,9 @@
         <button type="button" class="btn btn-secondary" onclick="openExportModal()">
             <i class="bi bi-download"></i> Export Attendance
         </button>
+        <button type="button" class="btn btn-danger" onclick="openCancelModal()" style="background: var(--danger); border-color: var(--danger); color: white;">
+            <i class="bi bi-calendar-x"></i> Cancel Class
+        </button>
         <a href="{% url 'batch_detail' batch.id %}" class="btn btn-secondary">
             <i class="bi bi-arrow-left"></i> Batch Details
         </a>
@@ -45,7 +48,8 @@
             <span style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--success);"></span> Present (P)</span>
             <span style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--warning);"></span> Late (L)</span>
             <span style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--danger);"></span> Absent (A)</span>
-            <span style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--border-color);"></span> Not Marked (-)</span>
+            <span style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--border-color);"></span> Cancelled (C)</span>
+            <span style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--bg-subtle); border: 1px solid var(--border-color);"></span> Not Marked (-)</span>
         </div>
     </div>
 
@@ -73,9 +77,17 @@
                                 <a href="{% url 'student_detail' row.student.id %}">{{ row.student.name }}</a>
                                 <div style="font-size: 11px; font-family: monospace; color: var(--text-muted);">{{ row.student.roll_number }}</div>
                             </div>
-                            <a href="{% url 'export_student_attendance' row.student.id %}" title="Download Individual Attendance (CSV)" style="color: var(--primary); background: var(--bg-subtle); width: 26px; height: 26px; border-radius: 4px; display: flex; align-items: center; justify-content: center; text-decoration: none;">
-                                <i class="bi bi-file-earmark-arrow-down"></i>
-                            </a>
+                            <div style="display: flex; gap: 4px;">
+                                <a href="{% url 'student_attendance_pdf' row.student.id %}" title="Download Attendance Statement (PDF)" style="color: #EF4444; background: var(--bg-subtle); width: 26px; height: 26px; border-radius: 4px; display: flex; align-items: center; justify-content: center; text-decoration: none;">
+                                    <i class="bi bi-file-earmark-pdf-fill"></i>
+                                </a>
+                                <a href="{% url 'student_college_attendance_pdf' row.student.id %}" title="Download College Format (PDF)" style="color: #0891B2; background: var(--bg-subtle); width: 26px; height: 26px; border-radius: 4px; display: flex; align-items: center; justify-content: center; text-decoration: none;">
+                                    <i class="bi bi-mortarboard-fill"></i>
+                                </a>
+                                <a href="{% url 'export_student_attendance' row.student.id %}" title="Download Individual Attendance (Excel)" style="color: #10B981; background: var(--bg-subtle); width: 26px; height: 26px; border-radius: 4px; display: flex; align-items: center; justify-content: center; text-decoration: none;">
+                                    <i class="bi bi-file-earmark-excel"></i>
+                                </a>
+                            </div>
                         </div>
                     </td>
                     {% for cell in row.statuses %}
@@ -88,6 +100,8 @@
                                 <span style="display: inline-flex; width: 24px; height: 24px; border-radius: 6px; background: var(--danger-light); color: var(--danger); font-weight: 800; font-size: 11px; align-items: center; justify-content: center;" title="{{ cell.date|date:'d M' }}: Absent">A</span>
                             {% elif cell.status == 'EXCUSED' %}
                                 <span style="display: inline-flex; width: 24px; height: 24px; border-radius: 6px; background: var(--info-light); color: var(--info); font-weight: 800; font-size: 11px; align-items: center; justify-content: center;" title="{{ cell.date|date:'d M' }}: Excused">E</span>
+                            {% elif cell.status == 'CANCELLED' %}
+                                <span style="display: inline-flex; width: 24px; height: 24px; border-radius: 6px; background: var(--border-color); color: var(--text-main); font-weight: 800; font-size: 11px; align-items: center; justify-content: center;" title="{{ cell.date|date:'d M' }}: Cancelled">C</span>
                             {% else %}
                                 <span style="display: inline-flex; width: 24px; height: 24px; border-radius: 6px; background: var(--bg-subtle); color: var(--text-dim); font-size: 11px; align-items: center; justify-content: center;">-</span>
                             {% endif %}
@@ -158,12 +172,50 @@
     </div>
 </div>
 
+<div id="cancelModal" class="modal-backdrop" style="display: none;">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+            <div class="modal-title" style="color: var(--danger);">
+                <i class="bi bi-exclamation-triangle"></i> Cancel Class
+            </div>
+            <button type="button" class="modal-close" onclick="closeCancelModal()"><i class="bi bi-x"></i></button>
+        </div>
+        <form method="post" action="{% url 'batch_cancel_class' %}">
+            {% csrf_token %}
+            <input type="hidden" name="batch_id" value="{{ batch.id }}">
+            <div class="modal-body">
+                <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">
+                    Select the date to cancel the class. All upcoming tasks will be automatically shifted to the next valid working day.
+                </div>
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px;">Date *</label>
+                    <input type="date" name="date" class="form-input" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-surface); color: var(--text-main);" required>
+                </div>
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px;">Reason for Cancellation *</label>
+                    <input type="text" name="reason" class="form-input" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-surface); color: var(--text-main);" required placeholder="e.g. Trainer unavailable, Holiday, etc.">
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 16px 24px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 12px; background: var(--bg-subtle); border-radius: 0 0 var(--radius-lg) var(--radius-lg);">
+                <button type="button" class="btn btn-secondary" onclick="closeCancelModal()">Cancel</button>
+                <button type="submit" class="btn" style="background: var(--danger); color: white; border: none;"><i class="bi bi-calendar-x"></i> Confirm Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
     function openExportModal() {
         document.getElementById('exportModal').style.display = 'flex';
     }
     function closeExportModal() {
         document.getElementById('exportModal').style.display = 'none';
+    }
+    function openCancelModal() {
+        document.getElementById('cancelModal').style.display = 'flex';
+    }
+    function closeCancelModal() {
+        document.getElementById('cancelModal').style.display = 'none';
     }
 </script>
 {% endblock %}

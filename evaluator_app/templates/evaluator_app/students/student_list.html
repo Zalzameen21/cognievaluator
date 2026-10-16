@@ -1,0 +1,148 @@
+{% extends 'evaluator_app/base.html' %}
+
+{% block title %}Students Directory - CogniLearn Evaluator{% endblock %}
+{% block page_title %}Students Directory{% endblock %}
+
+{% block content %}
+<!-- Page Header & Filter Bar -->
+<div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-xl); padding: 22px 26px; margin-bottom: 24px; box-shadow: var(--shadow-sm);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 18px;">
+        <div>
+            <h2 style="font-size: 22px; font-weight: 800; color: var(--text-main); margin-bottom: 4px;">
+                <i class="bi bi-people-fill text-primary" style="margin-right: 8px;"></i> Enrolled Students Roster
+            </h2>
+            <div style="font-size: 13px; color: var(--text-muted);">
+                Browse individual students, view performance scorecards, and download individual attendance statements.
+            </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 13px; font-weight: 700; color: var(--primary); background: rgba(79, 70, 229, 0.08); padding: 6px 14px; border-radius: 20px; border: 1px solid rgba(79, 70, 229, 0.2);">
+                {{ total_count }} Total Students
+            </span>
+            <a href="{% url 'student_add' %}" class="btn btn-primary btn-sm">
+                <i class="bi bi-person-plus-fill"></i> Add Student
+            </a>
+        </div>
+    </div>
+
+    <!-- Filter Form -->
+    <form method="GET" action="{% url 'student_list' %}" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+        <div style="flex: 1; min-width: 240px; position: relative;">
+            <i class="bi bi-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 14px;"></i>
+            <input type="text" name="q" value="{{ search_query }}" placeholder="Search by name, roll number, email..." class="form-control" style="padding-left: 36px; height: 38px;">
+        </div>
+
+        <div style="min-width: 200px;">
+            <select name="batch" class="form-control" style="height: 38px;">
+                <option value="">All Accessible Batches</option>
+                {% for b in batches %}
+                    <option value="{{ b.id }}" {% if selected_batch == b.id|stringformat:"s" %}selected{% endif %}>
+                        {{ b.name }} ({{ b.location.name }})
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="height: 38px;">
+            <i class="bi bi-filter"></i> Filter
+        </button>
+        {% if search_query or selected_batch %}
+            <a href="{% url 'student_list' %}" class="btn btn-secondary" style="height: 38px;" title="Reset filters">
+                <i class="bi bi-x-circle"></i> Clear
+            </a>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Student Table Card -->
+<div class="card">
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="min-width: 220px;">Student Profile</th>
+                    <th>Roll Number</th>
+                    <th>Batch & Center</th>
+                    <th>Contact</th>
+                    <th style="text-align: center;">Attendance Standing</th>
+                    <th style="text-align: right; min-width: 240px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for stu in students %}
+                <tr>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="width: 38px; height: 38px; border-radius: var(--radius-full); background: {{ stu.avatar_color }}; color: #FFF; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.12);">
+                                {{ stu.initials }}
+                            </div>
+                            <div>
+                                <a href="{% url 'student_detail' stu.id %}" style="font-weight: 700; color: var(--text-main); font-size: 14px; text-decoration: none;" class="hover-underline">
+                                    {{ stu.name }}
+                                </a>
+                                <div style="font-size: 11px; color: var(--text-muted);">
+                                    Joined {{ stu.join_date|date:"d M Y" }}
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <code style="font-size: 12px; font-weight: 700; background: var(--bg-subtle); padding: 3px 8px; border-radius: 4px; border: 1px solid var(--border-color);">
+                            {{ stu.roll_number }}
+                        </code>
+                    </td>
+                    <td>
+                        <div style="font-weight: 600; font-size: 13px;">
+                            <a href="{% url 'batch_detail' stu.batch.id %}" style="color: var(--text-main); text-decoration: none;">
+                                {{ stu.batch.name }}
+                            </a>
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-muted);">
+                            <i class="bi bi-geo-alt"></i> {{ stu.batch.location.name }}
+                        </div>
+                    </td>
+                    <td>
+                        <div style="font-size: 12px; color: var(--text-main);">{{ stu.phone|default:"-" }}</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">{{ stu.email|default:"-" }}</div>
+                    </td>
+                    <td style="text-align: center;">
+                        <div style="display: inline-flex; flex-direction: column; align-items: center; gap: 2px;">
+                            <span class="badge-status {% if stu.calc_att_pct >= 75 %}status-present{% elif stu.calc_att_pct >= 60 %}status-late{% else %}status-absent{% endif %}" style="font-weight: 700;">
+                                {{ stu.calc_att_pct }}%
+                            </span>
+                            <span style="font-size: 10px; color: var(--text-muted);">
+                                {{ stu.calc_att_present }}/{{ stu.calc_att_total }} days
+                            </span>
+                        </div>
+                    </td>
+                    <td style="text-align: right;">
+                        <div style="display: inline-flex; gap: 6px; align-items: center; justify-content: flex-end;">
+                            <a href="{% url 'student_detail' stu.id %}" class="btn btn-secondary btn-sm" title="View Student Scorecard">
+                                <i class="bi bi-person-badge"></i> Profile
+                            </a>
+                            <a href="{% url 'student_attendance_pdf' stu.id %}" class="btn btn-primary btn-sm" title="Download Standard Attendance (PDF)" style="display: inline-flex; align-items: center; gap: 4px;">
+                                <i class="bi bi-file-earmark-pdf-fill"></i> Attendance PDF
+                            </a>
+                            <a href="{% url 'student_college_attendance_pdf' stu.id %}" class="btn btn-sm" title="Download College Format (PDF)" style="background: linear-gradient(135deg, #0891B2, #0E7490); color: #FFF; display: inline-flex; align-items: center; gap: 4px; border: none;">
+                                <i class="bi bi-mortarboard-fill"></i> College PDF
+                            </a>
+                            <a href="{% url 'export_student_attendance' stu.id %}" class="btn btn-secondary btn-sm" title="Download Attendance (Excel)" style="padding: 4px 8px;">
+                                <i class="bi bi-file-earmark-excel"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 48px 24px; color: var(--text-muted);">
+                        <i class="bi bi-people" style="font-size: 40px; display: block; margin-bottom: 12px; opacity: 0.5;"></i>
+                        <div style="font-size: 15px; font-weight: 600; color: var(--text-main); margin-bottom: 4px;">No students found</div>
+                        <div style="font-size: 13px;">No student records match the specified search or filter criteria.</div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

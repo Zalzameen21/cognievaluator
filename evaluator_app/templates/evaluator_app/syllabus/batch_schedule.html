@@ -43,6 +43,14 @@
           <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('rescheduleModal').style.display='flex'">
             <i class="bi bi-arrow-repeat"></i> Reschedule a Day
           </button>
+          {% if batch_syllabus and request.user.profile.is_admin %}
+          <form method="post" action="{% url 'batch_schedule_regenerate' batch.id %}" onsubmit="return confirm('WARNING: This will clear the current schedule and rebuild it based on the syllabus. Custom edits will be lost. Continue?');" style="margin:0;">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-warning btn-sm">
+                  <i class="bi bi-arrow-clockwise"></i> Regenerate
+              </button>
+          </form>
+          {% endif %}
         </div>
       </div>
       {% if schedules %}
@@ -82,7 +90,11 @@
                   {% if s.custom_task_description %}
                   <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">{{ s.custom_task_description|truncatechars:80 }}</div>
                   {% endif %}
+                  {% if s.status == 'CANCELLED' %}
+                  <span style="font-size:10px;background:rgba(239,68,68,0.1);color:var(--danger);padding:1px 6px;border-radius:50px;font-weight:600;display:inline-block;margin-top:4px;">Cancelled</span>
+                  {% else %}
                   <span style="font-size:10px;background:rgba(245,158,11,0.1);color:#D97706;padding:1px 6px;border-radius:50px;font-weight:600;display:inline-block;margin-top:4px;">Custom Task</span>
+                  {% endif %}
                 </div>
                 {% else %}
                 <span style="color:var(--text-muted);font-size:13px;">—</span>
@@ -102,6 +114,8 @@
               <td style="padding:13px 16px;vertical-align:top;">
                 {% if s.status == 'COMPLETED' %}
                 <span style="font-size:11px;background:rgba(16,185,129,0.1);color:var(--success);padding:3px 8px;border-radius:50px;font-weight:600;white-space:nowrap;margin-bottom:4px;display:inline-block;"><i class="bi bi-check-circle-fill"></i> Completed</span>
+                {% elif s.status == 'CANCELLED' %}
+                <span style="font-size:11px;background:rgba(239,68,68,0.1);color:var(--danger);padding:3px 8px;border-radius:50px;font-weight:600;white-space:nowrap;margin-bottom:4px;display:inline-block;"><i class="bi bi-x-circle-fill"></i> Cancelled</span>
                 {% else %}
                 <span style="font-size:11px;background:rgba(245,158,11,0.1);color:#D97706;padding:3px 8px;border-radius:50px;font-weight:600;white-space:nowrap;margin-bottom:4px;display:inline-block;"><i class="bi bi-hourglass-split"></i> Pending</span>
                 {% endif %}
@@ -113,6 +127,7 @@
                 {% endif %}
               </td>
               <td style="padding:13px 16px;vertical-align:top;text-align:right;">
+                {% if s.status != 'CANCELLED' %}
                 <form method="post" action="{% url 'batch_schedule_toggle_status' s.id %}" style="display:inline;">
                     {% csrf_token %}
                     <input type="hidden" name="status" value="{% if s.status == 'COMPLETED' %}PENDING{% else %}COMPLETED{% endif %}">
@@ -124,6 +139,9 @@
                 <button type="button" class="btn btn-secondary btn-sm" style="padding:4px 8px;font-size:11px; margin-left: 4px;" title="Edit Task" onclick="openEditModal('{{ s.id }}', '{{ s.custom_task_title|escapejs }}', '{{ s.custom_task_description|escapejs }}', '{{ s.incharge.id|default:'' }}', '{{ s.incharge_name|escapejs }}')">
                     <i class="bi bi-pencil"></i>
                 </button>
+                {% endif %}
+                {% endif %}
+                {% if request.user.profile.is_admin %}
                 <form method="post" action="{% url 'batch_schedule_delete' s.id %}" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this schedule entry?');">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-danger btn-sm" style="padding:4px 8px;font-size:11px; margin-left: 4px;" title="Delete Task Schedule">

@@ -65,17 +65,18 @@ def documents_download_view(request, batch_id):
         
     if request.method == 'POST':
         export_format = request.POST.get('format', 'pdf')
+        month = request.POST.get('month', '').strip()
         
         if export_format == 'pdf':
-            return _generate_pdf_report(request, batch)
+            return _generate_pdf_report(request, batch, month)
         elif export_format == 'excel':
-            return _generate_excel_report(request, batch)
+            return _generate_excel_report(request, batch, month)
         elif export_format == 'csv':
-            return _generate_csv_report(request, batch)
+            return _generate_csv_report(request, batch, month)
             
     return HttpResponse("Invalid Request", status=400)
 
-def _generate_pdf_report(request, batch):
+def _generate_pdf_report(request, batch, month=None):
     try:
         from xhtml2pdf import pisa
     except ImportError:
@@ -84,19 +85,35 @@ def _generate_pdf_report(request, batch):
     # Gather all necessary data
     students = Student.objects.filter(batch=batch).order_by('roll_number')
     
+    # Optional month filter (format: YYYY-MM)
+    y, m = None, None
+    if month:
+        try:
+            y, m = map(int, month.split('-'))
+        except ValueError:
+            pass
+    
     # Pre-calculate data for each student
     for student in students:
         # Attendance
-        total_classes = Attendance.objects.filter(student=student).count()
-        present = Attendance.objects.filter(student=student, status='PRESENT').count()
+        att_qs = Attendance.objects.filter(student=student)
+        if y and m:
+            att_qs = att_qs.filter(date__year=y, date__month=m)
+            
+        total_classes = att_qs.count()
+        present = att_qs.filter(status='PRESENT').count()
         student.total_classes = total_classes
         student.present = present
-        student.absent = Attendance.objects.filter(student=student, status='ABSENT').count()
-        student.late = Attendance.objects.filter(student=student, status='LATE').count()
+        student.absent = att_qs.filter(status='ABSENT').count()
+        student.late = att_qs.filter(status='LATE').count()
+        student.cancelled = att_qs.filter(status='CANCELLED').count()
         student.attendance_pct = round((present / total_classes * 100), 1) if total_classes > 0 else 0
         
         # Tasks
         tasks = StudentTask.objects.filter(student=student)
+        if y and m:
+            tasks = tasks.filter(assigned_date__year=y, assigned_date__month=m)
+            
         student.tasks_assigned = tasks.count()
         student.tasks_completed = tasks.filter(status__in=['COMPLETED', 'LATE']).count()
         student.tasks_pending = tasks.filter(status__in=['PENDING', 'OVERDUE']).count()
@@ -105,6 +122,9 @@ def _generate_pdf_report(request, batch):
         
         # Evaluations
         evals = DailyEvaluation.objects.filter(student=student).order_by('-date')
+        if y and m:
+            evals = evals.filter(date__year=y, date__month=m)
+            
         student.eval_count = evals.count()
         student.latest_eval = evals.first()
         student.avg_score = round(evals.aggregate(Avg('total_score'))['total_score__avg'] or 0, 1)
@@ -128,7 +148,7 @@ def _generate_pdf_report(request, batch):
        return HttpResponse('We had some errors <pre>' + html + '</pre>')
     return response
 
-def _generate_excel_report(request, batch):
+def _generate_excel_report(request, batch, month=None):
     try:
         import openpyxl
     except ImportError:
@@ -156,22 +176,36 @@ def _generate_excel_report(request, batch):
     for s in students:
         ws_students.append([s.roll_number, s.name, s.email, s.phone, s.get_status_display(), str(s.join_date)])
         
+    # Optional month filter (format: YYYY-MM)
+    y, m = None, None
+    if month:
+        try:
+            y, m = map(int, month.split('-'))
+        except ValueError:
+            pass
+
     # 3. Attendance
     ws_attendance = wb.create_sheet("Attendance")
-    ws_attendance.append(["Roll No", "Name", "Total Classes", "Present", "Absent", "Late", "Attendance %"])
+    ws_attendance.append(["Roll No", "Name", "Total Classes", "Present", "Absent", "Late", "Cancelled", "Attendance %"])
     for s in students:
-        total = Attendance.objects.filter(student=s).count()
-        present = Attendance.objects.filter(student=s, status='PRESENT').count()
-        absent = Attendance.objects.filter(student=s, status='ABSENT').count()
-        late = Attendance.objects.filter(student=s, status='LATE').count()
+        att_qs = Attendance.objects.filter(student=s)
+        if y and m:
+            att_qs = att_qs.filter(date__year=y, date__month=m)
+        total = att_qs.count()
+        present = att_qs.filter(status='PRESENT').count()
+        absent = att_qs.filter(status='ABSENT').count()
+        late = att_qs.filter(status='LATE').count()
+        cancelled = att_qs.filter(status='CANCELLED').count()
         pct = round((present / total * 100), 1) if total > 0 else 0
-        ws_attendance.append([s.roll_number, s.name, total, present, absent, late, pct])
+        ws_attendance.append([s.roll_number, s.name, total, present, absent, late, cancelled, pct])
         
     # 4. Tasks
     ws_tasks = wb.create_sheet("Tasks")
     ws_tasks.append(["Roll No", "Name", "Assigned", "Completed", "Pending", "Needs Revision", "Completion %"])
     for s in students:
         tasks = StudentTask.objects.filter(student=s)
+        if y and m:
+            tasks = tasks.filter(assigned_date__year=y, assigned_date__month=m)
         assigned = tasks.count()
         completed = tasks.filter(status__in=['COMPLETED', 'LATE']).count()
         pending = tasks.filter(status__in=['PENDING', 'OVERDUE']).count()
@@ -184,6 +218,8 @@ def _generate_excel_report(request, batch):
     ws_evals.append(["Roll No", "Name", "Evaluations Count", "Average Score", "Latest Grade"])
     for s in students:
         evals = DailyEvaluation.objects.filter(student=s).order_by('-date')
+        if y and m:
+            evals = evals.filter(date__year=y, date__month=m)
         count = evals.count()
         avg_score = evals.aggregate(Avg('total_score'))['total_score__avg']
         avg_score = round(avg_score, 1) if avg_score else 0
@@ -202,7 +238,7 @@ def _generate_excel_report(request, batch):
     wb.save(response)
     return response
 
-def _generate_csv_report(request, batch):
+def _generate_csv_report(request, batch, month=None):
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename="batch_students_{batch.code}.csv"'
     

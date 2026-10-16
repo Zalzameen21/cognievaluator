@@ -24,8 +24,9 @@
         <h2 style="font-size: 26px; font-weight: 800; letter-spacing: -0.02em;">Welcome back, {{ user.get_full_name|default:user.username }}! 👋</h2>
         <p style="font-size: 14px; color: #E0E7FF; margin-top: 4px; max-width: 600px;">
             {% if is_admin_user %}
-                Monitor student performance across all training centers (Kozhikode, Kochi, Wayanad), assign evaluators, and analyze academic metrics.
-            {% else %}
+                Monitor student performance across all training centers, assign evaluators, and analyze academic metrics.
+          
+                {% else %}
                 Track daily performance metrics, evaluate students on practical tasks, and record batch attendance for your assigned center.
             {% endif %}
         </p>
@@ -120,7 +121,7 @@
 
     <!-- Student Projects & Tech Card -->
     <a href="{% url 'project_hub' %}" style="text-decoration: none; color: inherit;">
-        <div class="kpi-card" style="border: 2px solid {% if total_projects_count > 0 %}rgba(79, 70, 229, 0.3){% else %}transparent{% endif %}; cursor: pointer;">
+        <div class="kpi-card" style="border: 2px solid {% if total_projects_count > 0 %}rgba (79, 70, 229, 0.3){% else %}transparent{% endif %}; cursor: pointer;">
             <div class="kpi-icon-box" style="background: rgba(99, 102, 241, 0.15); color: #6366F1;">
                 <i class="bi bi-kanban-fill"></i>
             </div>

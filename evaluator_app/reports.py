@@ -6,9 +6,10 @@ from docx.shared import Inches, Pt
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.pdfgen import canvas
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, KeepTogether, Image as RLImage
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
 def generate_student_excel_report(student, attendance_records, eval_stats, evaluations, tasks, batch_comparison=None):
     wb = Workbook()
@@ -357,3 +358,604 @@ def generate_student_pdf_report(student, attendance_records, eval_stats, evaluat
     doc.build(elements)
     output.seek(0)
     return output
+
+
+class NumberedCanvas(canvas.Canvas):
+    """
+    Two-pass canvas to dynamically compute total page count
+    and render professional headers and footers with page numbering.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._saved_page_states = []
+
+    def showPage(self):
+        self._saved_page_states.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self):
+        num_pages = len(self._saved_page_states)
+        for state in self._saved_page_states:
+            self.__dict__.update(state)
+            self.draw_header_and_footer(num_pages)
+            canvas.Canvas.showPage(self)
+        canvas.Canvas.save(self)
+
+    def draw_header_and_footer(self, page_count):
+        self.saveState()
+        self.setFont('Helvetica', 8)
+        self.setFillColor(colors.HexColor('#64748B'))
+        
+        # Bottom footer line and text
+        self.setStrokeColor(colors.HexColor('#CBD5E1'))
+        self.setLineWidth(0.5)
+        self.line(36, 30, A4[0] - 36, 30)
+        
+        self.drawString(36, 18, 'CogniLearn Evaluator • Confidential & Official Attendance Statement')
+        self.drawRightString(A4[0] - 36, 18, f'Page {self._pageNumber} of {page_count}')
+        
+        # Running top header for pages 2 and later
+        if self._pageNumber > 1:
+            self.drawString(36, A4[1] - 22, 'CogniLearn Evaluator — Student Attendance Log (Continued)')
+            self.drawRightString(A4[0] - 36, A4[1] - 22, datetime.datetime.now().strftime('%d-%b-%Y'))
+            self.line(36, A4[1] - 26, A4[0] - 36, A4[1] - 26)
+            
+        self.restoreState()
+
+
+def generate_student_attendance_pdf(student, attendance_items, month_label=None, stats=None):
+    """
+    Generates a high-quality, professional executive attendance statement in PDF format
+    using ReportLab. Formatted with student profile, attendance KPI metrics, and a
+    structured table including Date, Day, Month, Status, and Remarks.
+    """
+    output = io.BytesIO()
+    # Filter out any cancelled records completely
+    attendance_items = [it for it in attendance_items if it.get('status', '').upper() != 'CANCELLED']
+    doc = SimpleDocTemplate(
+        output,
+        pagesize=A4,
+        leftMargin=36,
+        rightMargin=36,
+        topMargin=36,
+        bottomMargin=42
+    )
+    styles = getSampleStyleSheet()
+    
+    # Custom styles
+    brand_sub_style = ParagraphStyle(
+        'BrandSub',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8.5,
+        leading=11,
+        textColor=colors.HexColor('#4F46E5')
+    )
+    title_style = ParagraphStyle(
+        'DocTitle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=18,
+        leading=22,
+        textColor=colors.HexColor('#0F172A')
+    )
+    subtitle_style = ParagraphStyle(
+        'DocSubtitle',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=9.5,
+        leading=13,
+        textColor=colors.HexColor('#475569')
+    )
+    meta_box_style = ParagraphStyle(
+        'MetaBoxText',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8.5,
+        leading=12,
+        textColor=colors.HexColor('#1E293B')
+    )
+    meta_box_bold = ParagraphStyle(
+        'MetaBoxBold',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8.5,
+        leading=12,
+        textColor=colors.HexColor('#0F172A')
+    )
+    kpi_num_style = ParagraphStyle(
+        'KPINum',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=13,
+        leading=16,
+        alignment=1,
+        textColor=colors.HexColor('#0F172A')
+    )
+    kpi_lbl_style = ParagraphStyle(
+        'KPILbl',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=7.5,
+        leading=9.5,
+        alignment=1,
+        textColor=colors.HexColor('#64748B')
+    )
+    section_h_style = ParagraphStyle(
+        'SectionH',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=11,
+        leading=15,
+        textColor=colors.HexColor('#1E293B')
+    )
+    cell_style = ParagraphStyle(
+        'CellRegular',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8.5,
+        leading=11,
+        textColor=colors.HexColor('#1E293B')
+    )
+    cell_bold = ParagraphStyle(
+        'CellBoldText',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8.5,
+        leading=11,
+        textColor=colors.HexColor('#0F172A')
+    )
+    remarks_cell_style = ParagraphStyle(
+        'RemarksCell',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=7.5,
+        leading=10,
+        textColor=colors.HexColor('#475569')
+    )
+
+    elements = []
+    
+    # 1. Header Banner
+    generated_now = timezone.now().strftime('%d %B %Y, %I:%M %p')
+    header_data = [
+        [
+            Paragraph("<b>COGNILearn ACADEMIC PORTAL</b>", brand_sub_style),
+            Paragraph(f"<font color='#64748B'>Generated:</font> <b>{generated_now}</b>", ParagraphStyle('DateH', parent=styles['Normal'], fontName='Helvetica', fontSize=8, alignment=2, textColor=colors.HexColor('#475569')))
+        ],
+        [
+            Paragraph("STUDENT ATTENDANCE STATEMENT", title_style),
+            Paragraph(f"<font color='#64748B'>Center:</font> <b>{student.batch.location.name if student.batch and student.batch.location else 'Main Center'}</b>", ParagraphStyle('CenterH', parent=styles['Normal'], fontName='Helvetica', fontSize=8.5, alignment=2, textColor=colors.HexColor('#1E293B')))
+        ],
+        [
+            Paragraph(f"Official session-by-session attendance & participation record", subtitle_style),
+            ""
+        ]
+    ]
+    header_table = Table(header_data, colWidths=[330, 193])
+    header_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 1),
+        ('TOPPADDING', (0,0), (-1,-1), 0),
+        ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ('RIGHTPADDING', (0,0), (-1,-1), 0),
+    ]))
+    elements.append(header_table)
+    elements.append(Spacer(1, 4))
+    elements.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor('#4F46E5'), spaceBefore=2, spaceAfter=10))
+
+    # 2. Student & Batch Details Card
+    period_str = month_label if month_label else "Full Program Attendance (All Dates)"
+    student_details_data = [
+        [
+            Paragraph(f"<b>Student Name:</b> {student.name}", meta_box_style),
+            Paragraph(f"<b>Roll Number:</b> <code>{student.roll_number}</code>", meta_box_style),
+            Paragraph(f"<b>Batch:</b> {student.batch.name if student.batch else '-'}", meta_box_style),
+        ],
+        [
+            Paragraph(f"<b>Class Days:</b> {student.batch.class_days if student.batch else '-'}", meta_box_style),
+            Paragraph(f"<b>Location / Center:</b> {student.batch.location.name if student.batch and student.batch.location else '-'}", meta_box_style),
+            Paragraph(f"<b>Period Covered:</b> {period_str}", meta_box_style),
+        ]
+    ]
+    student_box = Table(student_details_data, colWidths=[174, 174, 175])
+    student_box.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F8FAFC')),
+        ('BOX', (0,0), (-1,-1), 0.75, colors.HexColor('#E2E8F0')),
+        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#F1F5F9')),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('LEFTPADDING', (0,0), (-1,-1), 10),
+        ('RIGHTPADDING', (0,0), (-1,-1), 10),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ]))
+    elements.append(student_box)
+    elements.append(Spacer(1, 10))
+
+    # 3. Attendance Summary KPI Cards Strip
+    if stats:
+        pct = stats.get('percentage', 0.0)
+        pct_color = '#15803D' if pct >= 75 else ('#B45309' if pct >= 60 else '#B91C1C')
+        kpi_data = [
+            [
+                Paragraph(f"<b>{stats.get('total', len(attendance_items))}</b>", kpi_num_style),
+                Paragraph(f"<b><font color='#15803D'>{stats.get('present', 0)}</font></b>", kpi_num_style),
+                Paragraph(f"<b><font color='#B91C1C'>{stats.get('absent', 0)}</font></b>", kpi_num_style),
+                Paragraph(f"<b><font color='#B45309'>{stats.get('late', 0) + stats.get('excused', 0)}</font></b>", kpi_num_style),
+                Paragraph(f"<b><font color='{pct_color}'>{pct}%</font></b>", kpi_num_style),
+            ],
+            [
+                Paragraph("TOTAL SESSIONS", kpi_lbl_style),
+                Paragraph("PRESENT", kpi_lbl_style),
+                Paragraph("ABSENT", kpi_lbl_style),
+                Paragraph("LATE / EXCUSED", kpi_lbl_style),
+                Paragraph("ATTENDANCE RATE", kpi_lbl_style),
+            ]
+        ]
+        kpi_table = Table(kpi_data, colWidths=[104, 104, 105, 105, 105])
+        kpi_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,-1), colors.white),
+            ('BOX', (0,0), (-1,-1), 0.75, colors.HexColor('#CBD5E1')),
+            ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
+            ('TOPPADDING', (0,0), (-1,0), 7),
+            ('BOTTOMPADDING', (0,0), (-1,0), 2),
+            ('TOPPADDING', (0,1), (-1,1), 1),
+            ('BOTTOMPADDING', (0,1), (-1,1), 7),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ]))
+        elements.append(kpi_table)
+        elements.append(Spacer(1, 14))
+
+    # 4. Detailed Attendance History Table
+    elements.append(Paragraph("<b>Detailed Session Attendance Log</b>", section_h_style))
+    elements.append(Spacer(1, 6))
+
+    # Table Header
+    table_rows = [
+        ['#', 'Date', 'Day', 'Month', 'Status']
+    ]
+
+    for idx, item in enumerate(attendance_items, start=1):
+        d = item['date']
+        # Format date as DD/MM/YYYY
+        date_formatted = d.strftime('%d/%m/%Y')
+        day_str = d.strftime('%A')
+        month_str = d.strftime('%B %Y')
+        status_str = item.get('status', 'ABSENT').upper()
+        if 'PRESENT' in status_str:
+            status_str = 'PRESENT'
+        elif 'ABSENT' in status_str or 'NOT MARKED' in status_str:
+            status_str = 'ABSENT'
+        elif 'LATE' in status_str:
+            status_str = 'LATE'
+        elif 'EXCUSED' in status_str:
+            status_str = 'EXCUSED'
+        
+        table_rows.append([
+            str(idx),
+            date_formatted,
+            day_str,
+            month_str,
+            status_str
+        ])
+
+    col_widths = [35, 115, 120, 125, 128]
+    att_table = Table(table_rows, colWidths=col_widths, repeatRows=1)
+    
+    table_styles = [
+        # Table Header Styling
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1E293B')),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,0), 9),
+        ('ALIGN', (0,0), (-1,0), 'LEFT'),
+        ('ALIGN', (0,0), (0,-1), 'CENTER'),   # Sl No centered
+        ('ALIGN', (4,0), (4,-1), 'CENTER'),   # Status centered
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
+        ('TOPPADDING', (0,0), (-1,0), 6),
+        ('BOTTOMPADDING', (0,0), (-1,0), 6),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('TOPPADDING', (0,1), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,1), (-1,-1), 6),
+        ('LEFTPADDING', (0,0), (-1,-1), 8),
+        ('RIGHTPADDING', (0,0), (-1,-1), 8),
+        ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
+        ('FONTSIZE', (0,1), (-1,-1), 8.5),
+    ]
+
+    # Row-specific styling for Status badges & alternating zebra stripes
+    for row_idx, item in enumerate(attendance_items, start=1):
+        st = item.get('status', '').upper()
+        
+        # Alternating row background for columns 0 to 3
+        if row_idx % 2 == 0:
+            table_styles.append(('BACKGROUND', (0, row_idx), (3, row_idx), colors.HexColor('#F8FAFC')))
+        else:
+            table_styles.append(('BACKGROUND', (0, row_idx), (3, row_idx), colors.white))
+
+        # Status badge background & text colors
+        if 'PRESENT' in st:
+            bg_col = colors.HexColor('#DCFCE7')  # Light green
+            tx_col = colors.HexColor('#15803D')  # Dark green
+        elif 'LATE' in st:
+            bg_col = colors.HexColor('#FEF3C7')  # Light amber
+            tx_col = colors.HexColor('#B45309')  # Dark amber
+        elif 'CANCELLED' in st:
+            bg_col = colors.HexColor('#F1F5F9')  # Light slate
+            tx_col = colors.HexColor('#475569')  # Dark slate
+        elif 'EXCUSED' in st:
+            bg_col = colors.HexColor('#DBEAFE')  # Light blue
+            tx_col = colors.HexColor('#1D4ED8')  # Dark blue
+        else: # ABSENT or Not Marked
+            bg_col = colors.HexColor('#FEE2E2')  # Light red
+            tx_col = colors.HexColor('#B91C1C')  # Dark red
+
+        table_styles.append(('BACKGROUND', (4, row_idx), (4, row_idx), bg_col))
+        table_styles.append(('TEXTCOLOR', (4, row_idx), (4, row_idx), tx_col))
+        table_styles.append(('FONTNAME', (4, row_idx), (4, row_idx), 'Helvetica-Bold'))
+        table_styles.append(('FONTSIZE', (4, row_idx), (4, row_idx), 8))
+
+    att_table.setStyle(TableStyle(table_styles))
+    elements.append(att_table)
+    elements.append(Spacer(1, 16))
+
+    # 5. Signatures & Official Validation Block
+    sign_data = [
+        [
+            Paragraph("<b>Verified By (Evaluator / Faculty):</b>", meta_box_bold),
+            Paragraph("<b>Academic Head / Center Coordinator:</b>", meta_box_bold)
+        ],
+        [
+            Spacer(1, 24),
+            Spacer(1, 24)
+        ],
+        [
+            Paragraph("___________________________________<br/><font color='#64748B' size=7.5>Signature & Date</font>", meta_box_style),
+            Paragraph("___________________________________<br/><font color='#64748B' size=7.5>Seal & Signature</font>", meta_box_style)
+        ],
+        [
+            Paragraph("<font color='#94A3B8' size=7><i>* Document generated by CogniLearn Evaluator. Valid for academic records and performance review.</i></font>", meta_box_style),
+            ""
+        ]
+    ]
+    sign_table = Table(sign_data, colWidths=[261, 262])
+    sign_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ('RIGHTPADDING', (0,0), (-1,-1), 0),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+        ('TOPPADDING', (0,0), (-1,-1), 2),
+    ]))
+    
+    elements.append(KeepTogether([sign_table]))
+
+    doc.build(elements, canvasmaker=NumberedCanvas)
+    output.seek(0)
+    return output
+
+
+class CollegeLetterheadCanvas(canvas.Canvas):
+    """
+    Canvas for official College Attendance Report letterhead.
+    Renders official teal footer at the bottom margin of each page.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._saved_page_states = []
+
+    def showPage(self):
+        self._saved_page_states.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self):
+        num_pages = len(self._saved_page_states)
+        for state in self._saved_page_states:
+            self.__dict__.update(state)
+            self.draw_letterhead_footer()
+            canvas.Canvas.showPage(self)
+        canvas.Canvas.save(self)
+
+    def draw_letterhead_footer(self):
+        self.saveState()
+        teal = colors.HexColor('#00838F')
+        self.setFont('Helvetica-Bold', 10)
+        self.setFillColor(teal)
+        self.drawString(54, 76, 'JHF IT Innovations Private Limited')
+        self.setFont('Helvetica', 7.5)
+        self.drawString(54, 64, 'CIN: U58200KL2024PTC091151')
+        self.drawString(54, 53, 'Registered Address: 5th Floor, Asiatic Business Centre, Kazhakuttam, Trivandrum – 695582')
+        self.drawString(54, 42, 'PH: +91- 8891559888; E-mail: info@cognilearn.org ; Website : www.cognilearn.com')
+        self.drawString(54, 31, 'Branches: Trivandrum | Calicut')
+        self.restoreState()
+
+
+def generate_college_attendance_pdf(student, attendance_items, college_name=None, month_label=None):
+    """
+    Generates an official College Attendance Report on JHF IT Innovations Private Limited
+    letterhead, formatted specifically for college submission & internship verification.
+    """
+    import os
+    from django.conf import settings
+
+    # Filter out any cancelled records completely
+    attendance_items = [it for it in attendance_items if it.get('status', '').upper() != 'CANCELLED']
+
+    output = io.BytesIO()
+    doc = SimpleDocTemplate(
+        output,
+        pagesize=A4,
+        leftMargin=54,
+        rightMargin=54,
+        topMargin=44,
+        bottomMargin=95
+    )
+    styles = getSampleStyleSheet()
+
+    # Typography styles matching the official college format
+    title_style = ParagraphStyle(
+        'CollegeDocTitle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=13.5,
+        leading=17,
+        alignment=1, # Center
+        spaceAfter=14,
+        textColor=colors.black
+    )
+    body_style = ParagraphStyle(
+        'CollegeDocBody',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=10,
+        leading=15,
+        textColor=colors.black
+    )
+    body_bold = ParagraphStyle(
+        'CollegeDocBodyBold',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=10,
+        leading=15,
+        textColor=colors.black
+    )
+
+    elements = []
+
+    # 1. Logos Header Table (JHF on left, CogniLearn on right)
+    base_dir = getattr(settings, 'BASE_DIR', '')
+    img_dir = os.path.join(base_dir, 'evaluator_app', 'static', 'images')
+    jhf_logo_path = os.path.join(img_dir, 'jhf_logo.png')
+    cog_logo_path = os.path.join(img_dir, 'cognilearn_logo.png')
+    seal_path = os.path.join(img_dir, 'jhf_seal_signature.png')
+
+    logo_cells = []
+    if os.path.exists(jhf_logo_path):
+        logo_cells.append(RLImage(jhf_logo_path, width=120, height=50))
+    else:
+        logo_cells.append(Paragraph("<b>JHF IT</b><br/><font size=7 color='#00A3C4'>INNOVATIONS PVT LTD</font>", body_bold))
+
+    if os.path.exists(cog_logo_path):
+        logo_cells.append(RLImage(cog_logo_path, width=76, height=58))
+    else:
+        logo_cells.append(Paragraph("<b>CogniLearn</b>", body_bold))
+
+    logo_table = Table([[logo_cells[0], logo_cells[1]]], colWidths=[280, 207])
+    logo_table.setStyle(TableStyle([
+        ('ALIGN', (0,0), (0,0), 'LEFT'),
+        ('ALIGN', (1,0), (1,0), 'RIGHT'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ('RIGHTPADDING', (0,0), (-1,-1), 0),
+        ('TOPPADDING', (0,0), (-1,-1), 0),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+    ]))
+    elements.append(logo_table)
+    elements.append(Spacer(1, 28))
+
+    # 2. Heading
+    elements.append(Paragraph("<b>ATTENDANCE REPORT</b>", title_style))
+    elements.append(Spacer(1, 16))
+
+    # 3. Recipient Section
+    college = college_name or "AWH Engineering College, Calicut"
+    elements.append(Paragraph(f"To<br/><b>{college}</b>", body_style))
+    elements.append(Spacer(1, 14))
+
+    # 4. Salutation
+    elements.append(Paragraph("Dear Sir/Madam,", body_style))
+    elements.append(Spacer(1, 10))
+
+    # 5. Introductory Paragraph
+    # Determine Class / Year string dynamically
+    class_parts = []
+    if student.batch:
+        class_parts.append(student.batch.name)
+    if student.student_class:
+        class_parts.append(student.student_class)
+    elif student.academic_year:
+        class_parts.append(student.academic_year)
+    else:
+        class_parts.append("Second Year (S3)")
+    class_str = ", ".join(class_parts)
+
+    location_name = student.batch.location.name if student.batch and student.batch.location else "Calicut"
+
+    intro_text = (
+        f"This is to inform you that <b>Ms./Mr. {student.name}</b>, a student of <b>{class_str}</b>, "
+        f"from your institution visited our {location_name} Corporate Office in connection with "
+        f"her/his internship under the <b>CogniLearn Experienceship Program</b>."
+    )
+    elements.append(Paragraph(intro_text, body_style))
+    elements.append(Spacer(1, 18))
+
+    # 6. Attendance Table (3 columns: Date, Day, Activity / Status)
+    table_rows = [
+        ['Date', 'Day', 'Activity / Status']
+    ]
+
+    for item in attendance_items:
+        d = item['date']
+        date_str = d.strftime('%d-%m-%Y')
+        day_str = d.strftime('%A')
+        st_raw = item.get('status', 'PRESENT').upper()
+        
+        # Display status in Title Case as shown in college letter: Present, Absent
+        if 'PRESENT' in st_raw:
+            display_status = 'Present'
+        elif 'ABSENT' in st_raw or 'NOT MARKED' in st_raw:
+            display_status = 'Absent'
+        elif 'LATE' in st_raw:
+            display_status = 'Late'
+        elif 'EXCUSED' in st_raw:
+            display_status = 'Excused'
+        else:
+            display_status = item.get('status', 'Present').title()
+
+        table_rows.append([
+            date_str,
+            day_str,
+            display_status
+        ])
+
+    table_widths = [110, 170, 207]
+    table = Table(table_rows, colWidths=table_widths, repeatRows=1)
+    table.setStyle(TableStyle([
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,-1), 9.5),
+        ('ALIGN', (0,0), (0,-1), 'CENTER'), # Date centered
+        ('ALIGN', (1,0), (1,-1), 'LEFT'),   # Day left
+        ('ALIGN', (2,0), (2,-1), 'LEFT'),   # Activity/Status left
+        ('GRID', (0,0), (-1,-1), 0.5, colors.black),
+        ('TOPPADDING', (0,0), (-1,-1), 5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+        ('LEFTPADDING', (0,0), (-1,-1), 8),
+        ('RIGHTPADDING', (0,0), (-1,-1), 8),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ]))
+    elements.append(table)
+    elements.append(Spacer(1, 18))
+
+    # 7. Closing Text
+    elements.append(Paragraph("For any further information or clarification, please feel free to contact us.", body_style))
+    elements.append(Spacer(1, 14))
+    elements.append(Paragraph("Yours sincerely,<br/><br/>For JHF IT Innovations Private Limited", body_style))
+    elements.append(Spacer(1, 10))
+
+    # 8. Signature and Seal
+    if os.path.exists(seal_path):
+        sig_img = RLImage(seal_path, width=170, height=85)
+        sig_table = Table([[sig_img]], colWidths=[487])
+        sig_table.setStyle(TableStyle([
+            ('LEFTPADDING', (0,0), (-1,-1), 0),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+            ('TOPPADDING', (0,0), (-1,-1), 0),
+        ]))
+        elements.append(sig_table)
+    
+    elements.append(Spacer(1, 4))
+    elements.append(Paragraph("<b>Arif Muhammed TA</b><br/>CEO", body_style))
+
+    doc.build(elements, canvasmaker=CollegeLetterheadCanvas)
+    output.seek(0)
+    return output
+

@@ -134,6 +134,7 @@
                 <th>Present</th>
                 <th>Absent</th>
                 <th>Late</th>
+                <th>Cancelled</th>
                 <th>Attendance %</th>
             </tr>
         </thead>
@@ -146,6 +147,7 @@
                 <td class="text-center">{{ student.present }}</td>
                 <td class="text-center">{{ student.absent }}</td>
                 <td class="text-center">{{ student.late }}</td>
+                <td class="text-center">{{ student.cancelled }}</td>
                 <td class="text-center"><strong>{{ student.attendance_pct }}%</strong></td>
             </tr>
             {% empty %}
@@ -237,10 +239,16 @@
                 <td>{{ student.tasks_pending }} / {{ student.tasks_needs_revision }}</td>
             </tr>
             <tr>
-                <th>Attendance %</th>
-                <td><strong>{{ student.attendance_pct }}%</strong></td>
+                <th>Cancelled</th>
+                <td>{{ student.cancelled }}</td>
                 <th>Completion %</th>
                 <td><strong>{{ student.task_completion_pct }}%</strong></td>
+            </tr>
+            <tr>
+                <th>Attendance %</th>
+                <td><strong>{{ student.attendance_pct }}%</strong></td>
+                <th></th>
+                <td></td>
             </tr>
         </table>
         

@@ -31,12 +31,15 @@ urlpatterns = [
     path('batch-groups/<int:group_id>/delete/', views.batch_group_delete_view, name='batch_group_delete'),
 
     # Students
+    path('students/', views.student_list_view, name='student_list'),
     path('students/add/', views.student_add_view, name='student_add'),
     path('students/add/<int:batch_id>/', views.student_add_view, name='student_add_to_batch'),
     path('students/<int:student_id>/', views.student_detail_view, name='student_detail'),
     path('students/<int:student_id>/report/', views.student_report_download_view, name='student_report_download'),
     path('students/<int:student_id>/edit/', views.student_edit_view, name='student_edit'),
     path('students/<int:student_id>/delete/', views.student_delete_view, name='student_delete'),
+    path('students/<int:student_id>/attendance/pdf/', views.student_attendance_pdf_view, name='student_attendance_pdf'),
+    path('students/<int:student_id>/attendance/college-pdf/', views.student_college_attendance_pdf_view, name='student_college_attendance_pdf'),
     path('students/<int:student_id>/export-attendance/', views.export_student_attendance_csv_view, name='export_student_attendance'),
     path('api/students/<int:student_id>/update-payment-status/', views.update_payment_status_api, name='update_payment_status_api'),
 
@@ -61,6 +64,7 @@ urlpatterns = [
     path('ajax/batch-syllabus-modules/', views.ajax_get_batch_syllabus_modules, name='ajax_get_batch_syllabus_modules'),
 
     # Attendance Hub
+    path('attendance/cancel-class/', views.batch_cancel_class_view, name='batch_cancel_class'),
     path('attendance/reschedule/', views.batch_reschedule_class_view, name='batch_reschedule_class'),
     path('attendance/', views.attendance_hub_view, name='attendance_hub'),
     path('attendance/register/<int:batch_id>/', views.attendance_register_view, name='attendance_register'),

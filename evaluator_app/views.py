@@ -530,6 +530,46 @@ def student_add_view(request, batch_id=None):
 
 
 @evaluator_required
+def student_list_view(request):
+    user = request.user
+    accessible_batches = get_user_batches(user).order_by('name')
+    
+    q = request.GET.get('q', '').strip()
+    batch_filter = request.GET.get('batch', '').strip()
+    
+    students_qs = Student.objects.filter(batch__in=accessible_batches).select_related('batch', 'batch__location').prefetch_related('attendance_records')
+    
+    if batch_filter:
+        students_qs = students_qs.filter(batch_id=batch_filter)
+        
+    if q:
+        students_qs = students_qs.filter(
+            Q(name__icontains=q) |
+            Q(roll_number__icontains=q) |
+            Q(email__icontains=q) |
+            Q(phone__icontains=q)
+        )
+        
+    students = list(students_qs.order_by('batch__name', 'roll_number'))
+    
+    for stu in students:
+        total = stu.attendance_records.exclude(status='CANCELLED').count()
+        present = stu.attendance_records.filter(status__in=['PRESENT', 'LATE']).count()
+        stu.calc_att_pct = round((present / total * 100), 1) if total > 0 else 0.0
+        stu.calc_att_total = total
+        stu.calc_att_present = present
+
+    context = {
+        'students': students,
+        'batches': accessible_batches,
+        'selected_batch': batch_filter,
+        'search_query': q,
+        'total_count': len(students),
+    }
+    return render(request, 'evaluator_app/students/student_list.html', context)
+
+
+@evaluator_required
 def student_detail_view(request, student_id):
     user = request.user
     student = get_object_or_404(Student, id=student_id)
@@ -581,10 +621,11 @@ def student_detail_view(request, student_id):
         
         for d in actual_dates:
             status = att_map.get(d, 'Not Marked/Absent')
-            history_records.append({'date': d, 'status': status})
+            if status != 'CANCELLED':
+                history_records.append({'date': d, 'status': status})
     else:
         # Fallback if no start_date
-        history_records = [{'date': a.date, 'status': a.status} for a in student.attendance_records.all().order_by('-date')[:30]]
+        history_records = [{'date': a.date, 'status': a.status} for a in student.attendance_records.exclude(status='CANCELLED').order_by('-date')[:30]]
 
     # Calculate performance metrics averages
     eval_stats = evaluations.aggregate(
@@ -608,7 +649,7 @@ def student_detail_view(request, student_id):
     att_late = student.attendance_records.filter(status='LATE').count()
     att_absent = student.attendance_records.filter(status='ABSENT').count()
     att_excused = student.attendance_records.filter(status='EXCUSED').count()
-    total_att = student.attendance_records.count()
+    total_att = student.attendance_records.exclude(status='CANCELLED').count()
     att_percentage = round(((att_present + att_late) / total_att * 100), 1) if total_att > 0 else 0
     
     # Score progression chart data
@@ -708,9 +749,22 @@ def student_report_download_view(request, student_id):
         return redirect('student_list')
         
     format_type = request.GET.get('format', 'pdf')
+    month = request.GET.get('month', '').strip()
     
     attendance_records = student.attendance_records.all().order_by('-date')
-    eval_stats = student.evaluations.aggregate(
+    evaluations = student.evaluations.all().order_by('-date')
+    tasks = student.tasks.all().order_by('-assigned_date')
+    
+    if month:
+        try:
+            y, m = map(int, month.split('-'))
+            attendance_records = attendance_records.filter(date__year=y, date__month=m)
+            evaluations = evaluations.filter(date__year=y, date__month=m)
+            tasks = tasks.filter(assigned_date__year=y, assigned_date__month=m)
+        except ValueError:
+            pass
+
+    eval_stats = evaluations.aggregate(
         avg_pres=Avg('presentation_score'),
         avg_prob=Avg('problem_solving_score'),
         avg_comm=Avg('communication_score'),
@@ -722,8 +776,6 @@ def student_report_download_view(request, student_id):
         avg_tasks_given=Avg('tasks_given'),
         avg_tasks_completed=Avg('tasks_completed'),
     )
-    evaluations = student.evaluations.all().order_by('-date')
-    tasks = student.tasks.all().order_by('-assigned_date')
     
     batch_students = student.batch.students.filter(status='ACTIVE')
     
@@ -2295,7 +2347,7 @@ def attendance_register_view(request, batch_id=None, group_id=None):
         is_cancelled = current_date in cancelled_dates
         is_makeup = current_date in makeup_dates
         
-        if (is_regular and not is_cancelled) or is_makeup:
+        if is_regular or is_makeup:
             dates.append(current_date)
             
         current_date += timedelta(days=1)
@@ -2377,7 +2429,146 @@ def export_batch_csv_view(request, batch_id):
 
 
 @evaluator_required
+def student_attendance_pdf_view(request, student_id, is_college_format=False):
+    user = request.user
+    student = get_object_or_404(Student, id=student_id)
+    if not can_user_access_batch(user, student.batch):
+        return HttpResponseForbidden("Access denied")
+
+    month = request.GET.get('month', '').strip()
+    college_param = request.GET.get('college', '').strip()
+    report_type = request.GET.get('type', request.GET.get('format_type', '')).lower()
+    use_college_format = is_college_format or (report_type in ['college', 'college_format', 'college-format'])
+    
+    # 1. Fetch from Attendance model
+    att_qs = student.attendance_records.exclude(status='CANCELLED').order_by('date')
+    
+    month_label = None
+    y, m = None, None
+    if month:
+        try:
+            y, m = map(int, month.split('-'))
+            att_qs = att_qs.filter(date__year=y, date__month=m)
+            import calendar
+            month_label = f"{calendar.month_name[m]} {y}"
+        except (ValueError, IndexError):
+            pass
+
+    records_dict = {}
+    for att in att_qs:
+        records_dict[att.date] = {
+            'date': att.date,
+            'status': att.status,
+            'remarks': att.remarks or ('Present in class' if att.status == 'PRESENT' else ''),
+            'marked_by': (att.marked_by.get_full_name() or att.marked_by.username) if att.marked_by else 'System'
+        }
+
+    # 2. Check scheduled batch class dates to capture any session not explicitly recorded
+    batch = student.batch
+    if batch and batch.start_date:
+        DAYS_MAP = {
+            'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
+            'friday': 4, 'saturday': 5, 'sunday': 6
+        }
+        class_days_str = (batch.class_days or '').lower()
+        valid_weekdays = [v for k, v in DAYS_MAP.items() if k in class_days_str]
+        today = timezone.now().date()
+        
+        check_date = batch.start_date
+        end_date = today
+        
+        if y and m:
+            import calendar
+            _, last_day = calendar.monthrange(y, m)
+            start_of_month = date(y, m, 1)
+            end_of_month = min(date(y, m, last_day), today)
+            if start_of_month > check_date:
+                check_date = start_of_month
+            if end_of_month < end_date:
+                end_date = end_of_month
+                
+        exceptions = {ex.original_date: ex for ex in BatchScheduleException.objects.filter(batch=batch)}
+        
+        curr = check_date
+        while curr <= end_date:
+            ex = exceptions.get(curr)
+            is_class_day = curr.weekday() in valid_weekdays
+            
+            if is_class_day:
+                if ex and ex.rescheduled_date and ex.rescheduled_date <= today:
+                    target_date = ex.rescheduled_date
+                elif ex and not ex.rescheduled_date:
+                    # Class was permanently cancelled without makeup - omit completely
+                    target_date = None
+                else:
+                    target_date = curr
+                    
+                if target_date and target_date not in records_dict:
+                    if (not y or not m) or (target_date.year == y and target_date.month == m):
+                        records_dict[target_date] = {
+                            'date': target_date,
+                            'status': 'Not Marked/Absent',
+                            'remarks': 'Unmarked Class Session',
+                            'marked_by': 'Schedule'
+                        }
+            curr += timedelta(days=1)
+
+    # Filter out any cancelled records completely
+    active_records = [it for it in records_dict.values() if it.get('status', '').upper() != 'CANCELLED']
+
+    safe_roll = student.roll_number.replace('/', '_').replace(' ', '_')
+    filename_suffix = f"_{month}" if month else "_All"
+
+    if use_college_format:
+        # College format uses reverse chronological order (newest date first)
+        items = sorted(active_records, key=lambda x: x['date'], reverse=True)
+        from .reports import generate_college_attendance_pdf
+        pdf_buffer = generate_college_attendance_pdf(
+            student,
+            items,
+            college_name=college_param or "AWH Engineering College, Calicut",
+            month_label=month_label
+        )
+        filename = f"{safe_roll}_College_Attendance{filename_suffix}.pdf"
+    else:
+        # Standard format
+        items = sorted(active_records, key=lambda x: x['date'])
+        # Statistics
+        total = len(items)
+        present = sum(1 for it in items if it['status'] == 'PRESENT')
+        absent = sum(1 for it in items if it['status'] in ['ABSENT', 'Not Marked/Absent'])
+        late = sum(1 for it in items if it['status'] == 'LATE')
+        excused = sum(1 for it in items if it['status'] == 'EXCUSED')
+        pct = round(((present + late) / total * 100), 1) if total > 0 else 0.0
+
+        stats = {
+            'total': total,
+            'present': present,
+            'absent': absent,
+            'late': late,
+            'excused': excused,
+            'percentage': pct,
+        }
+
+        from .reports import generate_student_attendance_pdf
+        pdf_buffer = generate_student_attendance_pdf(student, items, month_label=month_label, stats=stats)
+        filename = f"{safe_roll}_Attendance{filename_suffix}.pdf"
+
+    response = HttpResponse(pdf_buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@evaluator_required
+def student_college_attendance_pdf_view(request, student_id):
+    return student_attendance_pdf_view(request, student_id, is_college_format=True)
+
+
+@evaluator_required
 def export_student_attendance_csv_view(request, student_id):
+    if request.GET.get('format', '').lower() == 'pdf':
+        return student_attendance_pdf_view(request, student_id)
+        
     user = request.user
     student = get_object_or_404(Student, id=student_id)
     if not can_user_access_batch(user, student.batch):
@@ -2398,8 +2589,17 @@ def export_student_attendance_csv_view(request, student_id):
     start_date = student.batch.start_date.strftime('%d-%b-%Y') if student.batch.start_date else 'N/A'
     roll_no = student.roll_number
     stu_name = student.name
+    month = request.GET.get('month', '').strip()
 
-    attendance_records = student.attendance_records.all().order_by('date')
+    attendance_records = student.attendance_records.exclude(status='CANCELLED').order_by('date')
+    
+    if month:
+        try:
+            y, m = map(int, month.split('-'))
+            attendance_records = attendance_records.filter(date__year=y, date__month=m)
+        except ValueError:
+            pass
+            
     for record in attendance_records:
         ws.append([
             batch_name,
@@ -2429,22 +2629,34 @@ def export_batch_attendance_csv_view(request, batch_id):
     if not can_user_access_batch(user, batch):
         return HttpResponseForbidden("Access denied")
 
-    month_str = request.GET.get('month')
+    month_str = request.GET.get('month', '').strip()
     year_str = request.GET.get('year')
     
-    if not year_str:
-        year_str = str(timezone.now().year)
-        
-    year = int(year_str)
+    attendance_qs = Attendance.objects.filter(batch=batch)
     
-    attendance_qs = Attendance.objects.filter(batch=batch, date__year=year)
-    
-    if month_str:
-        month = int(month_str)
-        attendance_qs = attendance_qs.filter(date__month=month)
-        filename = f"{batch.code}_attendance_{year}_{month:02d}.xlsx"
+    if '-' in month_str:
+        # Format YYYY-MM
+        try:
+            year, month = map(int, month_str.split('-'))
+            attendance_qs = attendance_qs.filter(date__year=year, date__month=month)
+            filename = f"{batch.code}_attendance_{year}_{month:02d}.xlsx"
+        except ValueError:
+            year = timezone.now().year
+            attendance_qs = attendance_qs.filter(date__year=year)
+            filename = f"{batch.code}_attendance_{year}.xlsx"
     else:
-        filename = f"{batch.code}_attendance_{year}.xlsx"
+        if not year_str:
+            year_str = str(timezone.now().year)
+            
+        year = int(year_str)
+        attendance_qs = attendance_qs.filter(date__year=year)
+        
+        if month_str:
+            month = int(month_str)
+            attendance_qs = attendance_qs.filter(date__month=month)
+            filename = f"{batch.code}_attendance_{year}_{month:02d}.xlsx"
+        else:
+            filename = f"{batch.code}_attendance_{year}.xlsx"
         
     # Get unique dates in this period
     dates = list(attendance_qs.values_list('date', flat=True).distinct().order_by('date'))
@@ -3939,3 +4151,135 @@ def reports_hub_view(request):
         'students': accessible_students,
     }
     return render(request, 'evaluator_app/reports/reports_hub.html', context)
+
+
+@evaluator_required
+def batch_cancel_class_view(request):
+    if request.method == 'POST':
+        batch_id = request.POST.get('batch_id')
+        date_str = request.POST.get('date')
+        reason = request.POST.get('reason')
+        
+        batch = get_object_or_404(Batch, id=batch_id)
+        if not can_user_access_batch(request.user, batch):
+            messages.error(request, "Access denied.")
+            return redirect('attendance_hub')
+            
+        try:
+            cancel_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            messages.error(request, "Invalid date format.")
+            return redirect('attendance_register', batch_id=batch.id)
+            
+        # Check if attendance is already explicitly marked
+        existing_marked = Attendance.objects.filter(
+            batch=batch,
+            date=cancel_date,
+            marked_by__isnull=False
+        ).exclude(status='CANCELLED').exists()
+        
+        if existing_marked:
+            messages.error(request, f"Cannot cancel class on {cancel_date.strftime('%d/%m/%Y')} because attendance has already been marked by an admin/evaluator.")
+            return redirect('attendance_register', batch_id=batch.id)
+            
+        with transaction.atomic():
+            # Create exception
+            exc, exc_created = BatchScheduleException.objects.get_or_create(
+                batch=batch,
+                original_date=cancel_date,
+                defaults={'reason': reason, 'created_by': request.user}
+            )
+            
+            if not exc_created:
+                # If it already exists, just update reason and attendance, but DO NOT cascade tasks again
+                exc.reason = reason
+                exc.save()
+                
+                # Update attendance reason
+                Attendance.objects.filter(batch=batch, date=cancel_date, status='CANCELLED').update(remarks=reason)
+                
+                # Update schedule placeholder
+                BatchTaskSchedule.objects.filter(batch=batch, date=cancel_date, status='CANCELLED').update(custom_task_description=reason)
+                
+                messages.info(request, f"Class on {cancel_date.strftime('%d/%m/%Y')} was already cancelled. The reason has been updated.")
+                return redirect('attendance_register', batch_id=batch.id)
+                
+            # If newly created, proceed with cascading logic
+            
+            # Mark attendance as cancelled
+            students = batch.students.all()
+            for student in students:
+                att, created = Attendance.objects.get_or_create(
+                    batch=batch,
+                    student=student,
+                    date=cancel_date,
+                    defaults={'status': 'CANCELLED', 'remarks': reason, 'marked_by': request.user}
+                )
+                if not created:
+                    att.status = 'CANCELLED'
+                    att.remarks = reason
+                    att.marked_by = request.user
+                    att.save()
+                    
+            # Cascade Tasks and Schedules
+            from collections import defaultdict
+            
+            tasks = StudentTask.objects.filter(batch=batch, assigned_date__gte=cancel_date).order_by('assigned_date')
+            tasks_by_date = defaultdict(list)
+            for t in tasks:
+                tasks_by_date[t.assigned_date].append(t)
+                
+            scheds = BatchTaskSchedule.objects.filter(batch=batch, date__gte=cancel_date).order_by('date')
+            scheds_by_date = defaultdict(list)
+            for s in scheds:
+                scheds_by_date[s.date].append(s)
+                
+            all_dates = set(tasks_by_date.keys()).union(set(scheds_by_date.keys()))
+            sorted_dates = sorted(list(all_dates))
+            
+            skip_dates = set(e.original_date for e in BatchScheduleException.objects.filter(batch=batch))
+            batch_days = batch.days_list
+            
+            def get_next_valid_date(d):
+                d += timedelta(days=1)
+                while True:
+                    if d not in skip_dates:
+                        if not batch_days or d.strftime('%A') in batch_days:
+                            return d
+                    d += timedelta(days=1)
+            
+            date_mapping = {}
+            for old_date in sorted_dates:
+                date_mapping[old_date] = get_next_valid_date(old_date)
+            
+            # Process in reverse chronological order to prevent date overlap conflicts
+            for old_date in reversed(sorted_dates):
+                new_date = date_mapping[old_date]
+                
+                # Shift StudentTasks
+                for t in tasks_by_date[old_date]:
+                    if t.due_date:
+                        delta = new_date - t.assigned_date
+                        t.due_date = t.due_date + delta
+                    t.assigned_date = new_date
+                    t.save()
+                    
+                # Shift BatchTaskSchedules
+                for s in scheds_by_date[old_date]:
+                    s.date = new_date
+                    s.save()
+                    
+            # Insert a cancelled placeholder in the batch schedule
+            BatchTaskSchedule.objects.create(
+                batch=batch,
+                date=cancel_date,
+                status='CANCELLED',
+                custom_task_title='Class Cancelled',
+                custom_task_description=reason,
+                incharge=request.user
+            )
+                    
+        messages.success(request, f"Class on {cancel_date.strftime('%d/%m/%Y')} cancelled successfully. Upcoming tasks have been shifted.")
+        return redirect('attendance_register', batch_id=batch.id)
+        
+    return redirect('attendance_hub')

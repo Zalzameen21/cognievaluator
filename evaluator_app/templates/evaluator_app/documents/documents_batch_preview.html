@@ -136,6 +136,10 @@
         
         <form method="post" action="{% url 'documents_download' batch.id %}">
             {% csrf_token %}
+            <div style="margin-bottom: 20px;">
+                <label for="monthFilter" style="font-weight: 600; margin-bottom: 8px; display: block;">Filter by Month (Optional):</label>
+                <input type="month" name="month" id="monthFilter" class="form-control" style="max-width: 250px; padding: 10px; border-radius: var(--radius-md); border: 1px solid var(--border-color);" placeholder="Select Month">
+            </div>
             <div class="download-grid">
                 <button type="submit" name="format" value="pdf" class="btn-download btn-pdf">
                     <i class="bi bi-file-earmark-pdf-fill"></i> Download PDF

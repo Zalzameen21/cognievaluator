@@ -66,6 +66,9 @@
         <button type="button" class="btn btn-warning" onclick="openRescheduleModal()">
             <i class="bi bi-calendar2-range"></i> Reschedule Class
         </button>
+        <button type="button" class="btn btn-danger" onclick="openCancelModal()" style="background: var(--danger); border-color: var(--danger); color: white;">
+            <i class="bi bi-calendar-x"></i> Cancel Class
+        </button>
         <a href="{% url 'attendance_register' selected_batch.id %}" class="btn btn-secondary">
             <i class="bi bi-grid-3x3"></i> View Monthly Matrix
         </a>
@@ -473,12 +476,52 @@
     </div>
 </div>
 
+<div id="cancelModal" class="modal-backdrop" style="display: none;">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+            <div class="modal-title" style="color: var(--danger);">
+                <i class="bi bi-exclamation-triangle"></i> Cancel Class
+            </div>
+            <button type="button" class="modal-close" onclick="closeCancelModal()"><i class="bi bi-x"></i></button>
+        </div>
+        <form method="post" action="{% url 'batch_cancel_class' %}">
+            {% csrf_token %}
+            <input type="hidden" name="batch_id" value="{{ selected_batch.id }}">
+            <div class="modal-body">
+                <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">
+                    Select the date to cancel the class. All upcoming tasks will be automatically shifted to the next valid working day.
+                </div>
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px;">Date *</label>
+                    <input type="date" name="date" class="form-input" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-surface); color: var(--text-main);" required>
+                </div>
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px;">Reason for Cancellation *</label>
+                    <input type="text" name="reason" class="form-input" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-surface); color: var(--text-main);" required placeholder="e.g. Trainer unavailable, Holiday, etc.">
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 16px 24px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 12px; background: var(--bg-subtle); border-radius: 0 0 var(--radius-lg) var(--radius-lg);">
+                <button type="button" class="btn btn-secondary" onclick="closeCancelModal()">Cancel</button>
+                <button type="submit" class="btn" style="background: var(--danger); color: white; border: none;"><i class="bi bi-calendar-x"></i> Confirm Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
 <script>
     function openRescheduleModal() {
         document.getElementById('rescheduleModal').style.display = 'flex';
     }
     function closeRescheduleModal() {
         document.getElementById('rescheduleModal').style.display = 'none';
+    }
+    
+    function openCancelModal() {
+        document.getElementById('cancelModal').style.display = 'flex';
+    }
+    function closeCancelModal() {
+        document.getElementById('cancelModal').style.display = 'none';
     }
 
     function toggleAllCheckboxes(source) {
