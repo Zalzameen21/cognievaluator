@@ -46,8 +46,15 @@
         </div>
 
         <div>
-            <label class="form-label" style="margin-bottom: 4px; font-size: 11px; text-transform: uppercase;">Attendance Date</label>
-            <input type="date" name="date" value="{{ selected_date }}" {% if min_date %}min="{{ min_date }}"{% endif %} class="form-input" style="width: 170px;" onchange="this.form.submit()">
+            <label class="form-label" style="margin-bottom: 4px; font-size: 11px; text-transform: uppercase;">
+                Attendance Date
+                {% if selected_group %}
+                    <span style="color: var(--primary); font-weight: 600;">(Class Days for Group)</span>
+                {% elif selected_batch %}
+                    <span style="color: var(--primary); font-weight: 600;">({{ selected_batch.short_days_display }})</span>
+                {% endif %}
+            </label>
+            <input type="date" name="date" id="attendanceDatePicker" value="{{ selected_date }}" {% if min_date %}min="{{ min_date }}"{% endif %} {% if max_date %}max="{{ max_date }}"{% endif %} class="form-input" style="width: 175px;">
         </div>
 
         <div style="align-self: flex-end;">
@@ -55,13 +62,6 @@
         </div>
     </form>
 
-    {% if selected_group %}
-    <div style="display: flex; gap: 10px; align-items: center;">
-        <a href="{% url 'attendance_register_group' selected_group.id %}" class="btn btn-secondary">
-            <i class="bi bi-grid-3x3"></i> View Monthly Matrix
-        </a>
-    </div>
-    {% elif selected_batch %}
     <div style="display: flex; gap: 10px; align-items: center;">
         <button type="button" class="btn btn-warning" onclick="openRescheduleModal()">
             <i class="bi bi-calendar2-range"></i> Reschedule Class
@@ -69,11 +69,16 @@
         <button type="button" class="btn btn-danger" onclick="openCancelModal()" style="background: var(--danger); border-color: var(--danger); color: white;">
             <i class="bi bi-calendar-x"></i> Cancel Class
         </button>
+        {% if selected_group %}
+        <a href="{% url 'attendance_register_group' selected_group.id %}" class="btn btn-secondary">
+            <i class="bi bi-grid-3x3"></i> View Monthly Matrix
+        </a>
+        {% elif selected_batch %}
         <a href="{% url 'attendance_register' selected_batch.id %}" class="btn btn-secondary">
             <i class="bi bi-grid-3x3"></i> View Monthly Matrix
         </a>
+        {% endif %}
     </div>
-    {% endif %}
 </div>
 
 <!-- ============================================================================== -->
@@ -434,7 +439,7 @@
 {% endif %}
 
 <!-- Reschedule Class Modal -->
-{% if selected_batch %}
+{% if selected_batch or selected_group %}
 <div id="rescheduleModal" class="modal-backdrop" style="display: none;">
     <div class="modal-content" style="max-width: 500px;">
         <div class="modal-header">
@@ -445,7 +450,11 @@
         </div>
         <form method="post" action="{% url 'batch_reschedule_class' %}">
             {% csrf_token %}
+            {% if selected_group %}
+            <input type="hidden" name="group_id" value="{{ selected_group.id }}">
+            {% else %}
             <input type="hidden" name="batch_id" value="{{ selected_batch.id }}">
+            {% endif %}
             <div class="modal-body">
                 <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">
                     Use this tool to shift a scheduled class day to a new date, or cancel it entirely. This ensures the attendance matrix remains accurate.
@@ -486,7 +495,11 @@
         </div>
         <form method="post" action="{% url 'batch_cancel_class' %}">
             {% csrf_token %}
+            {% if selected_group %}
+            <input type="hidden" name="group_id" value="{{ selected_group.id }}">
+            {% else %}
             <input type="hidden" name="batch_id" value="{{ selected_batch.id }}">
+            {% endif %}
             <div class="modal-body">
                 <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">
                     Select the date to cancel the class. All upcoming tasks will be automatically shifted to the next valid working day.
@@ -590,6 +603,33 @@
         }
     };
 </script>
-{% endif %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const dateInput = document.getElementById('attendanceDatePicker');
+    if (!dateInput) return;
 
+    const validDates = {{ valid_class_dates_json|default:"[]"|safe }};
+    const validDateSet = new Set(validDates);
+    let lastValidDate = dateInput.value;
+
+    dateInput.addEventListener('change', function(e) {
+        const chosenVal = this.value;
+        if (!chosenVal) return;
+
+        if (validDates.length > 0 && !validDateSet.has(chosenVal)) {
+            const batchName = "{% if selected_group %}{{ selected_group.name|escapejs }}{% elif selected_batch %}{{ selected_batch.name|escapejs }}{% else %}this batch{% endif %}";
+            const daysDisplay = "{% if selected_group %}scheduled days for this group{% elif selected_batch %}{{ selected_batch.short_days_display|escapejs }}{% else %}scheduled days{% endif %}";
+            
+            alert(`⚠️ Non-Class Date Selected!\n\n${batchName} does NOT have classes on ${chosenVal}.\nScheduled class days: ${daysDisplay}.\n\nPlease select one of the scheduled class dates.`);
+            
+            // Revert to last valid date
+            this.value = lastValidDate;
+            return;
+        }
+
+        lastValidDate = chosenVal;
+        this.form.submit();
+    });
+});
+</script>
 {% endblock %}

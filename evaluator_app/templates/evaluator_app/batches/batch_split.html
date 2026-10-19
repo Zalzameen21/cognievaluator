@@ -1,0 +1,1067 @@
+{% extends 'evaluator_app/base.html' %}
+
+{% block title %}Split {% if group %}Batch Group: {{ group.name }}{% else %}Batch: {{ batch.name }}{% endif %} - Admin Panel{% endblock %}
+{% block page_title %}Split {% if group %}{{ group.name }}{% else %}{{ batch.name }}{% endif %}{% endblock %}
+
+{% block content %}
+<div class="split-batch-container">
+    <!-- Header banner -->
+    <div class="split-header-card">
+        <div class="header-left">
+            {% if group %}
+            <a href="{% url 'batch_group_list' %}" class="back-link">
+                <i class="bi bi-arrow-left"></i> Back to Merged Batch Groups
+            </a>
+            {% else %}
+            <a href="{% url 'batch_detail' batch.id %}" class="back-link">
+                <i class="bi bi-arrow-left"></i> Back to {{ batch.name }}
+            </a>
+            {% endif %}
+            <div class="title-row">
+                <div class="split-icon-badge">
+                    <i class="bi bi-arrows-split"></i>
+                </div>
+                <div>
+                    <h2>Separate & Create New Batch {% if group %}from Group{% endif %}</h2>
+                    <p class="subtitle">
+                        Move selected students from <strong>{{ entity_name }}</strong> ({{ current_days_display }}) to a new schedule.
+                    </p>
+                </div>
+            </div>
+            <div class="batch-tags">
+                <span class="tag-badge"><i class="bi bi-geo-alt-fill"></i> {{ primary_location.name }}</span>
+                <span class="tag-badge"><i class="bi bi-calendar3"></i> Current Days: {{ current_days_display }}</span>
+                {% if batch %}
+                <span class="tag-badge"><i class="bi bi-clock"></i> {{ batch.timing }}</span>
+                {% endif %}
+                <span class="tag-badge"><i class="bi bi-people-fill"></i> Total Students: {{ students|length }}</span>
+            </div>
+        </div>
+        <div class="header-right-meta">
+            <span class="admin-badge"><i class="bi bi-shield-lock-fill"></i> Admin Authorization</span>
+            <span class="history-pill"><i class="bi bi-shield-check"></i> Previous Attendance & Tasks Preserved</span>
+        </div>
+    </div>
+
+    <form method="POST" id="splitBatchForm" class="split-form">
+        {% csrf_token %}
+
+        <div class="split-layout-grid">
+            <!-- LEFT PANEL: Student Selector -->
+            <div class="split-panel student-selection-panel">
+                <div class="panel-header">
+                    <div>
+                        <h3 class="panel-title"><i class="bi bi-people"></i> Select Students to Move</h3>
+                        <p class="panel-desc">Choose which students will move to the new batch schedule.</p>
+                    </div>
+                    <div class="selection-actions">
+                        <button type="button" class="btn-text-action" id="selectAllBtn">Select All</button>
+                        <span class="divider">•</span>
+                        <button type="button" class="btn-text-action" id="deselectAllBtn">Clear All</button>
+                    </div>
+                </div>
+
+                <!-- Live Transfer Counter Ribbon -->
+                <div class="transfer-summary-ribbon">
+                    <div class="ribbon-metric moved">
+                        <span class="count-badge" id="selectedCount">0</span>
+                        <span class="label">students selected for transfer</span>
+                    </div>
+                    <div class="ribbon-arrow">
+                        <i class="bi bi-arrow-right"></i>
+                    </div>
+                    <div class="ribbon-metric remain">
+                        <span class="count-badge" id="remainingCount">{{ students|length }}</span>
+                        <span class="label">remain in {{ entity_name }}</span>
+                    </div>
+                </div>
+
+                <!-- Search / filter student list -->
+                <div class="student-search-box">
+                    <i class="bi bi-search"></i>
+                    <input type="text" id="studentFilterInput" placeholder="Search by student name or roll number..." class="search-input">
+                </div>
+
+                <!-- Students Card List -->
+                <div class="student-cards-list" id="studentsListContainer">
+                    {% for student in students %}
+                    <label class="student-select-card" id="card_{{ student.id }}">
+                        <div class="student-checkbox-wrap">
+                            <input type="checkbox" name="selected_students" value="{{ student.id }}" class="student-checkbox" id="chk_{{ student.id }}" onchange="handleStudentToggle(this, '{{ student.id }}')">
+                            <span class="custom-checkbox"><i class="bi bi-check-lg"></i></span>
+                        </div>
+                        <div class="student-avatar" style="background-color: {{ student.avatar_color|default:'#6366F1' }};">
+                            {{ student.name|slice:":1"|upper }}
+                        </div>
+                        <div class="student-info">
+                            <div class="student-name">{{ student.name }}</div>
+                            <div class="student-meta">
+                                <span class="roll-code">{{ student.roll_number }}</span>
+                                {% if student.student_class %}
+                                <span class="class-badge">{{ student.student_class }}</span>
+                                {% endif %}
+                                <span class="badge" style="background: rgba(99, 102, 241, 0.08); color: var(--primary); font-size: 11px;">
+                                    {{ student.batch.name }}
+                                </span>
+                                <span class="att-pct"><i class="bi bi-calendar-check"></i> {{ student.attendance_percentage }}% Att.</span>
+                            </div>
+                        </div>
+                        <div class="transfer-status-badge stay" id="badge_{{ student.id }}" data-original-days="{{ student.batch.short_days_display }}">
+                            <span class="status-indicator"></span>
+                            <span class="status-text">Stay {{ student.batch.short_days_display }}</span>
+                        </div>
+                    </label>
+                    {% empty %}
+                    <div class="empty-students-notice">
+                        <i class="bi bi-people"></i>
+                        <p>No active students found in this batch/group to transfer.</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- RIGHT PANEL: Target Batch & Schedule Configuration -->
+            <div class="split-panel target-config-panel">
+                <div class="panel-header">
+                    <div>
+                        <h3 class="panel-title"><i class="bi bi-gear-fill"></i> New Batch Details</h3>
+                        <p class="panel-desc">Configure the new schedule and effective transfer date.</p>
+                    </div>
+                </div>
+
+                <div class="config-sections">
+                    <!-- Transfer Mode Selection -->
+                    <div class="form-group-custom">
+                        <label class="field-label">Transfer Destination Mode</label>
+                        <div class="destination-mode-tabs">
+                            <label class="mode-tab-label active" id="tabNewBatch">
+                                <input type="radio" name="transfer_mode" value="create_new" checked onchange="toggleTransferMode('create_new')">
+                                <i class="bi bi-plus-circle-fill"></i>
+                                <span>Create Brand New Batch</span>
+                            </label>
+                            <label class="mode-tab-label" id="tabExistingBatch">
+                                <input type="radio" name="transfer_mode" value="existing" onchange="toggleTransferMode('existing')">
+                                <i class="bi bi-box-arrow-in-right"></i>
+                                <span>Move to Existing Batch</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Destination: Existing Batch Selection (hidden by default) -->
+                    <div id="existingBatchSection" class="conditional-section" style="display: none;">
+                        <div class="form-group-custom">
+                            <label for="existing_batch_id" class="field-label">Select Existing Target Batch <span class="req">*</span></label>
+                            <select name="existing_batch_id" id="existing_batch_id" class="form-select-custom">
+                                <option value="">-- Choose Existing Active Batch --</option>
+                                {% for b in all_batches %}
+                                <option value="{{ b.id }}">
+                                    {{ b.name }} ({{ b.short_days_display }} • {{ b.location.name }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Destination: Create New Batch Form Fields -->
+                    <div id="newBatchSection" class="conditional-section">
+                        <div class="form-group-custom">
+                            <label for="new_batch_name" class="field-label">New Batch Name <span class="req">*</span></label>
+                            <input type="text" name="new_batch_name" id="new_batch_name" class="form-input-custom" placeholder="e.g. {{ batch.name }} - Monday Group" value="{{ batch.name }} - Monday">
+                        </div>
+
+                        <div class="form-row-2">
+                            <div class="form-group-custom">
+                                <label for="new_batch_code" class="field-label">New Batch Code <span class="req">*</span></label>
+                                <input type="text" name="new_batch_code" id="new_batch_code" class="form-input-custom" placeholder="e.g. {{ suggested_code }}" value="{{ suggested_code }}">
+                            </div>
+                            <div class="form-group-custom">
+                                <label for="location_id" class="field-label">Center Location <span class="req">*</span></label>
+                                <select name="location_id" id="location_id" class="form-select-custom">
+                                    {% for loc in locations %}
+                                    <option value="{{ loc.id }}" {% if loc.id == batch.location.id %}selected{% endif %}>
+                                        {{ loc.name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Class Schedule Days Picker -->
+                        <div class="form-group-custom">
+                            <label class="field-label">Class Schedule Days <span class="req">*</span></label>
+                            <p class="field-helper">Check the days classes will take place for this new batch:</p>
+                            <div class="days-checkbox-grid">
+                                {% for day in all_weekdays %}
+                                <label class="day-chip {% if day == 'Monday' %}active{% endif %}">
+                                    <input type="checkbox" name="class_days" value="{{ day }}" {% if day == 'Monday' %}checked{% endif %} onchange="handleDayToggle(this)">
+                                    <span class="day-text">{{ day }}</span>
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Timing -->
+                        <div class="form-row-2">
+                            <div class="form-group-custom">
+                                <label for="start_time" class="field-label">Start Time</label>
+                                <input type="time" name="start_time" id="start_time" class="form-input-custom" value="{{ batch.start_time|time:'H:i' }}">
+                            </div>
+                            <div class="form-group-custom">
+                                <label for="end_time" class="field-label">End Time</label>
+                                <input type="time" name="end_time" id="end_time" class="form-input-custom" value="{{ batch.end_time|time:'H:i' }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Effective Date & Notes (Applies to both modes) -->
+                    <div class="divider-line"></div>
+
+                    <div class="form-group-custom highlight-box">
+                        <div class="effective-date-header">
+                            <i class="bi bi-calendar-event-fill"></i>
+                            <div>
+                                <label for="effective_date" class="field-label" style="margin-bottom: 2px;">Effective Transfer Date <span class="req">*</span></label>
+                                <div class="field-subtext">Attendance & schedule switch to the new day from this date forward.</div>
+                            </div>
+                        </div>
+                        <input type="date" name="effective_date" id="effective_date" class="form-input-custom" value="{{ today_str }}" required>
+                        <div class="notice-callout">
+                            <i class="bi bi-info-circle-fill"></i>
+                            <span>Prior attendance recorded under <strong>{{ entity_name }}</strong> before this date remains completely intact and will show on student records.</span>
+                        </div>
+                    </div>
+
+                    {% if group %}
+                    <div class="form-group-custom" style="padding: 12px; background: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 8px;">
+                        <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--text-main); cursor: pointer;">
+                            <input type="checkbox" name="create_new_group_also" value="1" checked>
+                            <span>Also bundle into a new Merged Batch Group</span>
+                        </label>
+                        <input type="text" name="new_group_name" class="form-input-custom" style="margin-top: 8px;" placeholder="New Batch Group Name (e.g. {{ entity_name }} - Monday)" value="{{ entity_name }} - Monday">
+                    </div>
+                    {% endif %}
+
+                    <div class="form-group-custom">
+                        <label for="notes" class="field-label">Transfer Audit Notes (Optional)</label>
+                        <textarea name="notes" id="notes" class="form-textarea-custom" rows="2" placeholder="e.g. Separated CSE-A & AD students to Monday schedule due to laboratory availability..."></textarea>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="form-actions-bar">
+                        {% if group %}
+                        <a href="{% url 'batch_group_list' %}" class="btn-cancel">Cancel</a>
+                        {% else %}
+                        <a href="{% url 'batch_detail' batch.id %}" class="btn-cancel">Cancel</a>
+                        {% endif %}
+                        <button type="submit" class="btn-submit-split" id="submitSplitBtn" disabled>
+                            <i class="bi bi-arrows-split"></i> Confirm & Separate Batch
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<style>
+.split-batch-container {
+    max-width: 1380px;
+    margin: 0 auto;
+    padding-bottom: 60px;
+}
+
+.split-header-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    padding: 24px 28px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-decoration: none;
+    margin-bottom: 12px;
+    transition: color 0.15s;
+}
+.back-link:hover {
+    color: var(--primary);
+}
+
+.title-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.split-icon-badge {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(59, 130, 246, 0.2));
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    flex-shrink: 0;
+}
+
+.title-row h2 {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text-main);
+    margin: 0;
+}
+
+.subtitle {
+    margin: 3px 0 0;
+    font-size: 13.5px;
+    color: var(--text-muted);
+}
+
+.batch-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.tag-badge {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: var(--bg-hover);
+    color: var(--text-main);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.header-right-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+.admin-badge {
+    background: rgba(99, 102, 241, 0.12);
+    color: var(--primary);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.history-pill {
+    background: rgba(16, 185, 129, 0.12);
+    color: var(--success);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Two-column layout */
+.split-layout-grid {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 24px;
+    align-items: start;
+}
+
+@media (max-width: 980px) {
+    .split-layout-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.split-panel {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    padding: 24px;
+    box-shadow: var(--shadow-sm);
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border-color);
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.panel-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-main);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.panel-desc {
+    margin: 4px 0 0;
+    font-size: 12.5px;
+    color: var(--text-muted);
+}
+
+.selection-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-text-action {
+    background: none;
+    border: none;
+    color: var(--primary);
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: background 0.15s;
+}
+.btn-text-action:hover {
+    background: var(--bg-hover);
+}
+
+.divider {
+    color: var(--text-muted);
+}
+
+/* Transfer Ribbon */
+.transfer-summary-ribbon {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(59, 130, 246, 0.08));
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+}
+
+.ribbon-metric {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.count-badge {
+    min-width: 28px;
+    height: 28px;
+    padding: 0 8px;
+    border-radius: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 14px;
+}
+
+.ribbon-metric.moved .count-badge {
+    background: var(--primary);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+}
+
+.ribbon-metric.remain .count-badge {
+    background: var(--bg-hover);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+}
+
+.ribbon-metric .label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.ribbon-arrow {
+    color: var(--text-muted);
+    font-size: 18px;
+}
+
+/* Search Box */
+.student-search-box {
+    position: relative;
+    margin-bottom: 14px;
+}
+
+.student-search-box i {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+.search-input {
+    width: 100%;
+    padding: 9px 12px 9px 34px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-hover);
+    color: var(--text-main);
+    font-size: 13px;
+    outline: none;
+    box-sizing: border-box;
+}
+.search-input:focus {
+    border-color: var(--primary);
+    background: var(--bg-surface);
+}
+
+/* Student Cards List */
+.student-cards-list {
+    max-height: 520px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-right: 4px;
+}
+
+.student-select-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1.5px solid var(--border-color);
+    background: var(--bg-surface);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+}
+
+.student-select-card:hover {
+    background: var(--bg-hover);
+    border-color: rgba(99, 102, 241, 0.4);
+}
+
+.student-select-card.selected {
+    background: rgba(99, 102, 241, 0.05);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 1px var(--primary);
+}
+
+.student-checkbox-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.student-checkbox {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    width: 0;
+    height: 0;
+}
+
+.custom-checkbox {
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    border: 1.5px solid var(--border-color);
+    background: var(--bg-hover);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: transparent;
+    font-size: 13px;
+    transition: all 0.15s ease;
+}
+
+.student-checkbox:checked + .custom-checkbox {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+}
+
+.student-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.student-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.student-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.student-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11.5px;
+    color: var(--text-muted);
+    margin-top: 3px;
+    flex-wrap: wrap;
+}
+
+.roll-code {
+    font-family: monospace;
+    font-weight: 600;
+}
+
+.class-badge {
+    background: rgba(99, 102, 241, 0.1);
+    color: var(--primary);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.att-pct {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Transfer status pill on right of each card */
+.transfer-status-badge {
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 11.5px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    transition: all 0.2s;
+}
+
+.status-indicator {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+}
+
+.transfer-status-badge.stay {
+    background: var(--bg-hover);
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
+}
+.transfer-status-badge.stay .status-indicator {
+    background: #9CA3AF;
+}
+
+.transfer-status-badge.move {
+    background: rgba(99, 102, 241, 0.15);
+    color: var(--primary);
+    border: 1px solid rgba(99, 102, 241, 0.35);
+}
+.transfer-status-badge.move .status-indicator {
+    background: var(--primary);
+    box-shadow: 0 0 6px var(--primary);
+}
+
+/* RIGHT PANEL: Form styling */
+.config-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.form-group-custom {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.field-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.field-label .req {
+    color: var(--danger);
+}
+
+.field-helper {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    margin: -2px 0 4px;
+}
+
+.form-input-custom, .form-select-custom, .form-textarea-custom {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-hover);
+    color: var(--text-main);
+    font-size: 13.5px;
+    box-sizing: border-box;
+    outline: none;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.form-input-custom:focus, .form-select-custom:focus, .form-textarea-custom:focus {
+    border-color: var(--primary);
+    background: var(--bg-surface);
+}
+
+.form-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+/* Destination Mode Tabs */
+.destination-mode-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    background: var(--bg-hover);
+    padding: 4px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+}
+
+.mode-tab-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: all 0.15s ease;
+}
+
+.mode-tab-label input[type="radio"] {
+    display: none;
+}
+
+.mode-tab-label.active {
+    background: var(--bg-surface);
+    color: var(--primary);
+    box-shadow: var(--shadow-sm);
+    font-weight: 700;
+}
+
+/* Days Checkbox Grid */
+.days-checkbox-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.day-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-hover);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-main);
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.15s;
+}
+
+.day-chip input[type="checkbox"] {
+    display: none;
+}
+
+.day-chip.active {
+    background: rgba(99, 102, 241, 0.15);
+    border-color: var(--primary);
+    color: var(--primary);
+    font-weight: 700;
+}
+
+/* Highlight Box */
+.highlight-box {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(59, 130, 246, 0.05));
+    border: 1.5px solid rgba(99, 102, 241, 0.3);
+    border-radius: 12px;
+    padding: 14px 16px;
+}
+
+.effective-date-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    color: var(--primary);
+}
+
+.effective-date-header i {
+    font-size: 18px;
+}
+
+.field-subtext {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.notice-callout {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 10px;
+    line-height: 1.4;
+}
+
+.notice-callout i {
+    color: var(--primary);
+    font-size: 14px;
+    margin-top: 1px;
+}
+
+.divider-line {
+    height: 1px;
+    background: var(--border-color);
+    margin: 4px 0;
+}
+
+/* Form Actions */
+.form-actions-bar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.btn-cancel {
+    padding: 10px 18px;
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 13.5px;
+    text-decoration: none;
+    transition: background 0.15s;
+}
+.btn-cancel:hover {
+    background: var(--bg-hover);
+    color: var(--text-main);
+}
+
+.btn-submit-split {
+    padding: 11px 22px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #6366F1, #3B82F6);
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+}
+
+.btn-submit-split:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(99, 102, 241, 0.45);
+}
+
+.btn-submit-split:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+</style>
+
+<script>
+const originalBatchDays = "{{ batch.short_days_display|escapejs }}";
+const totalStudents = {{ students|length }};
+
+function getSelectedCount() {
+    return document.querySelectorAll('.student-checkbox:checked').length;
+}
+
+function getSelectedTargetDays() {
+    const checked = Array.from(document.querySelectorAll('input[name="class_days"]:checked')).map(c => c.value);
+    if (checked.length === 0) return "New Batch";
+    if (checked.length === 1) return checked[0];
+    return checked.map(d => d.slice(0, 3)).join(', ');
+}
+
+function updateRibbonAndBadges() {
+    const count = getSelectedCount();
+    const remain = totalStudents - count;
+    const targetDayName = getSelectedTargetDays();
+
+    // Update ribbon counts
+    document.getElementById('selectedCount').textContent = count;
+    document.getElementById('remainingCount').textContent = remain;
+
+    // Enable/disable submit button
+    const submitBtn = document.getElementById('submitSplitBtn');
+    submitBtn.disabled = (count === 0);
+
+    // Update each student badge
+    document.querySelectorAll('.student-checkbox').forEach(cb => {
+        const studentId = cb.value;
+        const card = document.getElementById('card_' + studentId);
+        const badge = document.getElementById('badge_' + studentId);
+        if (!badge) return;
+
+        const textSpan = badge.querySelector('.status-text');
+
+        if (cb.checked) {
+            card.classList.add('selected');
+            badge.classList.remove('stay');
+            badge.classList.add('move');
+            textSpan.textContent = 'Move to ' + targetDayName;
+        } else {
+            card.classList.remove('selected');
+            badge.classList.remove('move');
+            badge.classList.add('stay');
+            const origDays = badge.getAttribute('data-original-days') || originalBatchDays || 'Schedule';
+            textSpan.textContent = 'Stay ' + origDays;
+        }
+    });
+}
+
+function handleStudentToggle(checkbox, studentId) {
+    updateRibbonAndBadges();
+}
+
+function handleDayToggle(checkbox) {
+    checkbox.closest('.day-chip').classList.toggle('active', checkbox.checked);
+    
+    // Auto-update batch name suggestion if create_new mode
+    const selectedDays = Array.from(document.querySelectorAll('input[name="class_days"]:checked')).map(c => c.value);
+    const dayStr = selectedDays.join(', ') || 'Monday';
+    const nameInput = document.getElementById('new_batch_name');
+    const codeInput = document.getElementById('new_batch_code');
+    
+    if (nameInput && nameInput.value.includes(' - ')) {
+        const baseName = nameInput.value.split(' - ')[0];
+        nameInput.value = baseName + ' - ' + (selectedDays[0] || 'New');
+    }
+    if (codeInput && selectedDays.length > 0) {
+        codeInput.value = "{{ batch.code|escapejs }}-" + selectedDays[0].slice(0, 3).toUpperCase();
+    }
+
+    updateRibbonAndBadges();
+}
+
+function toggleTransferMode(mode) {
+    const tabNew = document.getElementById('tabNewBatch');
+    const tabExt = document.getElementById('tabExistingBatch');
+    const secNew = document.getElementById('newBatchSection');
+    const secExt = document.getElementById('existingBatchSection');
+
+    if (mode === 'create_new') {
+        tabNew.classList.add('active');
+        tabExt.classList.remove('active');
+        secNew.style.display = 'block';
+        secExt.style.display = 'none';
+        document.getElementById('new_batch_name').required = true;
+        document.getElementById('new_batch_code').required = true;
+        document.getElementById('existing_batch_id').required = false;
+    } else {
+        tabExt.classList.add('active');
+        tabNew.classList.remove('active');
+        secNew.style.display = 'none';
+        secExt.style.display = 'block';
+        document.getElementById('new_batch_name').required = false;
+        document.getElementById('new_batch_code').required = false;
+        document.getElementById('existing_batch_id').required = true;
+    }
+}
+
+// Select All / Deselect All
+document.getElementById('selectAllBtn').addEventListener('click', () => {
+    document.querySelectorAll('.student-checkbox').forEach(cb => {
+        // Only check if visible (not filtered out by search)
+        const card = document.getElementById('card_' + cb.value);
+        if (card.style.display !== 'none') {
+            cb.checked = true;
+        }
+    });
+    updateRibbonAndBadges();
+});
+
+document.getElementById('deselectAllBtn').addEventListener('click', () => {
+    document.querySelectorAll('.student-checkbox').forEach(cb => {
+        cb.checked = false;
+    });
+    updateRibbonAndBadges();
+});
+
+// Student search filter
+document.getElementById('studentFilterInput').addEventListener('input', function() {
+    const q = this.value.toLowerCase().trim();
+    document.querySelectorAll('.student-select-card').forEach(card => {
+        const text = card.textContent.toLowerCase();
+        if (text.includes(q)) {
+            card.style.display = 'flex';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+});
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', () => {
+    updateRibbonAndBadges();
+});
+</script>
+{% endblock %}

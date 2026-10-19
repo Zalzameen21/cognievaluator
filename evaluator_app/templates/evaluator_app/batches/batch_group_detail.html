@@ -1,0 +1,545 @@
+{% extends 'evaluator_app/base.html' %}
+
+{% block title %}{{ group.name }} - Merged Batch Group{% endblock %}
+{% block page_title %}{{ group.name }}{% endblock %}
+
+{% block content %}
+<div class="batch-group-detail-container">
+    <!-- Top Header Card -->
+    <div class="group-header-card">
+        <div class="header-left">
+            <a href="{% url 'batch_group_list' %}" class="back-link">
+                <i class="bi bi-arrow-left"></i> Back to Merged Batch Groups
+            </a>
+            <div class="title-row">
+                <div class="group-icon-badge">
+                    <i class="bi bi-collection-fill"></i>
+                </div>
+                <div>
+                    <h2>{{ group.name }}</h2>
+                    <p class="subtitle">
+                        Merged Batch Group combining <strong>{{ batches|length }}</strong> batches.
+                    </p>
+                </div>
+            </div>
+            <!-- Batches Pills -->
+            <div class="batches-pills-row">
+                <span class="pills-label">Included Batches:</span>
+                {% for b in batches %}
+                <a href="{% url 'batch_detail' b.id %}" class="batch-pill-link">
+                    <i class="bi bi-layers-fill"></i> {{ b.name }} ({{ b.short_days_display }})
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="header-actions">
+            <a href="{% url 'attendance_hub' %}?group_id={{ group.id }}" class="btn btn-primary" style="background: linear-gradient(135deg, #06B6D4, #3B82F6);">
+                <i class="bi bi-calendar-check-fill"></i> Mark Attendance
+            </a>
+            <a href="{% url 'task_hub' %}?group_id={{ group.id }}" class="btn btn-secondary" style="background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); font-weight: 600;">
+                <i class="bi bi-list-task"></i> Assigned Tasks ({{ total_group_tasks }})
+            </a>
+            <a href="{% url 'attendance_register_group' group.id %}" class="btn btn-secondary">
+                <i class="bi bi-grid-3x3"></i> Register
+            </a>
+            {% if request.user.profile.is_admin %}
+            <a href="{% url 'batch_group_split' group.id %}" class="btn btn-secondary" style="background: rgba(99, 102, 241, 0.1); color: var(--primary); border: 1px solid rgba(99, 102, 241, 0.3); font-weight: 600;">
+                <i class="bi bi-arrows-split"></i> Split Batch Group
+            </a>
+            <a href="{% url 'batch_group_edit' group.id %}" class="btn btn-secondary">
+                <i class="bi bi-pencil"></i> Edit Group
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- KPIs Row -->
+    <div class="kpi-grid" style="margin-bottom: 24px;">
+        <div class="kpi-card">
+            <div class="kpi-icon-box kpi-icon-primary">
+                <i class="bi bi-people-fill"></i>
+            </div>
+            <div class="kpi-info">
+                <div class="kpi-title">Total Enrolled Students</div>
+                <div class="kpi-value">{{ total_students_count }}</div>
+                <div class="kpi-meta">{{ active_students_count }} active students</div>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon-box" style="background: rgba(16, 185, 129, 0.12); color: var(--success);">
+                <i class="bi bi-collection-play-fill"></i>
+            </div>
+            <div class="kpi-info">
+                <div class="kpi-title">Constituent Batches</div>
+                <div class="kpi-value">{{ batches|length }}</div>
+                <div class="kpi-meta">Merged for unified operations</div>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon-box" style="background: rgba(99, 102, 241, 0.12); color: var(--primary);">
+                <i class="bi bi-list-check"></i>
+            </div>
+            <div class="kpi-info">
+                <div class="kpi-title">Assigned Tasks</div>
+                <div class="kpi-value">{{ total_group_tasks }}</div>
+                <div class="kpi-meta">
+                    <span style="color: var(--success); font-weight: 600;">{{ completed_group_tasks }} completed</span> &bull; 
+                    <span style="color: #F59E0B; font-weight: 600;">{{ pending_group_tasks }} pending</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon-box" style="background: rgba(245, 158, 11, 0.12); color: #F59E0B;">
+                <i class="bi bi-calendar3"></i>
+            </div>
+            <div class="kpi-info">
+                <div class="kpi-title">Class Schedules</div>
+                <div class="kpi-value" style="font-size: 14px; font-weight: 700; margin-top: 4px;">
+                    {% for b in batches %}
+                    <div>{{ b.name }}: {{ b.short_days_display }}</div>
+                    {% empty %}
+                    —
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Students Roster Card -->
+    <div class="card" style="border-radius: var(--radius-xl); border: 1px solid var(--border-color); overflow: hidden;">
+        <div class="card-header" style="padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; background: var(--bg-surface); border-bottom: 1px solid var(--border-color);">
+            <div>
+                <h3 style="font-size: 16px; font-weight: 700; color: var(--text-main); margin: 0; display: flex; align-items: center; gap: 8px;">
+                    <i class="bi bi-person-lines-fill" style="color: var(--primary);"></i> Students Enrolled in this Group
+                    <span class="badge" style="background: var(--bg-hover); color: var(--text-muted); font-size: 12px; font-weight: 600;">
+                        {{ students|length }} Shown
+                    </span>
+                </h3>
+            </div>
+
+            <!-- Filters -->
+            <form method="GET" class="filter-controls-row">
+                <div class="search-wrap">
+                    <i class="bi bi-search"></i>
+                    <input type="text" name="q" value="{{ search_q }}" placeholder="Search student name or roll..." class="form-input-sm">
+                </div>
+
+                <select name="batch_id" onchange="this.form.submit()" class="form-select-sm">
+                    <option value="">-- All Batches --</option>
+                    {% for b in batches %}
+                    <option value="{{ b.id }}" {% if selected_batch_id == b.id|stringformat:"s" %}selected{% endif %}>
+                        {{ b.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+
+                {% if search_q or selected_batch_id %}
+                <a href="{% url 'batch_group_detail' group.id %}" class="btn-clear-filters" title="Clear filters">
+                    <i class="bi bi-x-circle-fill"></i> Clear
+                </a>
+                {% endif %}
+            </form>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" style="font-size: 13.5px;">
+                <thead style="background: var(--bg-tertiary);">
+                    <tr>
+                        <th style="padding: 14px 20px; font-weight: 700; color: var(--text-muted); border-bottom: 2px solid var(--border-color);">STUDENT</th>
+                        <th style="padding: 14px 20px; font-weight: 700; color: var(--text-muted); border-bottom: 2px solid var(--border-color);">BATCH</th>
+                        <th style="padding: 14px 20px; font-weight: 700; color: var(--text-muted); border-bottom: 2px solid var(--border-color);">CLASS / YEAR</th>
+                        <th style="padding: 14px 20px; font-weight: 700; color: var(--text-muted); border-bottom: 2px solid var(--border-color); text-align: center;">ATTENDANCE</th>
+                        <th style="padding: 14px 20px; font-weight: 700; color: var(--text-muted); border-bottom: 2px solid var(--border-color); text-align: center;">STATUS</th>
+                        <th style="padding: 14px 20px; font-weight: 700; color: var(--text-muted); border-bottom: 2px solid var(--border-color); text-align: right;">ACTION</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for student in students %}
+                    <tr style="border-bottom: 1px solid var(--border-color); vertical-align: middle;">
+                        <td style="padding: 14px 20px;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div class="student-avatar-circle" style="background-color: {{ student.avatar_color|default:'#6366F1' }};">
+                                    {{ student.name|slice:":1"|upper }}
+                                </div>
+                                <div>
+                                    <a href="{% url 'student_detail' student.id %}" class="student-link">
+                                        {{ student.name }}
+                                    </a>
+                                    <div class="student-roll-code">{{ student.roll_number }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td style="padding: 14px 20px;">
+                            <span class="badge" style="background: rgba(99, 102, 241, 0.1); color: var(--primary); font-weight: 600; padding: 4px 10px; border-radius: 6px;">
+                                {{ student.batch.name }}
+                            </span>
+                            <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 3px;">
+                                {{ student.batch.short_days_display }}
+                            </div>
+                        </td>
+                        <td style="padding: 14px 20px;">
+                            {% if student.student_class %}
+                                <span style="font-weight: 600; color: var(--text-main);">{{ student.student_class }}</span>
+                            {% else %}
+                                <span style="color: var(--text-muted);">—</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 14px 20px; text-align: center;">
+                            <span style="font-weight: 700; color: {% if student.attendance_percentage < 50 %}var(--danger){% else %}var(--success){% endif %};">
+                                {{ student.attendance_percentage }}%
+                            </span>
+                        </td>
+                        <td style="padding: 14px 20px; text-align: center;">
+                            <span class="badge-status status-present" style="font-size: 11px;">
+                                {{ student.status }}
+                            </span>
+                        </td>
+                        <td style="padding: 14px 20px; text-align: right;">
+                            <a href="{% url 'student_detail' student.id %}" class="btn btn-sm btn-secondary" style="font-weight: 600;">
+                                Profile &rarr;
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 48px 20px; color: var(--text-muted);">
+                            <i class="bi bi-people" style="font-size: 32px; display: block; margin-bottom: 8px; color: var(--border-color);"></i>
+                            No students found matching your criteria in this batch group.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Tasks Assigned for Batch Group Card -->
+    <div class="card" style="border-radius: var(--radius-xl); border: 1px solid var(--border-color); overflow: hidden; margin-top: 24px;">
+        <div class="card-header" style="padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; background: var(--bg-surface); border-bottom: 1px solid var(--border-color);">
+            <div>
+                <h3 style="font-size: 16px; font-weight: 700; color: var(--text-main); margin: 0; display: flex; align-items: center; gap: 8px;">
+                    <i class="bi bi-list-task" style="color: var(--primary);"></i> Tasks Assigned for this Batch Group
+                    <span class="badge" style="background: rgba(99, 102, 241, 0.1); color: var(--primary); font-size: 12px; font-weight: 600;">
+                        {{ total_group_tasks }} Total
+                    </span>
+                </h3>
+                <p style="font-size: 12.5px; color: var(--text-muted); margin: 4px 0 0 0;">
+                    Showing tasks across all constituent batches in this group
+                </p>
+            </div>
+
+            <!-- Task Filter Controls -->
+            <form method="GET" class="filter-controls-row" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                {% if selected_batch_id %}<input type="hidden" name="batch_id" value="{{ selected_batch_id }}">{% endif %}
+                {% if search_q %}<input type="hidden" name="q" value="{{ search_q }}">{% endif %}
+
+                <div class="search-wrap">
+                    <i class="bi bi-search"></i>
+                    <input type="text" name="task_q" value="{{ task_search_q }}" placeholder="Search task, student, roll..." class="form-input-sm">
+                </div>
+
+                <select name="task_status" onchange="this.form.submit()" class="form-select-sm">
+                    <option value="">-- All Statuses --</option>
+                    <option value="PENDING" {% if task_status_filter == 'PENDING' %}selected{% endif %}>Pending</option>
+                    <option value="COMPLETED" {% if task_status_filter == 'COMPLETED' %}selected{% endif %}>Completed</option>
+                    <option value="LATE" {% if task_status_filter == 'LATE' %}selected{% endif %}>Late</option>
+                </select>
+
+                <select name="task_batch" onchange="this.form.submit()" class="form-select-sm">
+                    <option value="">-- All Batches --</option>
+                    {% for b in batches %}
+                    <option value="{{ b.id }}" {% if task_batch_filter == b.id|stringformat:"s" %}selected{% endif %}>
+                        {{ b.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+
+                <a href="{% url 'task_hub' %}?group_id={{ group.id }}" class="btn btn-sm btn-primary" style="height: 32px; display: inline-flex; align-items: center; gap: 5px; font-weight: 600;">
+                    <i class="bi bi-box-arrow-up-right"></i> Open in Task Hub
+                </a>
+
+                {% if task_search_q or task_status_filter or task_batch_filter %}
+                <a href="{% url 'batch_group_detail' group.id %}" class="btn-clear-filters" title="Clear task filters">
+                    <i class="bi bi-x-circle-fill"></i> Clear
+                </a>
+                {% endif %}
+            </form>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" style="font-size: 13.5px;">
+                <thead style="background: var(--bg-tertiary);">
+                    <tr>
+                        <th style="padding: 14px 20px; font-weight: 700; color: var(--text-muted); border-bottom: 2px solid var(--border-color);">TASK</th>
+                        <th style="padding: 14px 20px; font-weight: 700; color: var(--text-muted); border-bottom: 2px solid var(--border-color);">ASSIGNED TO</th>
+                        <th style="padding: 14px 20px; font-weight: 700; color: var(--text-muted); border-bottom: 2px solid var(--border-color);">BATCH</th>
+                        <th style="padding: 14px 20px; font-weight: 700; color: var(--text-muted); border-bottom: 2px solid var(--border-color);">ASSIGNED DATE</th>
+                        <th style="padding: 14px 20px; font-weight: 700; color: var(--text-muted); border-bottom: 2px solid var(--border-color);">DUE DATE</th>
+                        <th style="padding: 14px 20px; font-weight: 700; color: var(--text-muted); border-bottom: 2px solid var(--border-color); text-align: center;">STATUS</th>
+                        <th style="padding: 14px 20px; font-weight: 700; color: var(--text-muted); border-bottom: 2px solid var(--border-color); text-align: right;">ACTION</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in group_tasks %}
+                    <tr style="border-bottom: 1px solid var(--border-color); vertical-align: middle;">
+                        <td style="padding: 14px 20px;">
+                            <div style="font-weight: 600; color: var(--text-main);">{{ task.title }}</div>
+                            {% if task.description %}
+                            <div style="font-size: 12px; color: var(--text-muted); max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                {{ task.description }}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 14px 20px;">
+                            <div style="font-weight: 600;">
+                                <a href="{% url 'student_detail' task.student.id %}" class="student-link">
+                                    {{ task.student.name }}
+                                </a>
+                            </div>
+                            <div style="font-size: 11.5px; color: var(--text-muted);">{{ task.student.roll_number }}</div>
+                        </td>
+                        <td style="padding: 14px 20px;">
+                            <span class="badge" style="background: rgba(99, 102, 241, 0.1); color: var(--primary); font-weight: 600; padding: 4px 10px; border-radius: 6px;">
+                                {{ task.batch.name }}
+                            </span>
+                        </td>
+                        <td style="padding: 14px 20px; color: var(--text-muted);">
+                            {{ task.assigned_date|date:"M d, Y" }}
+                        </td>
+                        <td style="padding: 14px 20px;">
+                            {% if task.due_date %}
+                                <span style="{% if task.status == 'PENDING' and task.is_overdue %}color: var(--danger); font-weight: 600;{% else %}color: var(--text-muted);{% endif %}">
+                                    {{ task.due_date|date:"M d, Y" }}
+                                </span>
+                            {% else %}
+                                <span style="color: var(--text-muted);">—</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 14px 20px; text-align: center;">
+                            {% if task.status == 'COMPLETED' %}
+                                <span class="badge-status status-present" style="font-size: 11px;">Completed</span>
+                            {% elif task.status == 'LATE' %}
+                                <span class="badge-status" style="background: rgba(139, 92, 246, 0.15); color: #8B5CF6; font-size: 11px;">Late</span>
+                            {% elif task.is_overdue %}
+                                <span class="badge-status status-absent" style="font-size: 11px;">Overdue</span>
+                            {% else %}
+                                <span class="badge-status" style="background: rgba(245, 158, 11, 0.15); color: #F59E0B; font-size: 11px;">Pending</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 14px 20px; text-align: right;">
+                            <a href="{% url 'task_hub' %}?group_id={{ group.id }}&q={{ task.student.roll_number }}" class="btn btn-sm btn-secondary" style="font-weight: 600;">
+                                View &rarr;
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" style="text-align: center; padding: 48px 20px; color: var(--text-muted);">
+                            <i class="bi bi-clipboard-check" style="font-size: 32px; display: block; margin-bottom: 8px; color: var(--border-color);"></i>
+                            No tasks assigned for students in this batch group yet.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+.batch-group-detail-container {
+    max-width: 1380px;
+    margin: 0 auto;
+    padding-bottom: 60px;
+}
+
+.group-header-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    padding: 24px 28px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-decoration: none;
+    margin-bottom: 12px;
+}
+.back-link:hover {
+    color: var(--primary);
+}
+
+.title-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.group-icon-badge {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(59, 130, 246, 0.2));
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    flex-shrink: 0;
+}
+
+.title-row h2 {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text-main);
+    margin: 0;
+}
+
+.subtitle {
+    margin: 3px 0 0;
+    font-size: 13.5px;
+    color: var(--text-muted);
+}
+
+.batches-pills-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.pills-label {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+.batch-pill-link {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: var(--bg-hover);
+    color: var(--text-main);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--border-color);
+    transition: all 0.15s;
+}
+.batch-pill-link:hover {
+    background: rgba(99, 102, 241, 0.1);
+    color: var(--primary);
+    border-color: rgba(99, 102, 241, 0.3);
+}
+
+.header-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* Filter controls */
+.filter-controls-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.search-wrap {
+    position: relative;
+}
+.search-wrap i {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 12px;
+}
+.form-input-sm {
+    padding: 7px 12px 7px 30px;
+    font-size: 13px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-hover);
+    color: var(--text-main);
+    outline: none;
+}
+.form-input-sm:focus {
+    border-color: var(--primary);
+}
+
+.form-select-sm {
+    padding: 7px 12px;
+    font-size: 13px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-hover);
+    color: var(--text-main);
+    outline: none;
+}
+
+.btn-clear-filters {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--danger);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Student Row */
+.student-avatar-circle {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    color: #fff;
+    font-weight: 700;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.student-link {
+    font-weight: 700;
+    color: var(--text-main);
+    text-decoration: none;
+}
+.student-link:hover {
+    color: var(--primary);
+}
+
+.student-roll-code {
+    font-size: 11.5px;
+    font-family: monospace;
+    color: var(--text-muted);
+    margin-top: 1px;
+}
+</style>
+{% endblock %}

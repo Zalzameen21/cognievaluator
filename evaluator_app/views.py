@@ -18,7 +18,7 @@ from django.views.decorators.http import require_POST
 from .models import (
     Location, UserProfile, Batch, Student, DailyEvaluation, Attendance, StudentTask,
     Project, ProjectUpdate, BatchScheduleException, generate_batch_student_roll_number,
-    Syllabus, SyllabusTask, BatchSyllabus, BatchTaskSchedule, BatchGroup
+    Syllabus, SyllabusTask, BatchSyllabus, BatchTaskSchedule, BatchGroup, StudentBatchTransfer
 )
 from .forms import (
     BatchForm, StudentForm, DailyEvaluationForm, AttendanceForm,
@@ -324,6 +324,79 @@ def batch_group_delete_view(request, group_id):
     return redirect('batch_group_list')
 
 
+@evaluator_required
+def batch_group_detail_view(request, group_id):
+    """
+    Detailed overview of a Merged Batch Group:
+    - View all constituent batches
+    - View full roster of students across all batches in the group with search/filtering
+    - Links to evaluate, mark attendance, or split the group
+    """
+    user = request.user
+    group = get_object_or_404(BatchGroup, id=group_id)
+    batches = group.batches.all().select_related('location')
+
+    # Security check
+    if not user.is_superuser:
+        has_access = any(can_user_access_batch(user, b) for b in batches)
+        if not has_access:
+            messages.error(request, "Access denied to this batch group.")
+            return redirect('batch_group_list')
+
+    students = group.all_students
+    selected_batch_id = request.GET.get('batch_id')
+    search_q = request.GET.get('q', '').strip()
+
+    if selected_batch_id:
+        students = students.filter(batch_id=selected_batch_id)
+
+    if search_q:
+        students = students.filter(
+            Q(name__icontains=search_q) | Q(roll_number__icontains=search_q) | Q(student_class__icontains=search_q)
+        )
+    # Tasks for this batch group
+    group_tasks_qs = StudentTask.objects.filter(batch__in=batches).select_related('student', 'batch', 'assigned_by').order_by('-assigned_date', '-id')
+    
+    task_search_q = request.GET.get('task_q', '').strip()
+    task_status_filter = request.GET.get('task_status', '').strip()
+    task_batch_filter = request.GET.get('task_batch', '').strip()
+
+    if task_search_q:
+        group_tasks_qs = group_tasks_qs.filter(
+            Q(title__icontains=task_search_q) |
+            Q(student__name__icontains=task_search_q) |
+            Q(student__roll_number__icontains=task_search_q) |
+            Q(description__icontains=task_search_q)
+        )
+    if task_status_filter:
+        group_tasks_qs = group_tasks_qs.filter(status=task_status_filter)
+    if task_batch_filter:
+        group_tasks_qs = group_tasks_qs.filter(batch_id=task_batch_filter)
+
+    total_group_tasks = StudentTask.objects.filter(batch__in=batches).count()
+    pending_group_tasks = StudentTask.objects.filter(batch__in=batches, status='PENDING').count()
+    completed_group_tasks = StudentTask.objects.filter(batch__in=batches, status__in=['COMPLETED', 'LATE']).count()
+
+    context = {
+        'group': group,
+        'batches': batches,
+        'students': students,
+        'total_students_count': group.student_count,
+        'active_students_count': group.active_students_count,
+        'selected_batch_id': selected_batch_id or '',
+        'search_q': search_q,
+        'group_tasks': group_tasks_qs[:50],
+        'total_group_tasks': total_group_tasks,
+        'pending_group_tasks': pending_group_tasks,
+        'completed_group_tasks': completed_group_tasks,
+        'task_search_q': task_search_q,
+        'task_status_filter': task_status_filter,
+        'task_batch_filter': task_batch_filter,
+    }
+    return render(request, 'evaluator_app/batches/batch_group_detail.html', context)
+
+
+
 
 @evaluator_required
 def batch_list_view(request):
@@ -479,6 +552,201 @@ def batch_delete_view(request, batch_id):
     return render(request, 'evaluator_app/batches/batch_confirm_delete.html', {'batch': batch})
 
 
+@admin_required
+def batch_split_view(request, batch_id=None, group_id=None):
+    """
+    Allows administrators to split an existing batch or batch group:
+    - Select which students to move to a new batch (or new batch group / existing target)
+    - Configure new batch schedule/days (e.g. Move from Thursday to Monday)
+    - Specify effective transfer date
+    - Preserves previous attendance records on former batch days
+    - Re-assigns upcoming/pending tasks to the new batch
+    """
+    user = request.user
+    batch = None
+    group = None
+    
+    if group_id:
+        group = get_object_or_404(BatchGroup, id=group_id)
+        constituent_batches = list(group.batches.all())
+        students = list(Student.objects.filter(batch__in=constituent_batches).select_related('batch').order_by('name'))
+        primary_batch = constituent_batches[0] if constituent_batches else None
+    else:
+        batch = get_object_or_404(Batch, id=batch_id)
+        constituent_batches = [batch]
+        students = list(batch.students.all().order_by('name'))
+        primary_batch = batch
+
+    # Locations accessible to admin
+    locations = Location.objects.filter(is_active=True)
+    all_batches = Batch.objects.filter(status='ACTIVE').exclude(id__in=[b.id for b in constituent_batches])
+
+    today = timezone.now().date()
+    today_str = today.strftime('%Y-%m-%d')
+
+    # Display metadata
+    entity_name = group.name if group else batch.name
+    current_days_display = ", ".join(set(d for b in constituent_batches for d in b.days_list)) if constituent_batches else "Scheduled Days"
+    primary_location = primary_batch.location if primary_batch else locations.first()
+
+    if request.method == 'POST':
+        selected_student_ids = request.POST.getlist('selected_students')
+        effective_date_str = request.POST.get('effective_date')
+        transfer_mode = request.POST.get('transfer_mode', 'create_new') # 'create_new' or 'existing'
+        existing_batch_id = request.POST.get('existing_batch_id')
+        create_new_group_also = request.POST.get('create_new_group_also') == '1'
+        notes = request.POST.get('notes', '').strip()
+
+        if not selected_student_ids:
+            messages.error(request, "⚠️ Please select at least one student to transfer.")
+            redirect_url = reverse('batch_group_split', args=[group.id]) if group else reverse('batch_split', args=[batch.id])
+            return redirect(redirect_url)
+
+        try:
+            effective_date = datetime.strptime(effective_date_str, '%Y-%m-%d').date() if effective_date_str else today
+        except ValueError:
+            effective_date = today
+
+        with transaction.atomic():
+            if transfer_mode == 'existing' and existing_batch_id:
+                target_batch = get_object_or_404(Batch, id=existing_batch_id)
+            else:
+                # Create brand new batch
+                new_batch_name = request.POST.get('new_batch_name', '').strip()
+                new_batch_code = request.POST.get('new_batch_code', '').strip()
+                location_id = request.POST.get('location_id')
+                schedule_type = request.POST.get('schedule_type', 'WEEKLY')
+                class_days = request.POST.getlist('class_days')
+                class_days_str = ", ".join(class_days) if class_days else 'Monday'
+                start_time_str = request.POST.get('start_time', '10:00')
+                end_time_str = request.POST.get('end_time', '18:00')
+                description = request.POST.get('description', f"Separated from {entity_name} on {effective_date.strftime('%d %b %Y')}")
+
+                if not new_batch_name or not new_batch_code:
+                    messages.error(request, "⚠️ Please provide a valid Name and Code for the new batch.")
+                    redirect_url = reverse('batch_group_split', args=[group.id]) if group else reverse('batch_split', args=[batch.id])
+                    return redirect(redirect_url)
+
+                if Batch.objects.filter(code__iexact=new_batch_code).exists():
+                    messages.error(request, f"⚠️ Batch code '{new_batch_code}' is already in use. Please enter a unique code.")
+                    redirect_url = reverse('batch_group_split', args=[group.id]) if group else reverse('batch_split', args=[batch.id])
+                    return redirect(redirect_url)
+
+                target_location = Location.objects.filter(id=location_id).first() if location_id else primary_location
+
+                # Parse times
+                try:
+                    s_parts = [int(p) for p in start_time_str.split(':')]
+                    start_time = datetime.time(s_parts[0], s_parts[1])
+                except Exception:
+                    start_time = primary_batch.start_time if primary_batch else datetime.time(10, 0)
+
+                try:
+                    e_parts = [int(p) for p in end_time_str.split(':')]
+                    end_time = datetime.time(e_parts[0], e_parts[1])
+                except Exception:
+                    end_time = primary_batch.end_time if primary_batch else datetime.time(18, 0)
+
+                origin_start_date = primary_batch.start_date if (primary_batch and primary_batch.start_date) else effective_date
+
+                target_batch = Batch.objects.create(
+                    name=new_batch_name,
+                    code=new_batch_code,
+                    location=target_location,
+                    schedule_type=schedule_type,
+                    class_days=class_days_str,
+                    start_time=start_time,
+                    end_time=end_time,
+                    start_date=origin_start_date,
+                    split_date=effective_date,
+                    parent_batch=primary_batch,
+                    status='ACTIVE',
+                    description=description,
+                    created_by=user
+                )
+
+                # If copying from a batch with a syllabus, duplicate syllabus linkage & generate schedule timeline
+                orig_syllabus = BatchSyllabus.objects.filter(batch__in=constituent_batches).first()
+                if orig_syllabus:
+                    new_batch_syllabus = BatchSyllabus.objects.create(
+                        batch=target_batch,
+                        syllabus=orig_syllabus.syllabus,
+                        start_date=effective_date
+                    )
+                    from .services import generate_batch_schedule
+                    generate_batch_schedule(new_batch_syllabus)
+
+                # If this was a BatchGroup split or admin opted to create a group, create a corresponding new BatchGroup
+                if group or create_new_group_also:
+                    new_group_name = request.POST.get('new_group_name', '').strip() or f"{target_batch.name} (Group)"
+                    new_group = BatchGroup.objects.create(
+                        name=new_group_name,
+                        created_by=user
+                    )
+                    new_group.batches.add(target_batch)
+
+            # Move selected students
+            moved_students = Student.objects.filter(id__in=selected_student_ids, batch__in=constituent_batches)
+            transfer_records = []
+            
+            for stu in moved_students:
+                old_batch = stu.batch
+                # Record transfer history
+                transfer_records.append(
+                    StudentBatchTransfer(
+                        student=stu,
+                        from_batch=old_batch,
+                        to_batch=target_batch,
+                        effective_date=effective_date,
+                        notes=notes or f"Split from '{entity_name}' into '{target_batch.name}'",
+                        transferred_by=user
+                    )
+                )
+                
+                # Update student's current batch
+                stu.batch = target_batch
+                stu.save(update_fields=['batch', 'updated_at'])
+
+                # Update future / pending tasks so they belong to the new batch schedule
+                StudentTask.objects.filter(
+                    student=stu,
+                    batch=old_batch,
+                    status='PENDING'
+                ).filter(
+                    Q(due_date__gte=effective_date) | Q(assigned_date__gte=effective_date)
+                ).update(batch=target_batch)
+
+            if transfer_records:
+                StudentBatchTransfer.objects.bulk_create(transfer_records)
+
+        messages.success(
+            request, 
+            f"🎉 Success! Transferred {len(selected_student_ids)} student(s) from '{entity_name}' to '{target_batch.name}' with effective date {effective_date.strftime('%d %b, %Y')}."
+        )
+        return redirect('batch_detail', batch_id=target_batch.id)
+
+    # Days list
+    all_weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    suggested_code = f"{primary_batch.code}-MON" if (primary_batch and primary_batch.code) else "BATCH-NEW"
+
+    context = {
+        'batch': batch,
+        'group': group,
+        'entity_name': entity_name,
+        'current_days_display': current_days_display,
+        'primary_batch': primary_batch,
+        'primary_location': primary_location,
+        'students': students,
+        'locations': locations,
+        'all_batches': all_batches,
+        'today_str': today_str,
+        'all_weekdays': all_weekdays,
+        'suggested_code': suggested_code,
+    }
+    return render(request, 'evaluator_app/batches/batch_split.html', context)
+
+
+
 # ==============================================================================
 # STUDENT MANAGEMENT
 # ==============================================================================
@@ -580,51 +848,75 @@ def student_detail_view(request, student_id):
         
     evaluations = student.evaluations.all()
     
-    # Calculate historical attendance points
+    # Calculate historical attendance points across past and present batches
     history_records = []
-    batch = student.batch
-    if batch and batch.start_date:
-        DAYS_MAP = {
-            'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
-            'friday': 4, 'saturday': 5, 'sunday': 6
-        }
-        class_days_str = batch.class_days.lower()
-        valid_weekdays = [v for k, v in DAYS_MAP.items() if k in class_days_str]
+    today = timezone.now().date()
+    DAYS_MAP = {
+        'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
+        'friday': 4, 'saturday': 5, 'sunday': 6
+    }
+    
+    # Check if student was transferred from previous batch(es)
+    transfers = list(student.batch_transfers.all().select_related('from_batch', 'to_batch').order_by('effective_date'))
+    
+    # Build schedule periods: list of (batch, start_date, end_date)
+    periods = []
+    if transfers:
+        for i, t in enumerate(transfers):
+            prev_batch = t.from_batch
+            p_start = prev_batch.start_date or (t.effective_date - timedelta(days=60))
+            if hasattr(p_start, 'date'):
+                p_start = p_start.date()
+            p_end = t.effective_date - timedelta(days=1)
+            if p_start <= p_end:
+                periods.append((prev_batch, p_start, p_end))
         
-        today = timezone.now().date()
-        check_date = batch.start_date
-        
-        past_dates = []
-        while check_date <= today:
-            if check_date.weekday() in valid_weekdays:
-                past_dates.append(check_date)
-            check_date += timedelta(days=1)
+        # Current active batch period
+        curr_batch = student.batch
+        last_transfer = transfers[-1]
+        c_start = last_transfer.effective_date
+        periods.append((curr_batch, c_start, today))
+    elif student.batch and student.batch.start_date:
+        b_start = student.batch.start_date.date() if hasattr(student.batch.start_date, 'date') else student.batch.start_date
+        periods.append((student.batch, b_start, today))
+
+    past_dates = []
+    for b_item, start_d, end_d in periods:
+        if not b_item or not b_item.class_days:
+            continue
+        c_days_str = b_item.class_days.lower()
+        v_weekdays = [v for k, v in DAYS_MAP.items() if k in c_days_str]
+        curr = start_d
+        batch_sub_dates = []
+        while curr <= min(end_d, today):
+            if curr.weekday() in v_weekdays:
+                batch_sub_dates.append(curr)
+            curr += timedelta(days=1)
             
-        past_dates = sorted(past_dates, reverse=True)[:30] # take last 30 class days
-        
-        # apply class exceptions
-        actual_dates = []
-        exceptions = BatchScheduleException.objects.filter(batch=batch, original_date__in=past_dates)
+        # apply exceptions for this batch
+        exceptions = BatchScheduleException.objects.filter(batch=b_item, original_date__in=batch_sub_dates)
         ex_map = {ex.original_date: ex for ex in exceptions}
-        for d in past_dates:
+        for d in batch_sub_dates:
             ex = ex_map.get(d)
             if ex:
                 if ex.rescheduled_date and ex.rescheduled_date <= today:
-                    actual_dates.append(ex.rescheduled_date)
+                    past_dates.append(ex.rescheduled_date)
             else:
-                actual_dates.append(d)
-                
-        actual_dates = sorted(actual_dates, reverse=True)[:30]
-        
-        existing_att = Attendance.objects.filter(student=student, date__in=actual_dates)
+                past_dates.append(d)
+
+    # Also include any dates where attendance was explicitly recorded for this student
+    recorded_dates = list(Attendance.objects.filter(student=student).values_list('date', flat=True))
+    all_combined_dates = sorted(set(past_dates + recorded_dates), reverse=True)[:30]
+    
+    if all_combined_dates:
+        existing_att = Attendance.objects.filter(student=student, date__in=all_combined_dates)
         att_map = {att.date: att.status for att in existing_att}
-        
-        for d in actual_dates:
+        for d in all_combined_dates:
             status = att_map.get(d, 'Not Marked/Absent')
             if status != 'CANCELLED':
                 history_records.append({'date': d, 'status': status})
     else:
-        # Fallback if no start_date
+        # Fallback
         history_records = [{'date': a.date, 'status': a.status} for a in student.attendance_records.exclude(status='CANCELLED').order_by('-date')[:30]]
 
     # Calculate performance metrics averages
@@ -940,17 +1232,51 @@ def evaluation_hub_view(request):
             or (s['student'].email and q_lower in s['student'].email.lower())
         ]
 
-    from datetime import timedelta
-    prev_date = (selected_date - timedelta(days=1)).strftime('%Y-%m-%d')
-    next_date = (selected_date + timedelta(days=1)).strftime('%Y-%m-%d')
+    # Compute valid class dates for this batch
+    from .services import get_batch_class_dates
+    import json
+    valid_class_dates = get_batch_class_dates(batch=selected_batch) if selected_batch else []
+    valid_class_date_strs = [d.strftime('%Y-%m-%d') for d in valid_class_dates]
+
+    if valid_class_dates and selected_date not in valid_class_dates:
+        prior_dates = [d for d in valid_class_dates if d <= selected_date]
+        if prior_dates:
+            selected_date = max(prior_dates)
+        else:
+            selected_date = valid_class_dates[0]
+
+    # Calculate prev_date and next_date strictly among valid class dates
+    prev_date = None
+    next_date = None
+    if valid_class_dates:
+        if selected_date in valid_class_dates:
+            idx = valid_class_dates.index(selected_date)
+            if idx > 0:
+                prev_date = valid_class_dates[idx - 1].strftime('%Y-%m-%d')
+            if idx < len(valid_class_dates) - 1:
+                next_date = valid_class_dates[idx + 1].strftime('%Y-%m-%d')
+        else:
+            prev_date = valid_class_dates[-1].strftime('%Y-%m-%d')
+
+    if not prev_date and valid_class_dates:
+        prev_date = valid_class_dates[0].strftime('%Y-%m-%d')
+    if not next_date and valid_class_dates:
+        next_date = valid_class_dates[-1].strftime('%Y-%m-%d')
+
     today_str = today.strftime('%Y-%m-%d')
     is_today = (selected_date == today)
+    min_date = valid_class_dates[0].strftime('%Y-%m-%d') if valid_class_dates else None
+    max_date = valid_class_dates[-1].strftime('%Y-%m-%d') if valid_class_dates else None
 
     context = {
         'accessible_batches': accessible_batches,
         'selected_batch': selected_batch,
         'selected_date': selected_date.strftime('%Y-%m-%d'),
         'selected_date_display': selected_date.strftime('%B %d, %Y'),
+        'min_date': min_date,
+        'max_date': max_date,
+        'valid_class_date_strs': valid_class_date_strs,
+        'valid_class_dates_json': json.dumps(valid_class_date_strs),
         'prev_date': prev_date,
         'next_date': next_date,
         'today_str': today_str,
@@ -1327,9 +1653,29 @@ def task_hub_view(request):
     
     tasks_qs = StudentTask.objects.filter(batch__in=accessible_batches).select_related('student', 'batch', 'assigned_by')
     
-    # Filter by Batch
-    batch_id = request.GET.get('batch')
-    if batch_id:
+    # Filter by Batch or Batch Group
+    batch_param = request.GET.get('batch')
+    group_param = request.GET.get('group') or request.GET.get('group_id')
+    selected_group_id = None
+    batch_id = None
+    selected_group = None
+
+    if group_param:
+        selected_group_id = group_param
+    elif batch_param and str(batch_param).startswith('g_'):
+        selected_group_id = str(batch_param)[2:]
+    elif batch_param:
+        batch_id = batch_param
+
+    if selected_group_id:
+        try:
+            selected_group = BatchGroup.objects.get(id=selected_group_id)
+            group_batches = selected_group.batches.all()
+            tasks_qs = tasks_qs.filter(batch__in=group_batches)
+        except BatchGroup.DoesNotExist:
+            selected_group = None
+            selected_group_id = None
+    elif batch_id:
         tasks_qs = tasks_qs.filter(batch_id=batch_id)
         
     # Filter by Status
@@ -1355,7 +1701,19 @@ def task_hub_view(request):
         
     unique_task_titles = tasks_qs.values_list('title', flat=True).distinct().order_by('title')
     
-    if batch_id:
+    if selected_group:
+        group_batches = selected_group.batches.all()
+        start_dates = [b.start_date.date() if hasattr(b.start_date, 'date') else b.start_date for b in group_batches if b.start_date]
+        if start_dates:
+            earliest_start = min(start_dates)
+            num_days = (today - earliest_start).days
+            if num_days >= 0:
+                unique_dates = [today - timedelta(days=x) for x in range(num_days + 1)]
+            else:
+                unique_dates = [today]
+        else:
+            unique_dates = tasks_qs.values_list('assigned_date', flat=True).distinct().order_by('-assigned_date')
+    elif batch_id:
         try:
             batch = Batch.objects.get(id=batch_id)
             if batch.start_date:
@@ -1384,8 +1742,14 @@ def task_hub_view(request):
     if task_title_filter:
         tasks_qs = tasks_qs.filter(title=task_title_filter)
         
-    # Global Task Metrics for Filter Bar
-    all_scoped_tasks = StudentTask.objects.filter(batch__in=accessible_batches)
+    # Task Metrics for Filter Bar (scoped to selected group / batch if chosen)
+    if selected_group:
+        all_scoped_tasks = StudentTask.objects.filter(batch__in=selected_group.batches.all())
+    elif batch_id:
+        all_scoped_tasks = StudentTask.objects.filter(batch_id=batch_id)
+    else:
+        all_scoped_tasks = StudentTask.objects.filter(batch__in=accessible_batches)
+
     total_count = all_scoped_tasks.count()
     pending_count = all_scoped_tasks.filter(status='PENDING').count()
     completed_count = all_scoped_tasks.filter(status='COMPLETED').count()
@@ -1403,11 +1767,16 @@ def task_hub_view(request):
 
     quick_task_form = QuickTaskAssignForm(user=user)
 
+    selected_batch_val = f"g_{selected_group_id}" if selected_group_id else (str(batch_id) if batch_id else "")
+
     context = {
         'tasks': tasks_qs,
         'accessible_batches': accessible_batches,
         'accessible_groups': accessible_groups,
-        'selected_batch': batch_id,
+        'selected_batch': selected_batch_val,
+        'selected_batch_id': batch_id,
+        'selected_group': selected_group,
+        'selected_group_id': selected_group_id,
         'selected_status': status_filter or 'ALL',
         'search_query': search_q or '',
         'selected_date': date_filter or '',
@@ -2015,38 +2384,92 @@ def evaluation_history_view(request):
 def batch_reschedule_class_view(request):
     if request.method == 'POST':
         batch_id = request.POST.get('batch_id')
+        group_id = request.POST.get('group_id')
         original_date_str = request.POST.get('original_date')
         rescheduled_date_str = request.POST.get('rescheduled_date')
         reason = request.POST.get('reason', '')
-        
+        confirm_combine = request.POST.get('confirm_combine') # 'yes', 'no_standalone', or None
+
         try:
-            batch = Batch.objects.get(id=batch_id)
+            target_batches = []
+            selected_group = None
+            if group_id:
+                selected_group = BatchGroup.objects.get(id=group_id)
+                target_batches = list(selected_group.batches.all())
+            elif batch_id:
+                target_batches = [Batch.objects.get(id=batch_id)]
+
+            if not target_batches:
+                messages.error(request, "Batch or Group not found.")
+                return redirect('attendance_hub')
+
             orig_date = datetime.strptime(original_date_str, '%Y-%m-%d').date()
             resched_date = datetime.strptime(rescheduled_date_str, '%Y-%m-%d').date() if rescheduled_date_str else None
-            
-            # Check if exception already exists for this original date
-            exc, created = BatchScheduleException.objects.get_or_create(
-                batch=batch, 
-                original_date=orig_date,
-                defaults={
-                    'rescheduled_date': resched_date,
-                    'reason': reason,
-                    'created_by': request.user
-                }
-            )
-            
-            if not created:
-                exc.rescheduled_date = resched_date
-                exc.reason = reason
-                exc.created_by = request.user
-                exc.save()
+
+            # If single batch moving to a new makeup date, check if another batch already has class on that day
+            if len(target_batches) == 1 and resched_date and not confirm_combine:
+                batch = target_batches[0]
+                target_day_name = resched_date.strftime('%A')
+                conflicting_batches = [
+                    b for b in Batch.objects.filter(location=batch.location, status='ACTIVE').exclude(id=batch.id)
+                    if target_day_name in b.days_list
+                ]
+
+                if conflicting_batches:
+                    conflict_names = ", ".join([b.name for b in conflicting_batches])
+                    return render(request, 'evaluator_app/attendance/reschedule_conflict_modal.html', {
+                        'batch': batch,
+                        'original_date_str': original_date_str,
+                        'rescheduled_date_str': rescheduled_date_str,
+                        'resched_date': resched_date,
+                        'target_day_name': target_day_name,
+                        'reason': reason,
+                        'conflicting_batches': conflicting_batches,
+                        'conflict_names': conflict_names,
+                    })
+
+            # Check if user confirmed combining into a BatchGroup
+            if len(target_batches) == 1 and resched_date and confirm_combine == 'yes':
+                batch = target_batches[0]
+                group_name = request.POST.get('combined_group_name', '').strip()
+                selected_combine_batch_ids = request.POST.getlist('combine_batch_ids')
+                
+                target_day_name = resched_date.strftime('%A')
+                if not group_name:
+                    group_name = f"{target_day_name} Combined ({batch.name})"
+
+                new_group = BatchGroup.objects.create(name=group_name, created_by=request.user)
+                new_group.batches.add(batch)
+                for cb_id in selected_combine_batch_ids:
+                    try:
+                        new_group.batches.add(Batch.objects.get(id=cb_id))
+                    except Batch.DoesNotExist:
+                        pass
+                messages.info(request, f"🤝 Created new Merged Batch Group '{group_name}' combining classes on {resched_date.strftime('%d %b, %Y')}.")
+
+            # Apply exception to all target batches
+            for b in target_batches:
+                exc, created = BatchScheduleException.objects.get_or_create(
+                    batch=b, 
+                    original_date=orig_date,
+                    defaults={
+                        'rescheduled_date': resched_date,
+                        'reason': reason,
+                        'created_by': request.user
+                    }
+                )
+                if not created:
+                    exc.rescheduled_date = resched_date
+                    exc.reason = reason
+                    exc.created_by = request.user
+                    exc.save()
                 
             messages.success(request, f"Class on {orig_date} successfully rescheduled.")
         except Exception as e:
             messages.error(request, f"Failed to reschedule class: {str(e)}")
             
-        # Redirect back to attendance hub at the original date so they can see the banner
-        return redirect(f"/attendance/?batch_id={batch_id}&date={original_date_str}")
+        redirect_param = f"group_id={group_id}" if group_id else f"batch_id={batch_id}"
+        return redirect(f"/attendance/?{redirect_param}&date={original_date_str}")
     return redirect('attendance_hub')
 
 @evaluator_required
@@ -2104,42 +2527,35 @@ def attendance_hub_view(request):
         else:
             selected_batch = accessible_batches.first()
 
+    # Compute all valid class dates for this batch/group
+    from .services import get_batch_class_dates
+    valid_class_dates = get_batch_class_dates(batch=selected_batch, group=selected_group)
+    valid_class_date_strs = [d.strftime('%Y-%m-%d') for d in valid_class_dates]
+
+    # Snap selected_date to valid class dates if this batch/group has scheduled class dates
+    if valid_class_dates:
+        if selected_date not in valid_class_dates:
+            # Find the closest valid class date on or before selected_date; if none, take the first valid date
+            prior_dates = [d for d in valid_class_dates if d <= selected_date]
+            if prior_dates:
+                selected_date = max(prior_dates)
+            else:
+                selected_date = valid_class_dates[0]
+
     # Check if attendance is already recorded for this batch & date
     is_already_marked = False
-    is_class_day = True
+    is_class_day = selected_date in valid_class_dates if valid_class_dates else True
     selected_date_day_name = selected_date.strftime('%A')
     reschedule_exception = None
     makeup_exception = None
     
     if selected_group:
         # For a merged group, we check if attendance is marked for ANY batch in the group.
-        # Ideally, it's marked for all.
         is_already_marked = Attendance.objects.filter(batch__in=selected_group.batches.all(), date=selected_date).exists()
-        
-        # Check if today is a scheduled class day for the group (if any batch has it)
-        is_class_day = False
-        for b in selected_group.batches.all():
-            if b.days_list and selected_date_day_name in b.days_list:
-                is_class_day = True
-                break
-                
-        # For simplicity, exceptions aren't fully aggregated for groups, we just rely on is_class_day
     elif selected_batch:
         is_already_marked = Attendance.objects.filter(batch=selected_batch, date=selected_date).exists()
-        
-        # Check if today is a scheduled class day
-        if selected_batch.days_list:
-            is_class_day = selected_date_day_name in selected_batch.days_list
-            
-        # Check if this regular class day was cancelled/rescheduled
         reschedule_exception = BatchScheduleException.objects.filter(batch=selected_batch, original_date=selected_date).first()
-        if reschedule_exception:
-            is_class_day = False
-            
-        # Check if today is a makeup class for another cancelled day
         makeup_exception = BatchScheduleException.objects.filter(batch=selected_batch, rescheduled_date=selected_date).first()
-        if makeup_exception:
-            is_class_day = True
 
     can_edit_attendance = (is_admin or not is_already_marked) and is_class_day
 
@@ -2161,17 +2577,29 @@ def attendance_hub_view(request):
         for key, value in request.POST.items():
             if key.startswith('status_'):
                 student_id = key.replace('status_', '')
-                if selected_group:
-                    student = get_object_or_404(Student, id=student_id, batch__in=selected_group.batches.all())
-                else:
-                    student = get_object_or_404(Student, id=student_id, batch=selected_batch)
+                student = get_object_or_404(Student, id=student_id)
+                # Verify student is accessible
+                if not can_user_access_batch(user, student.batch) and not user.is_superuser:
+                    continue
                 remarks = request.POST.get(f'remarks_{student_id}', '')
                 
+                # Determine which batch the student belonged to on selected_date
+                assigned_batch = student.batch
+                if selected_batch:
+                    # If this attendance is marked under selected_batch, use selected_batch
+                    assigned_batch = selected_batch
+                elif selected_group:
+                    # Find which batch in group
+                    for b in selected_group.batches.all():
+                        if student in b.students.all():
+                            assigned_batch = b
+                            break
+
                 Attendance.objects.update_or_create(
                     student=student,
                     date=selected_date,
                     defaults={
-                        'batch': student.batch,
+                        'batch': assigned_batch,
                         'status': value,
                         'remarks': remarks,
                         'marked_by': user
@@ -2191,11 +2619,52 @@ def attendance_hub_view(request):
             redirect_url += f"&batch_id={selected_batch.id}"
         return redirect(redirect_url)
 
+    # Resolve students dynamically for selected_date taking batch transfers into account
+    def get_batch_students_on_date(b, on_date):
+        if not b:
+            return []
+        current_students = list(b.students.filter(status='ACTIVE'))
+        
+        # 1. Include students who were transferred OUT of this batch on effective_date > on_date
+        transferred_out = Student.objects.filter(
+            batch_transfers__from_batch=b,
+            batch_transfers__effective_date__gt=on_date,
+            status='ACTIVE'
+        ).distinct()
+        for s in transferred_out:
+            if s not in current_students:
+                current_students.append(s)
+                
+        # 2. Exclude students who transferred INTO this batch on effective_date > on_date
+        active_on_date = []
+        for s in current_students:
+            transfer_in = s.batch_transfers.filter(to_batch=b).order_by('-effective_date').first()
+            if transfer_in and transfer_in.effective_date > on_date:
+                continue
+            active_on_date.append(s)
+            
+        active_on_date.sort(key=lambda x: x.roll_number)
+        return active_on_date
+
     students_data = []
     if selected_group:
-        students = Student.objects.filter(batch__in=selected_group.batches.all()).select_related('batch')
+        group_students = []
+        for b in selected_group.batches.all():
+            group_students.extend(get_batch_students_on_date(b, selected_date))
+        # Unique students sorted by roll number
+        seen_ids = set()
+        students = []
+        for s in group_students:
+            if s.id not in seen_ids:
+                seen_ids.add(s.id)
+                students.append(s)
+        students.sort(key=lambda x: x.roll_number)
+
         att_dict = {
-            att.student_id: att for att in Attendance.objects.filter(batch__in=selected_group.batches.all(), date=selected_date)
+            att.student_id: att for att in Attendance.objects.filter(
+                date=selected_date,
+                student__in=students
+            )
         }
         for stu in students:
             rec = att_dict.get(stu.id)
@@ -2211,9 +2680,12 @@ def attendance_hub_view(request):
                 'is_low_attendance': is_low_att,
             })
     elif selected_batch:
-        students = selected_batch.students.all()
+        students = get_batch_students_on_date(selected_batch, selected_date)
         att_dict = {
-            att.student_id: att for att in Attendance.objects.filter(batch=selected_batch, date=selected_date)
+            att.student_id: att for att in Attendance.objects.filter(
+                date=selected_date,
+                student__in=students
+            )
         }
         for stu in students:
             rec = att_dict.get(stu.id)
@@ -2256,17 +2728,16 @@ def attendance_hub_view(request):
                 })
     low_attendance_students.sort(key=lambda x: x['attendance_pct'])
     
-    # Calculate min_date for the date picker based on batch/group start_date
-    min_date = None
-    if selected_group:
-        group_start_dates = [b.start_date for b in selected_group.batches.all() if b.start_date]
-        if group_start_dates:
-            min_date = min(group_start_dates)
-    elif selected_batch and selected_batch.start_date:
-        min_date = selected_batch.start_date
+    # Calculate min_date and max_date for the date picker
+    import json
+    min_date = valid_class_dates[0] if valid_class_dates else None
+    max_date = valid_class_dates[-1] if valid_class_dates else None
 
     context = {
         'min_date': min_date.strftime('%Y-%m-%d') if min_date else None,
+        'max_date': max_date.strftime('%Y-%m-%d') if max_date else None,
+        'valid_class_date_strs': valid_class_date_strs,
+        'valid_class_dates_json': json.dumps(valid_class_date_strs),
         'accessible_batches': accessible_batches,
         'accessible_groups': accessible_groups,
         'selected_batch': selected_batch,
@@ -2335,27 +2806,64 @@ def attendance_register_view(request, batch_id=None, group_id=None):
         earliest_start = earliest_start.date()
         
     dates = []
-    current_date = earliest_start
     
     # Pre-fetch exceptions for performance
     cancelled_dates = set(e.original_date for e in exceptions)
     makeup_dates = set(e.rescheduled_date for e in exceptions if e.rescheduled_date)
-    
-    # Generate all active class days from start date to today
-    while current_date <= today:
-        is_regular = (not batch_days or current_date.strftime('%A') in batch_days)
-        is_cancelled = current_date in cancelled_dates
-        is_makeup = current_date in makeup_dates
-        
-        if is_regular or is_makeup:
-            dates.append(current_date)
+
+    # If this batch was split from a parent batch, combine pre-split dates with post-split dates
+    if not group and batch and batch.parent_batch and batch.split_date:
+        parent = batch.parent_batch
+        p_start = parent.start_date.date() if hasattr(parent.start_date, 'date') else parent.start_date
+        p_split = batch.split_date.date() if hasattr(batch.split_date, 'date') else batch.split_date
+        p_days = parent.days_list
+        p_exceptions = list(BatchScheduleException.objects.filter(batch=parent))
+        p_cancelled = set(e.original_date for e in p_exceptions)
+        p_makeup = set(e.rescheduled_date for e in p_exceptions if e.rescheduled_date)
+
+        curr_p = p_start
+        p_end = min(p_split - timedelta(days=1), today)
+        while curr_p <= p_end:
+            if (not p_days or curr_p.strftime('%A') in p_days) or curr_p in p_makeup:
+                if curr_p not in p_cancelled:
+                    dates.append(curr_p)
+            curr_p += timedelta(days=1)
+
+        # Post-split dates
+        c_start = p_split
+        c_curr = c_start
+        while c_curr <= today:
+            is_regular = (not batch_days or c_curr.strftime('%A') in batch_days)
+            is_cancelled = c_curr in cancelled_dates
+            is_makeup = c_curr in makeup_dates
+            if (is_regular and not is_cancelled) or is_makeup:
+                dates.append(c_curr)
+            c_curr += timedelta(days=1)
+    else:
+        # Standard schedule generation from start date to today
+        current_date = earliest_start
+        while current_date <= today:
+            is_regular = (not batch_days or current_date.strftime('%A') in batch_days)
+            is_cancelled = current_date in cancelled_dates
+            is_makeup = current_date in makeup_dates
             
-        current_date += timedelta(days=1)
-    # Pre-fetch attendance records for these dates
+            if (is_regular and not is_cancelled) or is_makeup:
+                dates.append(current_date)
+                
+            current_date += timedelta(days=1)
+
+    # Pre-fetch attendance records for these dates across current and parent batches
     if group:
         attendance_records = Attendance.objects.filter(batch__in=group.batches.all(), date__in=dates)
     else:
-        attendance_records = Attendance.objects.filter(batch=batch, date__in=dates)
+        relevant_batches = [batch]
+        if batch.parent_batch:
+            relevant_batches.append(batch.parent_batch)
+        attendance_records = Attendance.objects.filter(
+            batch__in=relevant_batches, 
+            student__in=students, 
+            date__in=dates
+        ).exclude(status='CANCELLED')
         
     att_map = {(a.student_id, a.date): a.status for a in attendance_records}
     
@@ -2464,19 +2972,42 @@ def student_attendance_pdf_view(request, student_id, is_college_format=False):
         }
 
     # 2. Check scheduled batch class dates to capture any session not explicitly recorded
-    batch = student.batch
-    if batch and batch.start_date:
-        DAYS_MAP = {
-            'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
-            'friday': 4, 'saturday': 5, 'sunday': 6
-        }
-        class_days_str = (batch.class_days or '').lower()
-        valid_weekdays = [v for k, v in DAYS_MAP.items() if k in class_days_str]
-        today = timezone.now().date()
-        
-        check_date = batch.start_date
-        end_date = today
-        
+    # Respect transfer timeline so student is only checked for their actual batch on each date
+    DAYS_MAP = {
+        'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
+        'friday': 4, 'saturday': 5, 'sunday': 6
+    }
+    today = timezone.now().date()
+    transfers = list(student.batch_transfers.all().select_related('from_batch', 'to_batch').order_by('effective_date'))
+
+    periods = []
+    if transfers:
+        for i, t in enumerate(transfers):
+            prev_batch = t.from_batch
+            p_start = prev_batch.start_date or (t.effective_date - timedelta(days=60))
+            if hasattr(p_start, 'date'):
+                p_start = p_start.date()
+            p_end = t.effective_date - timedelta(days=1)
+            if p_start <= p_end:
+                periods.append((prev_batch, p_start, p_end))
+
+        curr_batch = student.batch
+        last_transfer = transfers[-1]
+        c_start = last_transfer.effective_date
+        periods.append((curr_batch, c_start, today))
+    elif student.batch and student.batch.start_date:
+        b_start = student.batch.start_date.date() if hasattr(student.batch.start_date, 'date') else student.batch.start_date
+        periods.append((student.batch, b_start, today))
+
+    for b_item, p_start_date, p_end_date in periods:
+        if not b_item or not b_item.class_days:
+            continue
+        c_days_str = b_item.class_days.lower()
+        v_weekdays = [v for k, v in DAYS_MAP.items() if k in c_days_str]
+
+        check_date = p_start_date
+        end_date = min(p_end_date, today)
+
         if y and m:
             import calendar
             _, last_day = calendar.monthrange(y, m)
@@ -2486,23 +3017,22 @@ def student_attendance_pdf_view(request, student_id, is_college_format=False):
                 check_date = start_of_month
             if end_of_month < end_date:
                 end_date = end_of_month
-                
-        exceptions = {ex.original_date: ex for ex in BatchScheduleException.objects.filter(batch=batch)}
-        
+
+        exceptions = {ex.original_date: ex for ex in BatchScheduleException.objects.filter(batch=b_item)}
+
         curr = check_date
         while curr <= end_date:
             ex = exceptions.get(curr)
-            is_class_day = curr.weekday() in valid_weekdays
-            
+            is_class_day = curr.weekday() in v_weekdays
+
             if is_class_day:
                 if ex and ex.rescheduled_date and ex.rescheduled_date <= today:
                     target_date = ex.rescheduled_date
                 elif ex and not ex.rescheduled_date:
-                    # Class was permanently cancelled without makeup - omit completely
                     target_date = None
                 else:
                     target_date = curr
-                    
+
                 if target_date and target_date not in records_dict:
                     if (not y or not m) or (target_date.year == y and target_date.month == m):
                         records_dict[target_date] = {
@@ -2580,13 +3110,22 @@ def export_student_attendance_csv_view(request, student_id):
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Student Attendance"
-    ws.append([
-        'Batch Name', 'Start Date', 'Roll Number', 'Student Name', 
-        'Date', 'Day', 'Status', 'Remarks'
-    ])
+
+    has_split = bool(student.batch and (student.batch.split_date or student.batch.parent_batch))
+    if has_split:
+        ws.append([
+            'Batch Name', 'Start Date', 'Separated Date', 'Roll Number', 'Student Name', 
+            'Date', 'Day', 'Status', 'Remarks'
+        ])
+    else:
+        ws.append([
+            'Batch Name', 'Start Date', 'Roll Number', 'Student Name', 
+            'Date', 'Day', 'Status', 'Remarks'
+        ])
 
     batch_name = student.batch.name
     start_date = student.batch.start_date.strftime('%d-%b-%Y') if student.batch.start_date else 'N/A'
+    split_date_str = student.batch.split_date.strftime('%d-%b-%Y') if (student.batch and student.batch.split_date) else 'N/A'
     roll_no = student.roll_number
     stu_name = student.name
     month = request.GET.get('month', '').strip()
@@ -2601,16 +3140,29 @@ def export_student_attendance_csv_view(request, student_id):
             pass
             
     for record in attendance_records:
-        ws.append([
-            batch_name,
-            start_date,
-            roll_no,
-            stu_name,
-            record.date.strftime('%d %b %Y'),
-            record.date.strftime('%A'),
-            record.get_status_display(),
-            record.remarks or ''
-        ])
+        if has_split:
+            ws.append([
+                batch_name,
+                start_date,
+                split_date_str,
+                roll_no,
+                stu_name,
+                record.date.strftime('%d %b %Y'),
+                record.date.strftime('%A'),
+                record.get_status_display(),
+                record.remarks or ''
+            ])
+        else:
+            ws.append([
+                batch_name,
+                start_date,
+                roll_no,
+                stu_name,
+                record.date.strftime('%d %b %Y'),
+                record.date.strftime('%A'),
+                record.get_status_display(),
+                record.remarks or ''
+            ])
 
     for col in ws.columns:
         ws.column_dimensions[get_column_letter(col[0].column)].width = 16
@@ -2631,9 +3183,32 @@ def export_batch_attendance_csv_view(request, batch_id):
 
     month_str = request.GET.get('month', '').strip()
     year_str = request.GET.get('year')
-    
-    attendance_qs = Attendance.objects.filter(batch=batch)
-    
+    students = batch.students.all().order_by('roll_number')
+
+    # If this batch was split from a parent batch, or students transferred in,
+    # pull attendance across both parent batch and current batch for enrolled students
+    parent_batches = [batch.parent_batch] if batch.parent_batch else []
+    for s in students:
+        for tr in s.batch_transfers.all():
+            if tr.from_batch and tr.from_batch not in parent_batches:
+                parent_batches.append(tr.from_batch)
+
+    relevant_batch_ids = [batch.id] + [pb.id for pb in parent_batches if pb]
+    attendance_qs = Attendance.objects.filter(
+        student__in=students,
+        batch_id__in=relevant_batch_ids
+    ).exclude(status='CANCELLED')
+
+    # Filter out post-transfer records from old batches if any
+    filtered_ids = []
+    for att in attendance_qs:
+        transfer = att.student.batch_transfers.filter(to_batch=batch).order_by('-effective_date').first()
+        if transfer and att.batch_id != batch.id and att.date >= transfer.effective_date:
+            continue
+        filtered_ids.append(att.id)
+
+    attendance_qs = Attendance.objects.filter(id__in=filtered_ids)
+
     if '-' in month_str:
         # Format YYYY-MM
         try:
@@ -2669,21 +3244,35 @@ def export_batch_attendance_csv_view(request, batch_id):
     ws.title = "Batch Attendance"
     
     # Header row
-    header = ['Batch Name', 'Start Date', 'Roll Number', 'Student Name'] + [d.strftime('%d-%b-%Y') for d in dates]
+    has_split = bool(batch.split_date or batch.parent_batch)
+    if has_split:
+        header = ['Batch Name', 'Start Date', 'Separated Date', 'Roll Number', 'Student Name'] + [d.strftime('%d-%b-%Y') for d in dates]
+    else:
+        header = ['Batch Name', 'Start Date', 'Roll Number', 'Student Name'] + [d.strftime('%d-%b-%Y') for d in dates]
     ws.append(header)
 
-    students = batch.students.all().order_by('roll_number')
-    
     # Pre-fetch attendance mapped by student and date
     att_map = {(a.student_id, a.date): a.get_status_display() for a in attendance_qs}
 
+    start_date_str = batch.start_date.strftime('%d-%b-%Y') if batch.start_date else 'N/A'
+    split_date_str = batch.split_date.strftime('%d-%b-%Y') if batch.split_date else 'N/A'
+
     for stu in students:
-        row = [
-            batch.name, 
-            batch.start_date.strftime('%d-%b-%Y') if batch.start_date else 'N/A',
-            stu.roll_number, 
-            stu.name
-        ]
+        if has_split:
+            row = [
+                batch.name,
+                start_date_str,
+                split_date_str,
+                stu.roll_number,
+                stu.name
+            ]
+        else:
+            row = [
+                batch.name,
+                start_date_str,
+                stu.roll_number,
+                stu.name
+            ]
         for d in dates:
             row.append(att_map.get((stu.id, d), '-'))
         ws.append(row)
@@ -4157,38 +4746,56 @@ def reports_hub_view(request):
 def batch_cancel_class_view(request):
     if request.method == 'POST':
         batch_id = request.POST.get('batch_id')
+        group_id = request.POST.get('group_id')
         date_str = request.POST.get('date')
         reason = request.POST.get('reason')
         
-        batch = get_object_or_404(Batch, id=batch_id)
-        if not can_user_access_batch(request.user, batch):
-            messages.error(request, "Access denied.")
+        target_batches = []
+        selected_group = None
+        if group_id:
+            selected_group = get_object_or_404(BatchGroup, id=group_id)
+            target_batches = list(selected_group.batches.all())
+        elif batch_id:
+            target_batches = [get_object_or_404(Batch, id=batch_id)]
+
+        if not target_batches:
+            messages.error(request, "Batch or Group not found.")
             return redirect('attendance_hub')
+
+        for b in target_batches:
+            if not can_user_access_batch(request.user, b) and not request.user.is_superuser:
+                messages.error(request, f"Access denied for {b.name}.")
+                return redirect('attendance_hub')
             
         try:
             cancel_date = datetime.strptime(date_str, '%Y-%m-%d').date()
         except ValueError:
             messages.error(request, "Invalid date format.")
-            return redirect('attendance_register', batch_id=batch.id)
+            if group_id:
+                return redirect('attendance_register_group', group_id=group_id)
+            return redirect('attendance_register', batch_id=target_batches[0].id)
             
-        # Check if attendance is already explicitly marked
+        # Check if attendance is already explicitly marked in any of the batches
         existing_marked = Attendance.objects.filter(
-            batch=batch,
+            batch__in=target_batches,
             date=cancel_date,
             marked_by__isnull=False
         ).exclude(status='CANCELLED').exists()
         
         if existing_marked:
             messages.error(request, f"Cannot cancel class on {cancel_date.strftime('%d/%m/%Y')} because attendance has already been marked by an admin/evaluator.")
-            return redirect('attendance_register', batch_id=batch.id)
+            if group_id:
+                return redirect('attendance_register_group', group_id=group_id)
+            return redirect('attendance_register', batch_id=target_batches[0].id)
             
         with transaction.atomic():
-            # Create exception
-            exc, exc_created = BatchScheduleException.objects.get_or_create(
-                batch=batch,
-                original_date=cancel_date,
-                defaults={'reason': reason, 'created_by': request.user}
-            )
+            for batch in target_batches:
+                # Create exception
+                exc, exc_created = BatchScheduleException.objects.get_or_create(
+                    batch=batch,
+                    original_date=cancel_date,
+                    defaults={'reason': reason, 'created_by': request.user}
+                )
             
             if not exc_created:
                 # If it already exists, just update reason and attendance, but DO NOT cascade tasks again
@@ -4280,6 +4887,8 @@ def batch_cancel_class_view(request):
             )
                     
         messages.success(request, f"Class on {cancel_date.strftime('%d/%m/%Y')} cancelled successfully. Upcoming tasks have been shifted.")
-        return redirect('attendance_register', batch_id=batch.id)
+        if group_id:
+            return redirect('attendance_register_group', group_id=group_id)
+        return redirect('attendance_register', batch_id=target_batches[0].id)
         
     return redirect('attendance_hub')

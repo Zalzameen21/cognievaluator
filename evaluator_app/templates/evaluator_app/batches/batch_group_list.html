@@ -46,23 +46,33 @@
                     {% for group in groups %}
                     <tr style="border-bottom: 1px solid var(--border-color); transition: background-color 0.2s;">
                         <td style="padding: 16px 20px;">
-                            <div style="font-weight: 600; color: var(--text-main);">{{ group.name }}</div>
+                            <a href="{% url 'batch_group_detail' group.id %}" style="font-weight: 700; color: var(--text-main); text-decoration: none; font-size: 15px;" class="group-name-link">
+                                {{ group.name }} <i class="bi bi-arrow-right-short text-primary"></i>
+                            </a>
                             <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Created by: {{ group.created_by.get_full_name|default:group.created_by.username }}</div>
                         </td>
                         <td style="padding: 16px 20px;">
                             <div style="display: flex; flex-wrap: wrap; gap: 6px;">
                                 {% for b in group.batches.all %}
-                                <span class="badge" style="background: rgba(79, 70, 229, 0.1); color: var(--primary); font-size: 12px; font-weight: 600; padding: 4px 8px; border-radius: 6px;">
+                                <a href="{% url 'batch_detail' b.id %}" class="badge" style="background: rgba(79, 70, 229, 0.1); color: var(--primary); font-size: 12px; font-weight: 600; padding: 4px 8px; border-radius: 6px; text-decoration: none;">
                                     {{ b.name }}
-                                </span>
+                                </a>
                                 {% endfor %}
                             </div>
                         </td>
                         <td style="padding: 16px 20px; text-align: center;">
-                            <span style="font-weight: 700; color: var(--text-main);">{{ group.student_count }}</span>
+                            <a href="{% url 'batch_group_detail' group.id %}" class="badge" style="background: var(--bg-hover); color: var(--text-main); border: 1px solid var(--border-color); font-weight: 700; font-size: 13px; padding: 6px 12px; border-radius: 20px; text-decoration: none;" title="Click to view students">
+                                <i class="bi bi-people-fill text-primary me-1"></i> {{ group.student_count }} Students
+                            </a>
                         </td>
-                        {% if request.user.profile.is_admin %}
                         <td style="padding: 16px 20px; text-align: right;">
+                            <a href="{% url 'batch_group_detail' group.id %}" class="btn btn-sm btn-light" style="padding: 5px 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; border-radius: 8px;" title="View Group Students">
+                                <i class="bi bi-people"></i> View Students
+                            </a>
+                            {% if request.user.profile.is_admin %}
+                            <a href="{% url 'batch_group_split' group.id %}" class="btn btn-sm btn-light" style="width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; color: var(--primary); background: rgba(99, 102, 241, 0.1);" title="Split Batch Group">
+                                <i class="bi bi-arrows-split"></i>
+                            </a>
                             <a href="{% url 'batch_group_edit' group.id %}" class="btn btn-sm btn-light" style="width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px;" title="Edit">
                                 <i class="bi bi-pencil" style="color: var(--text-muted);"></i>
                             </a>
@@ -72,8 +82,8 @@
                                     <i class="bi bi-trash text-danger"></i>
                                 </button>
                             </form>
+                            {% endif %}
                         </td>
-                        {% endif %}
                     </tr>
                     {% empty %}
                     <tr>

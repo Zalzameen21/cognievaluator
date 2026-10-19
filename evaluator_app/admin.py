@@ -1,5 +1,9 @@
 from django.contrib import admin
-from .models import Location, UserProfile, Batch, Student, Attendance, DailyEvaluation, StudentTask, Project, ProjectUpdate, Syllabus, SyllabusTask, BatchSyllabus, BatchTaskSchedule
+from .models import (
+    Location, UserProfile, Batch, Student, Attendance, DailyEvaluation, 
+    StudentTask, Project, ProjectUpdate, Syllabus, SyllabusTask, 
+    BatchSyllabus, BatchTaskSchedule, StudentBatchTransfer
+)
 
 @admin.register(Location)
 class LocationAdmin(admin.ModelAdmin):
@@ -16,6 +20,12 @@ class BatchAdmin(admin.ModelAdmin):
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
     list_display = ['name', 'roll_number', 'batch', 'status', 'join_date']
+
+@admin.register(StudentBatchTransfer)
+class StudentBatchTransferAdmin(admin.ModelAdmin):
+    list_display = ['student', 'from_batch', 'to_batch', 'effective_date', 'transferred_by', 'created_at']
+    list_filter = ['effective_date', 'from_batch', 'to_batch']
+    search_fields = ['student__name', 'student__roll_number', 'from_batch__name', 'to_batch__name']
 
 @admin.register(Attendance)
 class AttendanceAdmin(admin.ModelAdmin):

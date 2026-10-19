@@ -28,9 +28,11 @@
         <button type="button" class="btn btn-secondary" onclick="openExportModal()">
             <i class="bi bi-download"></i> Export Attendance
         </button>
+        {% endif %}
         <button type="button" class="btn btn-danger" onclick="openCancelModal()" style="background: var(--danger); border-color: var(--danger); color: white;">
             <i class="bi bi-calendar-x"></i> Cancel Class
         </button>
+        {% if not group %}
         <a href="{% url 'batch_detail' batch.id %}" class="btn btn-secondary">
             <i class="bi bi-arrow-left"></i> Batch Details
         </a>
@@ -124,6 +126,7 @@
 </div>
 
 <!-- Export Attendance Modal -->
+{% if batch %}
 <div id="exportModal" class="modal-backdrop" style="display: none;">
     <div class="modal-content" style="max-width: 400px;">
         <div class="modal-header">
@@ -171,6 +174,7 @@
         </form>
     </div>
 </div>
+{% endif %}
 
 <div id="cancelModal" class="modal-backdrop" style="display: none;">
     <div class="modal-content" style="max-width: 400px;">
@@ -182,7 +186,11 @@
         </div>
         <form method="post" action="{% url 'batch_cancel_class' %}">
             {% csrf_token %}
+            {% if group %}
+            <input type="hidden" name="group_id" value="{{ group.id }}">
+            {% else %}
             <input type="hidden" name="batch_id" value="{{ batch.id }}">
+            {% endif %}
             <div class="modal-body">
                 <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">
                     Select the date to cancel the class. All upcoming tasks will be automatically shifted to the next valid working day.

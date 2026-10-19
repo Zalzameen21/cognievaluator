@@ -18,6 +18,7 @@ urlpatterns = [
     path('batches/create/', views.batch_create_view, name='batch_create'),
     path('batches/<int:batch_id>/', views.batch_detail_view, name='batch_detail'),
     path('batches/<int:batch_id>/edit/', views.batch_edit_view, name='batch_edit'),
+    path('batches/<int:batch_id>/split/', views.batch_split_view, name='batch_split'),
     path('batches/<int:batch_id>/delete/', views.batch_delete_view, name='batch_delete'),
     path('batches/<int:batch_id>/export/', views.export_batch_csv_view, name='batch_export_csv'),
     path('batches/<int:batch_id>/export-attendance/', views.export_batch_attendance_csv_view, name='export_batch_attendance'),
@@ -27,7 +28,9 @@ urlpatterns = [
     # Batch Groups (Merged Batches)
     path('batch-groups/', views.batch_group_list_view, name='batch_group_list'),
     path('batch-groups/create/', views.batch_group_create_view, name='batch_group_create'),
+    path('batch-groups/<int:group_id>/', views.batch_group_detail_view, name='batch_group_detail'),
     path('batch-groups/<int:group_id>/edit/', views.batch_group_edit_view, name='batch_group_edit'),
+    path('batch-groups/<int:group_id>/split/', views.batch_split_view, name='batch_group_split'),
     path('batch-groups/<int:group_id>/delete/', views.batch_group_delete_view, name='batch_group_delete'),
 
     # Students

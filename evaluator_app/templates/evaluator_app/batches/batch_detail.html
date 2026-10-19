@@ -55,6 +55,9 @@
             <i class="bi bi-pencil"></i>
         </a>
         {% if is_admin_user %}
+        <a href="{% url 'batch_split' batch.id %}" class="btn btn-secondary" style="background: rgba(99, 102, 241, 0.1); color: var(--primary); border: 1px solid rgba(99, 102, 241, 0.3); font-weight: 600;" title="Separate / Split Batch">
+            <i class="bi bi-arrows-split"></i> Split Batch
+        </a>
         <a href="{% url 'batch_delete' batch.id %}" class="btn btn-secondary" style="color: var(--danger); background: var(--danger-light); border-color: transparent;" title="Delete Batch">
             <i class="bi bi-trash-fill"></i>
         </a>

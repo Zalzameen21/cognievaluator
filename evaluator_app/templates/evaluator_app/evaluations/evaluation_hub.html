@@ -663,7 +663,7 @@
                     <button type="button" class="date-nav-btn" onclick="stepDate('{{ prev_date }}')" title="Previous Day">
                         <i class="bi bi-chevron-left"></i>
                     </button>
-                    <input type="date" name="date" id="evalDateInput" value="{{ selected_date }}" class="eval-date-input" onchange="this.form.submit()">
+                    <input type="date" name="date" id="evalDateInput" value="{{ selected_date }}" {% if min_date %}min="{{ min_date }}"{% endif %} {% if max_date %}max="{{ max_date }}"{% endif %} class="eval-date-input">
                     <button type="button" class="date-nav-btn" onclick="stepDate('{{ next_date }}')" title="Next Day">
                         <i class="bi bi-chevron-right"></i>
                     </button>
@@ -1077,15 +1077,42 @@
 
 <!-- Evaluation Hub Interactive Script -->
 <script>
+const validEvalDates = {{ valid_class_dates_json|default:"[]"|safe }};
+const validEvalDateSet = new Set(validEvalDates);
+
 function stepDate(targetDate) {
     const dateInput = document.getElementById('evalDateInput');
     if (dateInput && targetDate) {
+        if (validEvalDates.length > 0 && !validEvalDateSet.has(targetDate)) {
+            // Find nearest valid date
+            const prior = validEvalDates.filter(d => d <= targetDate);
+            if (prior.length > 0) targetDate = prior[prior.length - 1];
+            else targetDate = validEvalDates[0];
+        }
         dateInput.value = targetDate;
         document.getElementById('evalFilterForm').submit();
     }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    const dateInput = document.getElementById('evalDateInput');
+    if (dateInput) {
+        let lastValidDate = dateInput.value;
+        dateInput.addEventListener('change', function() {
+            const chosenVal = this.value;
+            if (!chosenVal) return;
+
+            if (validEvalDates.length > 0 && !validEvalDateSet.has(chosenVal)) {
+                const batchName = "{{ selected_batch.name|escapejs|default:'this batch' }}";
+                const daysDisplay = "{{ selected_batch.short_days_display|escapejs|default:'scheduled days' }}";
+                alert(`⚠️ Non-Class Date Selected!\n\n${batchName} does NOT have classes on ${chosenVal}.\nScheduled class days: ${daysDisplay}.\n\nPlease select one of the scheduled class dates.`);
+                this.value = lastValidDate;
+                return;
+            }
+            lastValidDate = chosenVal;
+            document.getElementById('evalFilterForm').submit();
+        });
+    }
     // 1. View Switcher Logic (Table vs Cards)
     const btnTable = document.getElementById('btnTableView');
     const btnCard = document.getElementById('btnCardView');

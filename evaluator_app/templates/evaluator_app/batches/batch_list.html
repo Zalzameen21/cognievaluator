@@ -234,6 +234,9 @@
                                     <i class="bi bi-pencil-fill"></i>
                                 </a>
                                 {% if is_admin_user %}
+                                <a href="{% url 'batch_split' batch.id %}" class="btn-action-icon" style="color: var(--primary); background: rgba(99, 102, 241, 0.1);" title="Split Batch / Move Students">
+                                    <i class="bi bi-arrows-split"></i>
+                                </a>
                                 <a href="{% url 'batch_delete' batch.id %}" class="btn-action-icon" style="color: var(--danger); background: var(--danger-light);" title="Delete Batch">
                                     <i class="bi bi-trash-fill"></i>
                                 </a>
@@ -310,6 +313,9 @@
                     <i class="bi bi-calendar-check-fill"></i>
                 </a>
                 {% if is_admin_user %}
+                <a href="{% url 'batch_split' batch.id %}" class="btn btn-secondary btn-sm" style="padding: 6px 12px; color: var(--primary); background: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.2);" title="Split Batch">
+                    <i class="bi bi-arrows-split"></i>
+                </a>
                 <a href="{% url 'batch_delete' batch.id %}" class="btn btn-secondary btn-sm" style="padding: 6px 12px; color: var(--danger); background: var(--danger-light); border-color: transparent;" title="Delete Batch">
                     <i class="bi bi-trash-fill"></i>
                 </a>

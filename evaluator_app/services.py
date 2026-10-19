@@ -35,11 +35,21 @@ def generate_batch_schedule(batch_syllabus):
     if not tasks:
         return
 
-    # Delete existing NON-rescheduled schedules from start_date onwards to regenerate cleanly
+    # If this batch was split from a parent batch, exclude tasks already covered in parent before split_date
+    if batch.parent_batch and batch.split_date:
+        covered_task_ids = set(BatchTaskSchedule.objects.filter(
+            batch=batch.parent_batch,
+            date__lt=batch.split_date,
+            syllabus_task__isnull=False
+        ).values_list('syllabus_task_id', flat=True))
+        remaining_tasks = [t for t in tasks if t.id not in covered_task_ids]
+        if remaining_tasks:
+            tasks = remaining_tasks
+
+    # Delete existing NON-rescheduled schedules to regenerate cleanly
     BatchTaskSchedule.objects.filter(
         batch=batch,
-        is_rescheduled=False,
-        date__gte=start_date
+        is_rescheduled=False
     ).delete()
 
     # Build the list of actual upcoming class dates (one per session)
@@ -193,21 +203,108 @@ def auto_mark_absent_for_past_days(user_batches=None):
                         actual_date = None
                         
                 if actual_date and actual_date < today:
-                    existing_student_ids = set(Attendance.objects.filter(batch=batch, date=actual_date).values_list('student_id', flat=True))
+                    # If this actual_date is a rescheduled makeup date, verify original date didn't already have records
+                    existing_student_ids = set(Attendance.objects.filter(student__in=students, date=actual_date).values_list('student_id', flat=True))
                     
-                    missing_students = [s for s in students if s.id not in existing_student_ids]
+                    # Also respect student batch transfer effective date
+                    # A student is only eligible for this batch on actual_date if:
+                    # 1) join_date <= actual_date
+                    # 2) Not transferred into this batch on a date AFTER actual_date
+                    # 3) If transferred from another batch, transfer effective_date <= actual_date
+                    eligible_students = []
+                    for s in students:
+                        # If student enrolled after actual_date, skip
+                        if s.join_date and s.join_date > actual_date:
+                            continue
+                        
+                        # If student was transferred into this batch, they only have classes from effective_date onwards
+                        transfer_in = s.batch_transfers.filter(to_batch=batch).order_by('-effective_date').first()
+                        if transfer_in and transfer_in.effective_date > actual_date:
+                            continue
+
+                        eligible_students.append(s)
+
+                    missing_students = [s for s in eligible_students if s.id not in existing_student_ids]
                     
                     if missing_students:
-                        Attendance.objects.bulk_create([
-                            Attendance(
+                        for student in missing_students:
+                            Attendance.objects.get_or_create(
                                 student=student,
-                                batch=batch,
                                 date=actual_date,
-                                status='ABSENT',
-                                remarks='Auto-marked absent (End of day)'
-                            ) for student in missing_students
-                        ])
+                                defaults={
+                                    'batch': batch,
+                                    'status': 'ABSENT',
+                                    'remarks': 'Auto-marked absent (End of day)'
+                                }
+                            )
             
-            check_date += datetime.timedelta(days=1)
+def get_batch_class_dates(batch=None, group=None, start_limit=None, end_limit=None):
+    """
+    Returns a sorted list of datetime.date objects representing all valid class dates
+    for a given Batch or BatchGroup.
+    
+    Rules:
+    1. Weekly scheduled days from batch.days_list (or union of days for group).
+    2. Bounds: From batch start_date (or group's earliest start_date) up to end_limit (defaults to today + 30 days).
+    3. Excludes: original_date of BatchScheduleException (cancelled or shifted class days).
+    4. Includes: rescheduled_date of BatchScheduleException (makeup class days).
+    """
+    from .models import BatchScheduleException
+    today = timezone.now().date()
+    
+    DAYS_MAP = {
+        'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
+        'friday': 4, 'saturday': 5, 'sunday': 6
+    }
+    
+    batches = []
+    if group:
+        batches = list(group.batches.all())
+    elif batch:
+        batches = [batch]
+        
+    if not batches:
+        return []
+        
+    # Determine valid weekdays across batches
+    valid_weekdays = set()
+    start_dates = []
+    for b in batches:
+        if b.start_date:
+            s_date = b.start_date.date() if hasattr(b.start_date, 'date') else b.start_date
+            start_dates.append(s_date)
+        if b.class_days:
+            c_str = b.class_days.lower()
+            for day_name, w_idx in DAYS_MAP.items():
+                if day_name in c_str:
+                    valid_weekdays.add(w_idx)
+                    
+    if not valid_weekdays:
+        return []
+        
+    earliest_start = min(start_dates) if start_dates else (today - datetime.timedelta(days=90))
+    if start_limit and start_limit > earliest_start:
+        earliest_start = start_limit
+        
+    latest_end = end_limit if end_limit else (today + datetime.timedelta(days=60))
+    
+    # Gather exceptions across all batches
+    exceptions = BatchScheduleException.objects.filter(batch__in=batches)
+    cancelled_dates = set(e.original_date for e in exceptions if e.original_date)
+    makeup_dates = set(e.rescheduled_date for e in exceptions if e.rescheduled_date)
+    
+    class_dates = set()
+    curr = earliest_start
+    while curr <= latest_end:
+        if curr.weekday() in valid_weekdays and curr not in cancelled_dates:
+            class_dates.add(curr)
+        curr += datetime.timedelta(days=1)
+        
+    # Add makeup dates that fall within bounds
+    for md in makeup_dates:
+        if earliest_start <= md <= latest_end:
+            class_dates.add(md)
+            
+    return sorted(list(class_dates))
 
 

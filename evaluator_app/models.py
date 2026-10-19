@@ -102,6 +102,8 @@ class Batch(models.Model):
     end_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ACTIVE')
     description = models.TextField(blank=True)
+    parent_batch = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='child_batches', help_text="Original batch if created via split")
+    split_date = models.DateField(null=True, blank=True, help_text="Date when this batch was separated from parent batch")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -193,6 +195,16 @@ class BatchGroup(models.Model):
     @property
     def student_count(self):
         return sum(b.student_count for b in self.batches.all())
+
+    @property
+    def active_students_count(self):
+        return sum(b.active_students_count for b in self.batches.all())
+
+    @property
+    def all_students(self):
+        from .models import Student
+        return Student.objects.filter(batch__in=self.batches.all()).select_related('batch', 'batch__location').order_by('name')
+
 
 
 class BatchScheduleException(models.Model):
@@ -359,6 +371,24 @@ class Student(models.Model):
     @property
     def active_projects_count(self):
         return self.projects.filter(status__in=['IN_PROGRESS', 'PLANNING', 'UNDER_REVIEW']).count()
+
+
+class StudentBatchTransfer(models.Model):
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='batch_transfers')
+    from_batch = models.ForeignKey(Batch, on_delete=models.CASCADE, related_name='transfers_out')
+    to_batch = models.ForeignKey(Batch, on_delete=models.CASCADE, related_name='transfers_in')
+    effective_date = models.DateField(default=timezone.now, help_text="Date from which the transfer is effective")
+    notes = models.TextField(blank=True, help_text="Reason or batch split details")
+    transferred_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='initiated_transfers')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-effective_date', '-created_at']
+        verbose_name = 'Student Batch Transfer'
+        verbose_name_plural = 'Student Batch Transfers'
+
+    def __str__(self):
+        return f"{self.student.name}: {self.from_batch.name} -> {self.to_batch.name} ({self.effective_date})"
 
 
 class Attendance(models.Model):

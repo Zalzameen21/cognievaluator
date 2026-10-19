@@ -122,10 +122,23 @@
             </div>
 
             <select name="batch" class="form-select" style="height: 36px; font-size: 13px; width: auto;" onchange="this.form.submit()">
-                <option value="">All Batches</option>
-                {% for b in accessible_batches %}
-                    <option value="{{ b.id }}" {% if selected_batch == b.id|stringformat:"s" %}selected{% endif %}>{{ b.name }} ({{ b.location.code }})</option>
-                {% endfor %}
+                <option value="">All Batches & Groups</option>
+                {% if accessible_groups %}
+                <optgroup label="Merged Batch Groups">
+                    {% for g in accessible_groups %}
+                        <option value="g_{{ g.id }}" {% if selected_batch == 'g_'|add:g.id|stringformat:"s" or selected_group_id == g.id|stringformat:"s" %}selected{% endif %}>
+                            ★ {{ g.name }} ({{ g.batches.count }} batches)
+                        </option>
+                    {% endfor %}
+                </optgroup>
+                {% endif %}
+                <optgroup label="Individual Batches">
+                    {% for b in accessible_batches %}
+                        <option value="{{ b.id }}" {% if selected_batch == b.id|stringformat:"s" %}selected{% endif %}>
+                            {{ b.name }} ({{ b.location.code }})
+                        </option>
+                    {% endfor %}
+                </optgroup>
             </select>
             
             <select name="date" class="form-select" style="height: 36px; font-size: 13px; width: auto;" onchange="this.form.submit()">
