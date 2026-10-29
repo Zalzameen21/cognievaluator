@@ -166,11 +166,12 @@ class Batch(models.Model):
 
     @property
     def attendance_percentage(self):
-        total = self.attendance_records.count()
-        if not total:
+        # Exclude EXCUSED and CANCELLED sessions from denominator so excused reasons (e.g. college exams) do not penalize students
+        effective_sessions = self.attendance_records.exclude(status__in=['EXCUSED', 'CANCELLED']).count()
+        if not effective_sessions:
             return 0.0
         present_count = self.attendance_records.filter(status__in=['PRESENT', 'LATE']).count()
-        return round((present_count / total) * 100, 1)
+        return round((present_count / effective_sessions) * 100, 1)
 
 
 class BatchGroup(models.Model):
@@ -271,6 +272,7 @@ def generate_batch_student_roll_number(batch):
 class Student(models.Model):
     STATUS_CHOICES = [
         ('ACTIVE', 'Active'),
+        ('DISCONTINUED', 'Discontinued'),
         ('INACTIVE', 'Inactive'),
         ('COMPLETED', 'Completed'),
         ('DROPPED', 'Dropped'),
@@ -284,6 +286,7 @@ class Student(models.Model):
     avatar_color = models.CharField(max_length=20, default='#6366F1')
     join_date = models.DateField(default=timezone.now)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ACTIVE')
+    discontinued_date = models.DateField(null=True, blank=True, help_text="Date from which the student discontinued the batch")
     payment_status = models.CharField(max_length=20, choices=[('PAID', 'Paid'), ('UNPAID', 'Unpaid')], default='UNPAID')
     student_class = models.CharField(max_length=100, blank=True, null=True, verbose_name="Class")
     academic_year = models.CharField(max_length=20, blank=True, null=True, verbose_name="Year")
@@ -330,11 +333,12 @@ class Student(models.Model):
 
     @property
     def attendance_percentage(self):
-        total = self.attendance_records.count()
-        if not total:
+        # Exclude EXCUSED and CANCELLED sessions from denominator so excused reasons (e.g. college exams) do not penalize students
+        effective_sessions = self.attendance_records.exclude(status__in=['EXCUSED', 'CANCELLED']).count()
+        if not effective_sessions:
             return 0.0
         present = self.attendance_records.filter(status__in=['PRESENT', 'LATE']).count()
-        return round((present / total) * 100, 1)
+        return round((present / effective_sessions) * 100, 1)
 
     @property
     def total_evaluations_count(self):

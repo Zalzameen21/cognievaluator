@@ -310,10 +310,17 @@
 
                 <!-- Batch Tasks -->
                 <button class="download-btn batch-btn" data-type="batch_tasks" disabled>
-                    <div class="btn-icon"><i class="bi bi-list-task"></i></div>
-                    <div class="btn-title">Task Workflow</div>
-                    <div class="btn-desc">All assignments & deliverables</div>
+                    <div class="btn-icon" style="color: #10B981;"><i class="bi bi-file-earmark-excel-fill"></i></div>
+                    <div class="btn-title">Batch Tasks (.xlsx)</div>
+                    <div class="btn-desc">Individual batch task sheet</div>
                 </button>
+
+                <!-- Master Day-Wise Tasks (All Batches) -->
+                <a href="{% url 'export_all_batches_tasks_excel' %}" class="download-btn" style="text-decoration: none; border-color: rgba(16, 185, 129, 0.4); background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.04));">
+                    <div class="btn-icon" style="color: #059669;"><i class="bi bi-calendar2-week-fill"></i></div>
+                    <div class="btn-title" style="color: #065F46;">Master Tasks (All Batches)</div>
+                    <div class="btn-desc">Multi-sheet Excel (Mon, Tue, Wed...)</div>
+                </a>
             </div>
         </div>
     </div>

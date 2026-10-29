@@ -392,14 +392,18 @@
                                     <input type="radio" name="status_{{ item.student.id }}" value="ABSENT" {% if item.status == 'ABSENT' %}checked{% endif %} {% if not can_edit_attendance %}disabled{% endif %} style="display: none;">
                                     Absent
                                 </label>
-                                <label class="att-radio-btn {% if item.status == 'EXCUSED' %}active excused{% endif %} {% if not can_edit_attendance %}disabled{% endif %}" {% if not can_edit_attendance %}style="opacity: 0.8; cursor: not-allowed;"{% endif %}>
+                                <label class="att-radio-btn {% if item.status == 'EXCUSED' %}active excused{% endif %} {% if not can_edit_attendance %}disabled{% endif %}" {% if can_edit_attendance %}onclick="if(!this.querySelector('input').checked && !this.closest('.att-student-row').querySelector('input[name=\'remarks_{{ item.student.id }}\']').value) { openExcusedModal('{{ item.student.id }}'); }"{% else %}style="opacity: 0.8; cursor: not-allowed;"{% endif %}>
                                     <input type="radio" name="status_{{ item.student.id }}" value="EXCUSED" {% if item.status == 'EXCUSED' %}checked{% endif %} {% if not can_edit_attendance %}disabled{% endif %} style="display: none;">
                                     Excused
                                 </label>
                             </div>
                         </td>
                         <td>
-                            <input type="text" name="remarks_{{ item.student.id }}" value="{{ item.remarks }}" class="form-input" style="padding: 6px 10px; font-size: 13px;" placeholder="Optional reason/notes..." {% if not can_edit_attendance %}disabled readonly style="background: var(--bg-subtle); cursor: not-allowed;"{% endif %}>
+                            {% if item.status == 'PRESENT' %}
+                            <input type="text" name="remarks_{{ item.student.id }}" value="" class="form-input" style="padding: 6px 10px; font-size: 13px; background: var(--bg-subtle); opacity: 0.6; cursor: not-allowed;" placeholder="— Present (No remarks) —" disabled>
+                            {% else %}
+                            <input type="text" name="remarks_{{ item.student.id }}" value="{{ item.remarks }}" class="form-input" style="padding: 6px 10px; font-size: 13px;" placeholder="{% if item.status == 'EXCUSED' %}Reason (e.g. Exam in College)...{% else %}Optional reason/notes...{% endif %}" {% if not can_edit_attendance %}disabled readonly style="background: var(--bg-subtle); cursor: not-allowed;"{% endif %}>
+                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}
@@ -521,8 +525,57 @@
     </div>
 </div>
 
+<!-- Excused Reason Modal -->
+<div id="excusedModal" class="modal-backdrop" style="display: none; align-items: center; justify-content: center; z-index: 9999;">
+    <div class="modal-content" style="max-width: 480px; width: 90%; background: var(--bg-surface); border-radius: var(--radius-lg); border: 1px solid var(--border-color); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);">
+        <div class="modal-header" style="padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+            <div class="modal-title" style="font-size: 16px; font-weight: 700; color: var(--info); display: flex; align-items: center; gap: 8px;">
+                <i class="bi bi-info-circle-fill"></i> Reason for Excused Absence
+            </div>
+            <button type="button" class="modal-close" onclick="closeExcusedModal()" style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted);">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 20px;">
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px;">
+                Marking student(s) as <strong>Excused</strong> will preserve their attendance percentage without penalty. Please select or enter the official reason:
+            </p>
+            
+            <div style="margin-bottom: 14px;">
+                <label style="font-size: 12px; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 8px;">QUICK SELECTION:</label>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                    <button type="button" class="btn btn-sm" style="background: rgba(59, 130, 246, 0.1); color: var(--info); border: 1px solid rgba(59, 130, 246, 0.3); font-weight: 600;" onclick="setExcusedQuickReason('Exam in College')">
+                        <i class="bi bi-mortarboard-fill"></i> Exam in College
+                    </button>
+                    <button type="button" class="btn btn-sm" style="background: rgba(59, 130, 246, 0.1); color: var(--info); border: 1px solid rgba(59, 130, 246, 0.3); font-weight: 600;" onclick="setExcusedQuickReason('College Viva / Practical')">
+                        <i class="bi bi-journal-check"></i> College Viva / Practical
+                    </button>
+                    <button type="button" class="btn btn-sm" style="background: rgba(59, 130, 246, 0.1); color: var(--info); border: 1px solid rgba(59, 130, 246, 0.3); font-weight: 600;" onclick="setExcusedQuickReason('Medical / Sick Leave')">
+                        <i class="bi bi-heart-pulse-fill"></i> Medical Leave
+                    </button>
+                    <button type="button" class="btn btn-sm" style="background: rgba(59, 130, 246, 0.1); color: var(--info); border: 1px solid rgba(59, 130, 246, 0.3); font-weight: 600;" onclick="setExcusedQuickReason('Official College Event')">
+                        <i class="bi bi-flag-fill"></i> College Event
+                    </button>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" style="font-size: 12px; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 6px;">Reason / Remarks *</label>
+                <input type="text" id="excusedReasonInput" class="form-input" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-surface); color: var(--text-main); font-size: 13px;" placeholder="e.g. Exam in College">
+            </div>
+        </div>
+        <div class="modal-footer" style="padding: 14px 20px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px; background: var(--bg-subtle);">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="closeExcusedModal()">Cancel</button>
+            <button type="button" class="btn btn-primary btn-sm" style="background: var(--info); border-color: var(--info);" onclick="confirmApplyExcusedReason()">
+                <i class="bi bi-check-lg"></i> Apply Excused Status
+            </button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 
 <script>
+    let pendingExcusedTarget = null; // 'selected' or student_id string
+
     function openRescheduleModal() {
         document.getElementById('rescheduleModal').style.display = 'flex';
     }
@@ -537,6 +590,42 @@
         document.getElementById('cancelModal').style.display = 'none';
     }
 
+    function openExcusedModal(target) {
+        pendingExcusedTarget = target;
+        const modal = document.getElementById('excusedModal');
+        const input = document.getElementById('excusedReasonInput');
+        if (input) {
+            input.value = 'Exam in College';
+        }
+        if (modal) {
+            modal.style.display = 'flex';
+            setTimeout(() => input && input.focus(), 50);
+        }
+    }
+
+    function closeExcusedModal() {
+        const modal = document.getElementById('excusedModal');
+        if (modal) modal.style.display = 'none';
+        pendingExcusedTarget = null;
+    }
+
+    function setExcusedQuickReason(reason) {
+        const input = document.getElementById('excusedReasonInput');
+        if (input) input.value = reason;
+    }
+
+    function confirmApplyExcusedReason() {
+        const input = document.getElementById('excusedReasonInput');
+        const reasonText = (input && input.value.trim()) ? input.value.trim() : 'Exam in College';
+        
+        if (pendingExcusedTarget === 'selected') {
+            applyStatusToSelected('EXCUSED', reasonText);
+        } else if (pendingExcusedTarget) {
+            applyStatusToRow(pendingExcusedTarget, 'EXCUSED', reasonText);
+        }
+        closeExcusedModal();
+    }
+
     function toggleAllCheckboxes(source) {
         const checkboxes = document.querySelectorAll('.student-cb');
         for(let i=0, n=checkboxes.length; i<n; i++) {
@@ -544,62 +633,63 @@
         }
     }
 
-    window.markSelectedStudents = function(statusValue) {
+    function applyStatusToRow(studentId, statusValue, reasonText) {
+        const row = document.querySelector(`.student-cb[data-student-id="${studentId}"]`)?.closest('.att-student-row');
+        if (!row) return;
+
+        row.querySelectorAll('input[type="radio"]').forEach(r => r.checked = false);
+        row.querySelectorAll('.att-radio-btn').forEach(l => l.classList.remove('active', 'present', 'late', 'absent', 'excused'));
+
+        const targetInput = row.querySelector(`input[type="radio"][value="${statusValue}"]`);
+        if (targetInput) {
+            targetInput.checked = true;
+            const targetLabel = targetInput.closest('.att-radio-btn');
+            if (targetLabel) targetLabel.classList.add('active', statusValue.toLowerCase());
+        }
+
+        if (reasonText !== undefined) {
+            const remarksInput = row.querySelector(`input[name="remarks_${studentId}"]`);
+            if (remarksInput) remarksInput.value = reasonText;
+        }
+
+        if (typeof recalculateAttendanceStats === 'function') {
+            recalculateAttendanceStats();
+        }
+    }
+
+    function applyStatusToSelected(statusValue, reasonText) {
         const checkboxes = document.querySelectorAll('.student-cb');
         let selectedCount = 0;
-        
+
         checkboxes.forEach(cb => {
-            if(cb.checked) {
+            if (cb.checked) {
                 selectedCount++;
-                const row = cb.closest('.att-student-row');
-                if(!row) return;
-                
-                // Uncheck all radios in this row first
-                row.querySelectorAll('input[type="radio"]').forEach(r => r.checked = false);
-                // Remove all active classes from labels
-                row.querySelectorAll('.att-radio-btn').forEach(l => l.classList.remove('active', 'present', 'late', 'absent', 'excused'));
-                
-                // Find the target radio
-                const targetInput = row.querySelector(`input[type="radio"][value="${statusValue}"]`);
-                if(targetInput) {
-                    targetInput.checked = true;
-                    const targetLabel = targetInput.closest('.att-radio-btn');
-                    if(targetLabel) {
-                        targetLabel.classList.add('active', statusValue.toLowerCase());
-                    }
-                }
+                const stuId = cb.getAttribute('data-student-id');
+                applyStatusToRow(stuId, statusValue, reasonText);
             }
         });
-        
-        if(selectedCount === 0) {
+
+        if (selectedCount === 0) {
             alert('Please select at least one student by checking the box next to their name.');
             return;
         }
-        
-        // Update stats
+
         if (typeof recalculateAttendanceStats === 'function') {
             recalculateAttendanceStats();
+        }
+    }
+
+    window.markSelectedStudents = function(statusValue) {
+        const checkboxes = document.querySelectorAll('.student-cb:checked');
+        if (checkboxes.length === 0) {
+            alert('Please select at least one student by checking the box next to their name.');
+            return;
+        }
+
+        if (statusValue === 'EXCUSED') {
+            openExcusedModal('selected');
         } else {
-            // Fallback manual calculation if main.js is not loaded
-            const rows = document.querySelectorAll('.att-student-row');
-            let p = 0, l = 0, a = 0, e = 0;
-            rows.forEach(r => {
-                const checked = r.querySelector('input[type="radio"]:checked');
-                if (checked) {
-                    if (checked.value === 'PRESENT') p++;
-                    else if (checked.value === 'LATE') l++;
-                    else if (checked.value === 'ABSENT') a++;
-                    else if (checked.value === 'EXCUSED') e++;
-                }
-            });
-            const t = rows.length;
-            if(document.getElementById('livePresentCount')) document.getElementById('livePresentCount').innerText = p;
-            if(document.getElementById('liveAbsentCount')) document.getElementById('liveAbsentCount').innerText = a;
-            if(document.getElementById('liveLateCount')) document.getElementById('liveLateCount').innerText = l;
-            if(document.getElementById('liveExcusedCount')) document.getElementById('liveExcusedCount').innerText = e;
-            if(document.getElementById('liveAttendanceRate') && t > 0) {
-                document.getElementById('liveAttendanceRate').innerText = (((p + l) / t) * 100).toFixed(1) + '%';
-            }
+            applyStatusToSelected(statusValue);
         }
     };
 </script>

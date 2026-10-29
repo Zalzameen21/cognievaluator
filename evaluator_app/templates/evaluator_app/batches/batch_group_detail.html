@@ -38,6 +38,9 @@
             <a href="{% url 'attendance_hub' %}?group_id={{ group.id }}" class="btn btn-primary" style="background: linear-gradient(135deg, #06B6D4, #3B82F6);">
                 <i class="bi bi-calendar-check-fill"></i> Mark Attendance
             </a>
+            <a href="{% url 'batch_group_schedule_view' group.id %}" class="btn btn-secondary" style="background: rgba(99, 102, 241, 0.12); color: var(--primary); border: 1px solid rgba(99, 102, 241, 0.3); font-weight: 700;">
+                <i class="bi bi-calendar2-week-fill"></i> Task Schedule
+            </a>
             <a href="{% url 'task_hub' %}?group_id={{ group.id }}" class="btn btn-secondary" style="background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); font-weight: 600;">
                 <i class="bi bi-list-task"></i> Assigned Tasks ({{ total_group_tasks }})
             </a>

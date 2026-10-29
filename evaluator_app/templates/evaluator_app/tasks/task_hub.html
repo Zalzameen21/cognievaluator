@@ -20,7 +20,15 @@
         </p>
     </div>
 
-    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+        <a href="{% url 'export_all_batches_tasks_excel' %}" class="btn" style="background: linear-gradient(135deg, #10B981, #059669); color: #FFFFFF; font-weight: 700; border: none; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35); display: inline-flex; align-items: center; gap: 6px;" title="Download all batches task schedule in a single Excel file with Day-Wise sheets (Mon, Tue, Wed, Thu...)">
+            <i class="bi bi-file-earmark-excel-fill"></i> Download Master Task Schedule (Excel)
+        </a>
+        {% if selected_batch and not selected_batch|stringformat:"s"|slice:":2" == "g_" %}
+        <a href="{% url 'export_batch_tasks_excel' selected_batch %}" class="btn btn-secondary" style="background: rgba(255, 255, 255, 0.15); color: #FFFFFF; border-color: rgba(255, 255, 255, 0.3); display: inline-flex; align-items: center; gap: 6px;" title="Download tasks for currently selected batch">
+            <i class="bi bi-download"></i> Download Batch Tasks (.xlsx)
+        </a>
+        {% endif %}
         <a href="{% url 'task_hub_sync_deadlines' %}" class="btn btn-secondary" style="background: rgba(16, 185, 129, 0.2); color: #FFFFFF; border-color: rgba(16, 185, 129, 0.4);" title="Force update task due dates based on latest class schedules">
             <i class="bi bi-arrow-repeat"></i> Sync Deadlines
         </a>

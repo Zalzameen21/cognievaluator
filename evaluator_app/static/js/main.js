@@ -416,6 +416,15 @@ function initAttendanceControls() {
                     presentInput.checked = true;
                     highlightSelectedAtt(row, 'PRESENT');
                 }
+                const remarksInput = row.querySelector('input[name^="remarks_"]');
+                if (remarksInput) {
+                    remarksInput.value = '';
+                    remarksInput.placeholder = '— Present (No remarks) —';
+                    remarksInput.disabled = true;
+                    remarksInput.style.background = 'var(--bg-subtle)';
+                    remarksInput.style.opacity = '0.6';
+                    remarksInput.style.cursor = 'not-allowed';
+                }
             });
             recalculateAttendanceStats();
         });
@@ -431,6 +440,14 @@ function initAttendanceControls() {
                     absentInput.checked = true;
                     highlightSelectedAtt(row, 'ABSENT');
                 }
+                const remarksInput = row.querySelector('input[name^="remarks_"]');
+                if (remarksInput) {
+                    remarksInput.disabled = false;
+                    remarksInput.placeholder = 'Optional reason/notes...';
+                    remarksInput.style.background = 'var(--bg-surface)';
+                    remarksInput.style.opacity = '1';
+                    remarksInput.style.cursor = 'text';
+                }
             });
             recalculateAttendanceStats();
         });
@@ -444,6 +461,25 @@ function initAttendanceControls() {
             if (radio && row) {
                 radio.checked = true;
                 highlightSelectedAtt(row, radio.value);
+
+                const remarksInput = row.querySelector('input[name^="remarks_"]');
+                if (remarksInput) {
+                    if (radio.value === 'PRESENT') {
+                        remarksInput.value = '';
+                        remarksInput.placeholder = '— Present (No remarks) —';
+                        remarksInput.disabled = true;
+                        remarksInput.style.background = 'var(--bg-subtle)';
+                        remarksInput.style.opacity = '0.6';
+                        remarksInput.style.cursor = 'not-allowed';
+                    } else {
+                        remarksInput.disabled = false;
+                        remarksInput.placeholder = radio.value === 'EXCUSED' ? 'Reason (e.g. Exam in College)...' : 'Optional reason/notes...';
+                        remarksInput.style.background = 'var(--bg-surface)';
+                        remarksInput.style.opacity = '1';
+                        remarksInput.style.cursor = 'text';
+                    }
+                }
+
                 recalculateAttendanceStats();
             }
         });
@@ -475,7 +511,8 @@ function recalculateAttendanceStats() {
     });
 
     const total = rows.length;
-    const rate = total > 0 ? (((present + late) / total) * 100).toFixed(1) : 0;
+    const effectiveTotal = total - excused;
+    const rate = effectiveTotal > 0 ? (((present + late) / effectiveTotal) * 100).toFixed(1) : (present + late > 0 ? '100.0' : '0.0');
 
     const pEl = document.getElementById('livePresentCount');
     const aEl = document.getElementById('liveAbsentCount');

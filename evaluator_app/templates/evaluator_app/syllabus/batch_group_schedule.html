@@ -1,0 +1,159 @@
+{% extends 'evaluator_app/base.html' %}
+{% load static %}
+
+{% block title %}Task Schedule - {{ group.name }}{% endblock %}
+{% block page_title %}{{ group.name }} - Merged Task Schedule{% endblock %}
+
+{% block content %}
+<div style="max-width: 1200px; margin: 0 auto;">
+  <!-- Header Card -->
+  <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-xl); padding: 24px 28px; margin-bottom: 24px; box-shadow: var(--shadow-sm);">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px;">
+      <div>
+        <a href="{% url 'batch_group_detail' group.id %}" style="display:inline-flex; align-items:center; gap:6px; color:var(--text-muted); font-size:12px; font-weight:600; text-decoration:none; margin-bottom:8px;">
+          <i class="bi bi-arrow-left"></i> Back to {{ group.name }}
+        </a>
+        <h2 style="font-size:22px; font-weight:800; color:var(--text-main); margin:0;">
+          <i class="bi bi-calendar2-week-fill text-primary"></i> {{ group.name }} — Consolidated Task Schedule
+        </h2>
+        <div style="display:flex; align-items:center; gap:8px; margin-top:8px; flex-wrap:wrap;">
+          <span style="font-size:12px; color:var(--text-muted);">Merged Batches:</span>
+          {% for b in batches %}
+          <span class="badge" style="background:var(--bg-subtle); color:var(--text-main); border:1px solid var(--border-color); font-weight:700;">
+            {{ b.name }} ({{ b.short_days_display }})
+          </span>
+          {% endfor %}
+        </div>
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <a href="{% url 'export_all_batches_tasks_excel' %}" class="btn" style="background: linear-gradient(135deg, #10B981, #059669); color: #FFF; font-weight: 700; border: none; display: inline-flex; align-items: center; gap: 6px;">
+          <i class="bi bi-file-earmark-excel-fill"></i> Download Master Excel
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI Row -->
+  <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 24px;">
+    <div class="kpi-card">
+      <div class="kpi-icon-box kpi-icon-primary">
+        <i class="bi bi-journal-text"></i>
+      </div>
+      <div class="kpi-info">
+        <div class="kpi-title">Total Scheduled Topics</div>
+        <div class="kpi-value">{{ total_count }}</div>
+        <div class="kpi-meta">Consolidated curriculum tasks</div>
+      </div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-icon-box kpi-icon-success" style="background: rgba(16, 185, 129, 0.1); color: var(--success);">
+        <i class="bi bi-check2-circle"></i>
+      </div>
+      <div class="kpi-info">
+        <div class="kpi-title">Completed Tasks</div>
+        <div class="kpi-value" style="color: var(--success);">{{ completed_count }}</div>
+        <div class="kpi-meta">Finished deliverables</div>
+      </div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-icon-box kpi-icon-warning">
+        <i class="bi bi-pie-chart-fill"></i>
+      </div>
+      <div class="kpi-info">
+        <div class="kpi-title">Group Completion Rate</div>
+        <div class="kpi-value">{{ progress_pct }}%</div>
+        <div class="kpi-meta">Curriculum completion</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Task Schedule Table Card -->
+  <div class="card">
+    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <div>
+        <div class="card-title"><i class="bi bi-list-check text-primary"></i> Master Timeline & Deliverables</div>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Toggling a task status marks it for <strong>all {{ batches.count }} batches</strong> and their students.</div>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width:50px;">#</th>
+            <th style="min-width:140px;">Scheduled Date</th>
+            <th style="min-width:280px;">Task / Module</th>
+            <th style="min-width:140px;">In-Charge</th>
+            <th style="min-width:120px;">Current Status</th>
+            <th style="min-width:160px; text-align:right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in schedules %}
+          <tr>
+            <td style="font-weight:700; color:var(--text-dim);">{{ forloop.counter }}</td>
+            <td>
+              <div style="font-weight:700; color:var(--text-main);">
+                {{ s.date|date:"D, M d, Y" }}
+              </div>
+              <div style="font-size:11px; color:var(--text-muted);">{{ s.date|date:"l" }}</div>
+            </td>
+            <td>
+              <div style="font-weight:700; font-size:14px; color:var(--text-main);">
+                {{ s.title }}
+              </div>
+              {% if s.custom_task_description %}
+              <div style="font-size:12px; color:var(--text-muted); margin-top:3px; max-width:450px;">
+                {{ s.custom_task_description|truncatechars:120 }}
+              </div>
+              {% endif %}
+            </td>
+            <td>
+              {% if s.incharge %}
+                <span style="font-size:12px; font-weight:600; color:var(--text-main);"><i class="bi bi-person-fill"></i> {{ s.incharge.get_full_name|default:s.incharge.username }}</span>
+              {% elif s.incharge_name %}
+                <span style="font-size:12px; color:var(--text-main);"><i class="bi bi-person"></i> {{ s.incharge_name }}</span>
+              {% else %}
+                <span style="font-size:12px; color:var(--text-dim);">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if s.is_completed %}
+                <span class="badge" style="background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); font-weight: 700; font-size: 11px;">
+                  <i class="bi bi-check-circle-fill"></i> Completed
+                </span>
+              {% else %}
+                <span class="badge" style="background: rgba(245, 158, 11, 0.1); color: #D97706; border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 700; font-size: 11px;">
+                  <i class="bi bi-hourglass-split"></i> Pending
+                </span>
+              {% endif %}
+            </td>
+            <td style="text-align:right;">
+              <form method="POST" action="{% url 'batch_group_schedule_toggle_status' group.id s.id %}" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="status" value="{% if s.is_completed %}PENDING{% else %}COMPLETED{% endif %}">
+                <button type="submit" class="btn {% if s.is_completed %}btn-secondary{% else %}btn-primary{% endif %} btn-sm" style="font-weight:700; font-size:12px;">
+                  {% if s.is_completed %}
+                    <i class="bi bi-arrow-counterclockwise"></i> Mark Pending
+                  {% else %}
+                    <i class="bi bi-check-all"></i> Mark Completed (All Batches)
+                  {% endif %}
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" style="text-align:center; padding:36px; color:var(--text-muted);">
+              No active task schedule entries found for this batch group.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

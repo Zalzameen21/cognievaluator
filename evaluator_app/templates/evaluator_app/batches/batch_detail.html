@@ -51,6 +51,9 @@
         <a href="{% url 'batch_export_csv' batch.id %}" class="btn btn-secondary" title="Export CSV Report">
             <i class="bi bi-download"></i> CSV
         </a>
+        <a href="{% url 'export_batch_tasks_excel' batch.id %}" class="btn btn-secondary" style="background: rgba(16, 185, 129, 0.12); color: #059669; border-color: rgba(16, 185, 129, 0.3); font-weight: 600;" title="Download Batch Tasks (Excel)">
+            <i class="bi bi-file-earmark-excel-fill"></i> Tasks Excel
+        </a>
         <a href="{% url 'batch_edit' batch.id %}" class="btn btn-secondary" title="Edit Batch">
             <i class="bi bi-pencil"></i>
         </a>
@@ -136,6 +139,7 @@
                     <th>Student Name</th>
                     <th>Roll Number</th>
                     <th>Contact</th>
+                    <th>Status</th>
                     <th>Payment</th>
                     <th>Attendance %</th>
                     <th>Avg Evaluation</th>
@@ -161,6 +165,21 @@
                     <td>
                         <div style="font-size: 12px;">{{ stu.phone|default:"-" }}</div>
                         <div style="font-size: 11px; color: var(--text-muted);">{{ stu.email|default:"-" }}</div>
+                    </td>
+                    <td>
+                        <select class="form-select student-status-select" 
+                                data-student-id="{{ stu.id }}" 
+                                data-student-name="{{ stu.name }}"
+                                style="font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); width: 115px; 
+                                {% if stu.status == 'ACTIVE' %}background: rgba(16, 185, 129, 0.1); color: #10B981; border-color: rgba(16, 185, 129, 0.3);{% elif stu.status == 'DISCONTINUED' %}background: rgba(100, 116, 139, 0.15); color: #64748B; border-color: rgba(100, 116, 139, 0.3);{% else %}background: rgba(239, 68, 68, 0.1); color: #EF4444; border-color: rgba(239, 68, 68, 0.3);{% endif %}">
+                            <option value="ACTIVE" {% if stu.status == 'ACTIVE' %}selected{% endif %} style="color: #10B981;">Active</option>
+                            <option value="DISCONTINUED" {% if stu.status == 'DISCONTINUED' %}selected{% endif %} style="color: #64748B;">Discontinued</option>
+                            <option value="INACTIVE" {% if stu.status == 'INACTIVE' %}selected{% endif %} style="color: #F59E0B;">Inactive</option>
+                            <option value="COMPLETED" {% if stu.status == 'COMPLETED' %}selected{% endif %} style="color: #3B82F6;">Completed</option>
+                        </select>
+                        {% if stu.status == 'DISCONTINUED' and stu.discontinued_date %}
+                            <div style="font-size: 10px; color: var(--text-muted); margin-top: 3px;">Since {{ stu.discontinued_date|date:"d M Y" }}</div>
+                        {% endif %}
                     </td>
                     <td>
                         <select class="form-select payment-status-select" 
@@ -218,7 +237,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="7" style="text-align: center; color: var(--text-dim); padding: 36px 16px;">
+                    <td colspan="9" style="text-align: center; color: var(--text-dim); padding: 36px 16px;">
                         <i class="bi bi-people" style="font-size: 28px; display: block; margin-bottom: 8px; color: var(--text-dim);"></i>
                         <div style="font-size: 14px; font-weight: 600; color: var(--text-main); margin-bottom: 6px;">No students enrolled in this batch yet.</div>
                         <div style="display: flex; gap: 8px; justify-content: center; margin-top: 12px; flex-wrap: wrap;">
@@ -265,6 +284,46 @@
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Discontinue Student Confirmation -->
+<div class="modal-backdrop" id="discontinueStudentModal" style="display: none;">
+    <div class="modal-dialog" style="max-width: 480px;">
+        <div class="modal-content">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding: 18px 24px;">
+                <h3 class="modal-title" style="font-size: 18px; font-weight: 800; color: #475569; display: flex; align-items: center; gap: 8px; margin: 0;">
+                    <i class="bi bi-person-slash"></i> Discontinue Student
+                </h3>
+                <button type="button" class="modal-close" onclick="closeDiscontinueModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 24px;">
+                <p style="font-size: 14px; color: var(--text-main); margin-bottom: 14px; line-height: 1.5;">
+                    Set status to <strong>Discontinued</strong> for <strong id="discStudentName">Student</strong>?
+                </p>
+                
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px;">
+                        Effective Discontinuation Date *
+                    </label>
+                    <input type="date" id="discEffectiveDate" class="form-input" style="width: 100%;" value="{{ today_date|date:'Y-m-d' }}">
+                    <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">
+                        The student will not appear in attendance or evaluation rosters for any class dates after this day. Past records are kept intact.
+                    </div>
+                </div>
+
+                <div style="background: rgba(100, 116, 139, 0.08); border: 1px solid rgba(100, 116, 139, 0.2); border-radius: var(--radius-md); padding: 12px; font-size: 12px; color: var(--text-muted); display: flex; align-items: flex-start; gap: 8px;">
+                    <i class="bi bi-info-circle-fill" style="margin-top: 2px; color: #64748B;"></i>
+                    <span>Existing attendance history and completed evaluations will be preserved. Future rosters will automatically omit this student.</span>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 14px 24px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-secondary" onclick="closeDiscontinueModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmDiscBtn" style="background: #475569; border-color: #475569;">
+                    <i class="bi bi-check2 me-1"></i> Confirm Discontinuation
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -330,6 +389,117 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Student Status Update & Discontinue Modal
+    let pendingStatusSelect = null;
+    let pendingStudentId = null;
+    let pendingOriginalStatus = null;
+
+    window.closeDiscontinueModal = function() {
+        const modal = document.getElementById('discontinueStudentModal');
+        if (modal) modal.style.display = 'none';
+        if (pendingStatusSelect && pendingOriginalStatus) {
+            pendingStatusSelect.value = pendingOriginalStatus;
+            updateStatusStyle(pendingStatusSelect, pendingOriginalStatus);
+        }
+        pendingStatusSelect = null;
+        pendingStudentId = null;
+        pendingOriginalStatus = null;
+    };
+
+    function updateStatusStyle(selectEl, status) {
+        if (status === 'ACTIVE') {
+            selectEl.style.background = 'rgba(16, 185, 129, 0.1)';
+            selectEl.style.color = '#10B981';
+            selectEl.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+        } else if (status === 'DISCONTINUED') {
+            selectEl.style.background = 'rgba(100, 116, 139, 0.15)';
+            selectEl.style.color = '#64748B';
+            selectEl.style.borderColor = 'rgba(100, 116, 139, 0.3)';
+        } else if (status === 'COMPLETED') {
+            selectEl.style.background = 'rgba(59, 130, 246, 0.1)';
+            selectEl.style.color = '#3B82F6';
+            selectEl.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+        } else {
+            selectEl.style.background = 'rgba(239, 68, 68, 0.1)';
+            selectEl.style.color = '#EF4444';
+            selectEl.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+        }
+    }
+
+    function sendStatusUpdate(studentId, newStatus, discontinuedDate, selectEl, origVal) {
+        fetch(`/api/students/${studentId}/update-status/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({ 
+                status: newStatus,
+                discontinued_date: discontinuedDate
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                updateStatusStyle(selectEl, newStatus);
+                selectEl.dataset.currentStatus = newStatus;
+                // Reload or update subtle note if discontinued
+                window.location.reload();
+            } else {
+                alert(data.message || "Failed to update student status.");
+                selectEl.value = origVal;
+                updateStatusStyle(selectEl, origVal);
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("An error occurred while updating the student status.");
+            selectEl.value = origVal;
+            updateStatusStyle(selectEl, origVal);
+        });
+    }
+
+    const statusSelects = document.querySelectorAll('.student-status-select');
+    statusSelects.forEach(select => {
+        select.dataset.currentStatus = select.value;
+        select.addEventListener('change', function() {
+            const studentId = this.dataset.studentId;
+            const studentName = this.dataset.studentName || 'Student';
+            const newStatus = this.value;
+            const origStatus = this.dataset.currentStatus || 'ACTIVE';
+
+            if (newStatus === 'DISCONTINUED') {
+                pendingStatusSelect = this;
+                pendingStudentId = studentId;
+                pendingOriginalStatus = origStatus;
+                document.getElementById('discStudentName').textContent = studentName;
+                document.getElementById('discontinueStudentModal').style.display = 'flex';
+            } else {
+                sendStatusUpdate(studentId, newStatus, null, this, origStatus);
+            }
+        });
+    });
+
+    const confirmDiscBtn = document.getElementById('confirmDiscBtn');
+    if (confirmDiscBtn) {
+        confirmDiscBtn.addEventListener('click', function() {
+            if (!pendingStudentId || !pendingStatusSelect) return;
+            const effectiveDate = document.getElementById('discEffectiveDate').value;
+            if (!effectiveDate) {
+                alert("Please select an effective discontinuation date.");
+                return;
+            }
+            const sId = pendingStudentId;
+            const sel = pendingStatusSelect;
+            const orig = pendingOriginalStatus;
+            document.getElementById('discontinueStudentModal').style.display = 'none';
+            pendingStatusSelect = null;
+            pendingStudentId = null;
+            pendingOriginalStatus = null;
+            sendStatusUpdate(sId, 'DISCONTINUED', effectiveDate, sel, orig);
+        });
+    }
+
     // Payment Status Update
     const paymentSelects = document.querySelectorAll('.payment-status-select');
     paymentSelects.forEach(select => {
@@ -358,16 +528,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         this.style.color = '#EF4444';
                         this.style.borderColor = 'rgba(239, 68, 68, 0.3)';
                     }
-                    // Optional: show a quick success toast/message here
                 } else {
                     alert(data.message || "Failed to update payment status.");
-                    this.value = originalValue; // Revert on failure
+                    this.value = originalValue;
                 }
             })
             .catch(err => {
                 console.error(err);
                 alert("An error occurred while updating the payment status.");
-                this.value = originalValue; // Revert on error
+                this.value = originalValue;
             });
         });
     });

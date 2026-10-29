@@ -98,9 +98,7 @@ def dashboard_view(request):
     profile, _ = UserProfile.objects.get_or_create(user=user)
     accessible_batches = get_user_batches(user)
     
-    # Auto-mark missing attendance for past days
-    from .services import auto_mark_absent_for_past_days
-    auto_mark_absent_for_past_days(accessible_batches)
+
     
     accessible_students = get_user_students(user)
     today = timezone.now().date()
@@ -821,7 +819,7 @@ def student_list_view(request):
     students = list(students_qs.order_by('batch__name', 'roll_number'))
     
     for stu in students:
-        total = stu.attendance_records.exclude(status='CANCELLED').count()
+        total = stu.attendance_records.exclude(status__in=['EXCUSED', 'CANCELLED']).count()
         present = stu.attendance_records.filter(status__in=['PRESENT', 'LATE']).count()
         stu.calc_att_pct = round((present / total * 100), 1) if total > 0 else 0.0
         stu.calc_att_total = total
@@ -910,14 +908,16 @@ def student_detail_view(request, student_id):
     
     if all_combined_dates:
         existing_att = Attendance.objects.filter(student=student, date__in=all_combined_dates)
-        att_map = {att.date: att.status for att in existing_att}
+        att_map = {att.date: att for att in existing_att}
         for d in all_combined_dates:
-            status = att_map.get(d, 'Not Marked/Absent')
+            att_obj = att_map.get(d)
+            status = att_obj.status if att_obj else 'Not Marked/Absent'
+            remarks = att_obj.remarks if att_obj else ''
             if status != 'CANCELLED':
-                history_records.append({'date': d, 'status': status})
+                history_records.append({'date': d, 'status': status, 'remarks': remarks})
     else:
         # Fallback
-        history_records = [{'date': a.date, 'status': a.status} for a in student.attendance_records.exclude(status='CANCELLED').order_by('-date')[:30]]
+        history_records = [{'date': a.date, 'status': a.status, 'remarks': a.remarks} for a in student.attendance_records.exclude(status='CANCELLED').order_by('-date')[:30]]
 
     # Calculate performance metrics averages
     eval_stats = evaluations.aggregate(
@@ -941,8 +941,9 @@ def student_detail_view(request, student_id):
     att_late = student.attendance_records.filter(status='LATE').count()
     att_absent = student.attendance_records.filter(status='ABSENT').count()
     att_excused = student.attendance_records.filter(status='EXCUSED').count()
-    total_att = student.attendance_records.exclude(status='CANCELLED').count()
-    att_percentage = round(((att_present + att_late) / total_att * 100), 1) if total_att > 0 else 0
+    total_effective_att = student.attendance_records.exclude(status__in=['EXCUSED', 'CANCELLED']).count()
+    total_att = total_effective_att
+    att_percentage = round(((att_present + att_late) / total_effective_att * 100), 1) if total_effective_att > 0 else 0
     
     # Score progression chart data
     prog_dates = []
@@ -1193,7 +1194,11 @@ def evaluation_hub_view(request):
     students_data = []
     avg_score = 0.0
     if selected_batch:
-        students = selected_batch.students.all().order_by('roll_number', 'name')
+        # Exclude discontinued students if selected_date is after their discontinued_date
+        students = selected_batch.students.filter(
+            Q(status='ACTIVE') |
+            Q(status='DISCONTINUED', discontinued_date__isnull=False, discontinued_date__gte=selected_date)
+        ).order_by('roll_number', 'name')
         evaluations_qs = DailyEvaluation.objects.filter(batch=selected_batch, date=selected_date)
         evaluations_dict = {ev.student_id: ev for ev in evaluations_qs}
         
@@ -2080,6 +2085,46 @@ def update_payment_status_api(request, student_id):
         return JsonResponse({'success': False, 'message': str(e)}, status=400)
 
 
+@require_POST
+@evaluator_required
+def update_student_status_api(request, student_id):
+    user = request.user
+    student = get_object_or_404(Student, id=student_id)
+    
+    if not can_user_access_batch(user, student.batch) and not user.is_superuser:
+        return JsonResponse({'success': False, 'message': 'Permission denied.'}, status=403)
+        
+    try:
+        import json
+        data = json.loads(request.body)
+        new_status = data.get('status')
+        discontinued_date_str = data.get('discontinued_date')
+        
+        valid_statuses = [choice[0] for choice in Student.STATUS_CHOICES]
+        if new_status not in valid_statuses:
+            return JsonResponse({'success': False, 'message': f'Invalid status: {new_status}'}, status=400)
+            
+        student.status = new_status
+        if new_status == 'DISCONTINUED':
+            if discontinued_date_str:
+                student.discontinued_date = datetime.strptime(discontinued_date_str, '%Y-%m-%d').date()
+            else:
+                student.discontinued_date = timezone.now().date()
+        else:
+            student.discontinued_date = None
+            
+        student.save(update_fields=['status', 'discontinued_date'])
+        return JsonResponse({
+            'success': True,
+            'message': f"Student status updated to {student.get_status_display()}.",
+            'status': student.status,
+            'status_display': student.get_status_display(),
+            'discontinued_date': student.discontinued_date.strftime('%Y-%m-%d') if student.discontinued_date else None
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)}, status=400)
+
+
 # ==============================================================================
 # STUDENT TASK EVALUATION SECTION
 # ==============================================================================
@@ -2428,8 +2473,8 @@ def batch_reschedule_class_view(request):
                         'conflict_names': conflict_names,
                     })
 
-            # Check if user confirmed combining into a BatchGroup
-            if len(target_batches) == 1 and resched_date and confirm_combine == 'yes':
+            # Check if user confirmed combining continuously into a permanent BatchGroup
+            if len(target_batches) == 1 and resched_date and confirm_combine in ['yes', 'continuous']:
                 batch = target_batches[0]
                 group_name = request.POST.get('combined_group_name', '').strip()
                 selected_combine_batch_ids = request.POST.getlist('combine_batch_ids')
@@ -2445,7 +2490,9 @@ def batch_reschedule_class_view(request):
                         new_group.batches.add(Batch.objects.get(id=cb_id))
                     except Batch.DoesNotExist:
                         pass
-                messages.info(request, f"🤝 Created new Merged Batch Group '{group_name}' combining classes on {resched_date.strftime('%d %b, %Y')}.")
+                messages.info(request, f"🤝 Created new Merged Batch Group '{group_name}' combining classes continuously.")
+            elif len(target_batches) == 1 and resched_date and confirm_combine == 'single_day':
+                messages.info(request, f"🗓️ Scheduled makeup class on {resched_date.strftime('%d %b, %Y')} combined for this single day only.")
 
             # Apply exception to all target batches
             for b in target_batches:
@@ -2477,9 +2524,7 @@ def attendance_hub_view(request):
     user = request.user
     accessible_batches = get_user_batches(user)
     
-    # Auto-mark missing attendance for past days
-    from .services import auto_mark_absent_for_past_days
-    auto_mark_absent_for_past_days(accessible_batches)
+
     
     is_admin = request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.role == 'ADMIN')
     
@@ -2595,6 +2640,12 @@ def attendance_hub_view(request):
                             assigned_batch = b
                             break
 
+                # If status is PRESENT, remarks should be empty
+                if value == 'PRESENT':
+                    remarks = ''
+                elif 'Auto-marked' in remarks:
+                    remarks = ''
+
                 Attendance.objects.update_or_create(
                     student=student,
                     date=selected_date,
@@ -2623,13 +2674,21 @@ def attendance_hub_view(request):
     def get_batch_students_on_date(b, on_date):
         if not b:
             return []
-        current_students = list(b.students.filter(status='ACTIVE'))
+        # Active students, or discontinued students whose discontinuation date is AFTER on_date (they were active on on_date)
+        current_students = list(
+            b.students.filter(
+                Q(status='ACTIVE') |
+                Q(status='DISCONTINUED', discontinued_date__isnull=False, discontinued_date__gte=on_date)
+            )
+        )
         
         # 1. Include students who were transferred OUT of this batch on effective_date > on_date
         transferred_out = Student.objects.filter(
             batch_transfers__from_batch=b,
-            batch_transfers__effective_date__gt=on_date,
-            status='ACTIVE'
+            batch_transfers__effective_date__gt=on_date
+        ).filter(
+            Q(status='ACTIVE') |
+            Q(status='DISCONTINUED', discontinued_date__isnull=False, discontinued_date__gte=on_date)
         ).distinct()
         for s in transferred_out:
             if s not in current_students:
@@ -2671,10 +2730,13 @@ def attendance_hub_view(request):
             stu_pct = stu.attendance_percentage
             has_records = stu.attendance_records.exists()
             is_low_att = has_records and stu_pct < 50.0
+            raw_remarks = rec.remarks if rec else ''
+            # Strip auto-marked absent message from display
+            clean_remarks = '' if ('Auto-marked' in raw_remarks or (rec and rec.status == 'PRESENT')) else raw_remarks
             students_data.append({
                 'student': stu,
                 'status': rec.status if rec else 'PRESENT',
-                'remarks': rec.remarks if rec else '',
+                'remarks': clean_remarks,
                 'is_marked': rec is not None,
                 'cum_attendance_pct': stu_pct,
                 'is_low_attendance': is_low_att,
@@ -2692,10 +2754,12 @@ def attendance_hub_view(request):
             stu_pct = stu.attendance_percentage
             has_records = stu.attendance_records.exists()
             is_low_att = has_records and stu_pct < 50.0
+            raw_remarks = rec.remarks if rec else ''
+            clean_remarks = '' if ('Auto-marked' in raw_remarks or (rec and rec.status == 'PRESENT')) else raw_remarks
             students_data.append({
                 'student': stu,
                 'status': rec.status if rec else 'PRESENT',
-                'remarks': rec.remarks if rec else '',
+                'remarks': clean_remarks,
                 'is_marked': rec is not None,
                 'cum_attendance_pct': stu_pct,
                 'is_low_attendance': is_low_att,
@@ -2706,7 +2770,8 @@ def attendance_hub_view(request):
     absent_count = sum(1 for s in students_data if s['status'] == 'ABSENT')
     excused_count = sum(1 for s in students_data if s['status'] == 'EXCUSED')
     total_count = len(students_data)
-    present_rate = round(((present_count + late_count) / total_count * 100), 1) if total_count > 0 else 0
+    effective_session_count = total_count - excused_count
+    present_rate = round(((present_count + late_count) / effective_session_count * 100), 1) if effective_session_count > 0 else (100.0 if (present_count + late_count) > 0 else 0.0)
 
     # Low Attendance Students (< 50%) across all accessible batches
     low_attendance_students = []
@@ -3208,6 +3273,11 @@ def export_batch_attendance_csv_view(request, batch_id):
         filtered_ids.append(att.id)
 
     attendance_qs = Attendance.objects.filter(id__in=filtered_ids)
+
+    # Exclude any attendance records dated prior to the batch start date (or parent batch start date if split)
+    earliest_batch_start = batch.parent_batch.start_date if (batch.parent_batch and batch.parent_batch.start_date) else batch.start_date
+    if earliest_batch_start:
+        attendance_qs = attendance_qs.filter(date__gte=earliest_batch_start)
 
     if '-' in month_str:
         # Format YYYY-MM
@@ -4397,6 +4467,106 @@ def batch_schedule_view(request, batch_id):
 
 
 @evaluator_required
+def batch_group_schedule_view(request, group_id):
+    user = request.user
+    group = get_object_or_404(BatchGroup, id=group_id)
+    batches = group.batches.all()
+    if not any(can_user_access_batch(user, b) for b in batches):
+        messages.error(request, 'Permission denied.')
+        return redirect('batch_group_list')
+
+    # Collect consolidated group schedule excluding cancelled classes
+    pref_order = ['CSE', 'CSE-A', 'AD']
+    g_batches_sorted = sorted(batches, key=lambda b: pref_order.index(b.name) if b.name in pref_order else 99)
+
+    merged_schedules = []
+    seen_titles = {}
+
+    for b in g_batches_sorted:
+        b_schedules = BatchTaskSchedule.objects.filter(
+            batch=b
+        ).exclude(
+            status='CANCELLED'
+        ).select_related('syllabus_task').order_by('date')
+
+        for s in b_schedules:
+            title = s.syllabus_task.title if s.syllabus_task else (s.custom_task_title or 'Task')
+            if title.strip().lower() == 'class cancelled':
+                continue
+            norm = title.strip().lower()
+            if norm not in seen_titles:
+                entry = {
+                    'id': s.id,
+                    'title': title,
+                    'date': s.date,
+                    'status': s.status,
+                    'is_completed': s.status == 'COMPLETED',
+                    'syllabus_task': s.syllabus_task,
+                    'custom_task_description': s.custom_task_description or (s.syllabus_task.description if s.syllabus_task else ''),
+                    'incharge': s.incharge,
+                    'incharge_name': s.incharge_name,
+                    'is_rescheduled': s.is_rescheduled,
+                    'sample_schedule': s
+                }
+                seen_titles[norm] = entry
+                merged_schedules.append(entry)
+            else:
+                if s.status == 'COMPLETED':
+                    seen_titles[norm]['status'] = 'COMPLETED'
+                    seen_titles[norm]['is_completed'] = True
+
+    merged_schedules.sort(key=lambda x: (x['date'] is None, x['date']))
+
+    completed_count = sum(1 for s in merged_schedules if s['is_completed'])
+    total_count = len(merged_schedules)
+    progress_pct = round((completed_count / total_count * 100), 1) if total_count > 0 else 0
+
+    return render(request, 'evaluator_app/syllabus/batch_group_schedule.html', {
+        'group': group,
+        'batches': batches,
+        'schedules': merged_schedules,
+        'total_count': total_count,
+        'completed_count': completed_count,
+        'progress_pct': progress_pct,
+    })
+
+
+@evaluator_required
+def batch_group_schedule_toggle_status_view(request, group_id, schedule_id):
+    if request.method == 'POST':
+        group = get_object_or_404(BatchGroup, id=group_id)
+        schedule = get_object_or_404(BatchTaskSchedule, id=schedule_id)
+        new_status = request.POST.get('status')
+        if new_status in ['PENDING', 'COMPLETED']:
+            title = schedule.syllabus_task.title if schedule.syllabus_task else schedule.custom_task_title
+            batches = group.batches.all()
+            from .models import StudentTask
+
+            # 1. Update schedule records for this task across all batches in this group
+            BatchTaskSchedule.objects.filter(
+                batch__in=batches,
+                syllabus_task=schedule.syllabus_task
+            ).exclude(status='CANCELLED').update(status=new_status)
+
+            if schedule.custom_task_title:
+                BatchTaskSchedule.objects.filter(
+                    batch__in=batches,
+                    custom_task_title=schedule.custom_task_title
+                ).exclude(status='CANCELLED').update(status=new_status)
+
+            # 2. Update StudentTask records for all students enrolled in these batches
+            group_student_tasks = StudentTask.objects.filter(batch__in=batches, title=title)
+            if new_status == 'COMPLETED':
+                group_student_tasks.update(status='COMPLETED', completed_at=timezone.now())
+            else:
+                group_student_tasks.update(status='PENDING', completed_at=None)
+
+            messages.success(request, f"Task '{title}' successfully marked as {new_status} for all batches in {group.name}!")
+        return redirect('batch_group_schedule_view', group_id=group.id)
+    return redirect('batch_group_detail', group_id=group_id)
+
+
+@evaluator_required
 def batch_schedule_reschedule_view(request, batch_id):
     from .services import generate_batch_schedule
     user = request.user
@@ -4596,17 +4766,42 @@ def batch_schedule_toggle_status_view(request, schedule_id):
                 schedule.status = new_status
                 schedule.save()
                 
-                # Update all corresponding student tasks
                 title = schedule.syllabus_task.title if schedule.syllabus_task else schedule.custom_task_title
-                from .models import StudentTask
-                student_tasks = StudentTask.objects.filter(batch=schedule.batch, title=title)
+                from .models import StudentTask, BatchGroup
                 
-                if new_status == 'COMPLETED':
-                    student_tasks.update(status='COMPLETED', completed_at=timezone.now())
-                else:
-                    student_tasks.update(status='PENDING', completed_at=None)
+                # Check if this batch belongs to any BatchGroup
+                group = schedule.batch.batch_groups.first()
+                if group:
+                    # Sync schedule across all sister batches in the group for this title
+                    sister_batches = group.batches.all()
+                    BatchTaskSchedule.objects.filter(
+                        batch__in=sister_batches,
+                        date=schedule.date
+                    ).exclude(status='CANCELLED').update(status=new_status)
 
-                messages.success(request, f"Task status updated to {new_status}")
+                    # Also sync by title if dates differ slightly due to single-batch reschedules
+                    BatchTaskSchedule.objects.filter(
+                        batch__in=sister_batches,
+                        syllabus_task=schedule.syllabus_task
+                    ).exclude(status='CANCELLED').update(status=new_status)
+
+                    # Update student tasks for all students across all batches in this group
+                    group_student_tasks = StudentTask.objects.filter(batch__in=sister_batches, title=title)
+                    if new_status == 'COMPLETED':
+                        group_student_tasks.update(status='COMPLETED', completed_at=timezone.now())
+                    else:
+                        group_student_tasks.update(status='PENDING', completed_at=None)
+
+                    messages.success(request, f"Task '{title}' marked as {new_status} across all batches in {group.name}!")
+                else:
+                    # Update for this individual batch
+                    student_tasks = StudentTask.objects.filter(batch=schedule.batch, title=title)
+                    if new_status == 'COMPLETED':
+                        student_tasks.update(status='COMPLETED', completed_at=timezone.now())
+                    else:
+                        student_tasks.update(status='PENDING', completed_at=None)
+
+                    messages.success(request, f"Task status updated to {new_status}")
     return redirect(request.META.get('HTTP_REFERER', 'batch_list'))
 
 @evaluator_required
@@ -4684,49 +4879,290 @@ def batch_syllabus_download_csv_view(request, batch_id):
     return response
 
 
+def get_batch_task_items_for_export(batch):
+    """
+    Returns a sorted list of task items for a batch:
+    - Excludes cancelled classes ('CANCELLED' status or title 'Class Cancelled')
+    - If the batch was created via split (has parent_batch and split_date), also incorporates
+      tasks assigned to its students prior to the split_date.
+    """
+    task_items = []
+    seen_keys = set()
+
+    # 1. If batch was split from a parent batch, fetch parent's schedules before split_date
+    if batch.parent_batch and batch.split_date:
+        parent_schedules = BatchTaskSchedule.objects.filter(
+            batch=batch.parent_batch,
+            date__lt=batch.split_date
+        ).exclude(
+            status='CANCELLED'
+        ).select_related('syllabus_task').order_by('date')
+
+        for s in parent_schedules:
+            title = s.syllabus_task.title if s.syllabus_task else (s.custom_task_title or 'Task')
+            if title.strip().lower() == 'class cancelled':
+                continue
+            key = (title.strip().lower(), s.date)
+            if key not in seen_keys:
+                seen_keys.add(key)
+                task_items.append({
+                    'title': title,
+                    'date': s.date,
+                    'is_completed': s.status == 'COMPLETED'
+                })
+
+    # 2. Add this batch's own schedules
+    schedules = BatchTaskSchedule.objects.filter(
+        batch=batch
+    ).exclude(
+        status='CANCELLED'
+    ).select_related('syllabus_task').order_by('date')
+
+    if schedules.exists():
+        for s in schedules:
+            title = s.syllabus_task.title if s.syllabus_task else (s.custom_task_title or 'Task')
+            if title.strip().lower() == 'class cancelled':
+                continue
+            key = (title.strip().lower(), s.date)
+            if key not in seen_keys:
+                seen_keys.add(key)
+                task_items.append({
+                    'title': title,
+                    'date': s.date,
+                    'is_completed': s.status == 'COMPLETED'
+                })
+    else:
+        # Fallback to StudentTask if no BatchTaskSchedule exists
+        student_tasks = StudentTask.objects.filter(
+            batch=batch
+        ).order_by('assigned_date')
+        for st in student_tasks:
+            title = st.title or 'Task'
+            if title.strip().lower() == 'class cancelled':
+                continue
+            key = (title.strip().lower(), st.assigned_date)
+            if key not in seen_keys:
+                seen_keys.add(key)
+                task_items.append({
+                    'title': title,
+                    'date': st.assigned_date,
+                    'is_completed': st.status == 'COMPLETED'
+                })
+
+    # Sort chronologically by date
+    task_items.sort(key=lambda x: (x['date'] is None, x['date']))
+    return task_items
+
+
 @evaluator_required
-def export_batch_tasks_csv_view(request, batch_id):
+def export_batch_tasks_excel_view(request, batch_id):
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill
+
     user = request.user
     batch = get_object_or_404(Batch, id=batch_id)
     if not can_user_access_batch(user, batch):
         messages.error(request, 'Permission denied.')
         return redirect('batch_list')
 
-    # Get all distinct tasks assigned to students in this batch
-    tasks = StudentTask.objects.filter(student__batch=batch).select_related('assigned_by', 'student').order_by('-assigned_date')
-    
-    # We want a unique list of tasks by title and assigned date (or just all tasks)
-    # The user asked for "Task Title, Description, Priority, Module/Syllabus, Assigned Date, and Target Completion Date"
-    # We will just list all individual student tasks, or group them if they are identical.
-    # Grouping them is better for a "Batch Task List".
-    
-    # Let's get unique tasks by attributes
-    unique_tasks = []
-    seen = set()
-    for t in tasks:
-        key = (t.title, t.assigned_date, t.due_date)
-        if key not in seen:
-            seen.add(key)
-            unique_tasks.append(t)
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = (batch.name[:30]).replace('/', '-').replace('\\', '-')
 
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="task_list_{batch.name}_{timezone.now().strftime("%Y%m%d")}.csv"'
+    # Headers matching the reference image
+    headers = ['BATCHES', 'TASK', 'DATE', 'STATUS']
+    ws.append(headers)
 
-    writer = csv.writer(response)
-    writer.writerow(['Task Title', 'Description', 'Priority', 'Module/Syllabus', 'Assigned Date', 'Target Completion Date', 'Assigned By'])
+    header_font = Font(name='Calibri', size=11, bold=True)
+    header_fill = PatternFill(start_color='E2EFDA', end_color='E2EFDA', fill_type='solid')
 
-    for t in unique_tasks:
-        writer.writerow([
-            t.title,
-            t.description,
-            t.get_priority_display(),
-            "Yes" if getattr(t, 'is_syllabus_task', False) else "No",
-            t.assigned_date.strftime("%d %b %Y") if t.assigned_date else 'N/A',
-            t.due_date.strftime("%d %b %Y") if t.due_date else 'N/A',
-            t.assigned_by.get_full_name() or t.assigned_by.username if t.assigned_by else 'N/A'
-        ])
+    for col_idx, cell in enumerate(ws[1], start=1):
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='left', vertical='center')
+        if col_idx == 2:
+            cell.fill = header_fill
 
+    task_items = get_batch_task_items_for_export(batch)
+
+    first_row = True
+    for item in task_items:
+        batch_col = batch.name if first_row else ''
+        task_title = item['title']
+        date_str = item['date'].strftime('%a, %b %d') if item['date'] else ''
+        status_str = 'COMPLETED' if item['is_completed'] else ''
+
+        ws.append([batch_col, task_title, date_str, status_str])
+        current_row = ws.max_row
+        if first_row:
+            ws.cell(row=current_row, column=1).font = Font(name='Calibri', size=11, bold=True)
+            first_row = False
+        else:
+            ws.cell(row=current_row, column=1).font = Font(name='Calibri', size=11)
+
+        ws.cell(row=current_row, column=2).font = Font(name='Calibri', size=11)
+        ws.cell(row=current_row, column=3).font = Font(name='Calibri', size=11)
+        ws.cell(row=current_row, column=4).font = Font(name='Calibri', size=11)
+
+    # Set column widths
+    ws.column_dimensions['A'].width = 24
+    ws.column_dimensions['B'].width = 65
+    ws.column_dimensions['C'].width = 18
+    ws.column_dimensions['D'].width = 18
+
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    filename = f"Task_Details_{batch.name.replace(' ', '_')}_{timezone.now().strftime('%Y%m%d')}.xlsx"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    wb.save(response)
     return response
+
+
+@evaluator_required
+def export_all_batches_tasks_excel_view(request):
+    """
+    Downloads all batches task details in a single Excel file with separate sheets
+    for each day of the week (MONDAY, TUESDAY, WEDNESDAY, THURSDAY, etc.).
+    - Thursday batches (CSE, CSE-A, AD) are consolidated as 'CSE + CSE-A + AD'
+    - Class cancelled dates are excluded
+    - Split batches (Monday batch) include tasks completed prior to split date
+    """
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill
+
+    user = request.user
+    accessible_batches = list(get_user_batches(user).order_by('name'))
+
+    wb = openpyxl.Workbook()
+    days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    
+    header_font = Font(name='Calibri', size=11, bold=True)
+    header_fill = PatternFill(start_color='E2EFDA', end_color='E2EFDA', fill_type='solid')
+
+    first_sheet = True
+    created_any_sheet = False
+
+    for day in days_order:
+        day_batches = [b for b in accessible_batches if day.lower() in [d.lower() for d in b.days_list]]
+        if not day_batches:
+            continue
+
+        created_any_sheet = True
+        sheet_title = day.upper()
+        if first_sheet:
+            ws = wb.active
+            ws.title = sheet_title
+            first_sheet = False
+        else:
+            ws = wb.create_sheet(title=sheet_title)
+
+        ws.append(['BATCHES', 'TASK', 'DATE', 'STATUS'])
+        for col_idx, cell in enumerate(ws[1], start=1):
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal='left', vertical='center')
+            if col_idx == 2:
+                cell.fill = header_fill
+
+        # Check if batches on this day are grouped together
+        # Check BatchGroup for this day
+        grouped_batch_ids = set()
+        day_batch_groups = []
+        for g in BatchGroup.objects.all():
+            g_batches = [b for b in g.batches.all() if b in day_batches]
+            if len(g_batches) >= 2:
+                day_batch_groups.append((g, g_batches))
+                for gb in g_batches:
+                    grouped_batch_ids.add(gb.id)
+
+        # 1. Render Batch Groups first (e.g. Thursday 'CSE + CSE-A + AD')
+        for group, g_batches in day_batch_groups:
+            # Sort batches order matching desired display, e.g. CSE, CSE-A, AD
+            pref_order = ['CSE', 'CSE-A', 'AD']
+            g_batches_sorted = sorted(g_batches, key=lambda b: pref_order.index(b.name) if b.name in pref_order else 99)
+            group_label = " + ".join([b.name for b in g_batches_sorted])
+
+            # Merge task items across constituent batches deduplicating by task title
+            merged_task_items = []
+            seen_titles = {}
+
+            for b in g_batches_sorted:
+                b_items = get_batch_task_items_for_export(b)
+                for item in b_items:
+                    norm_title = item['title'].strip().lower()
+                    if norm_title not in seen_titles:
+                        item_copy = dict(item)
+                        seen_titles[norm_title] = item_copy
+                        merged_task_items.append(item_copy)
+                    else:
+                        existing = seen_titles[norm_title]
+                        if item['is_completed']:
+                            existing['is_completed'] = True
+
+            merged_task_items.sort(key=lambda x: (x['date'] is None, x['date']))
+
+            first_row = True
+            for item in merged_task_items:
+                batch_col = group_label if first_row else ''
+                task_title = item['title']
+                date_str = item['date'].strftime('%a, %b %d') if item['date'] else ''
+                status_str = 'COMPLETED' if item['is_completed'] else ''
+
+                ws.append([batch_col, task_title, date_str, status_str])
+                current_row = ws.max_row
+                if first_row:
+                    ws.cell(row=current_row, column=1).font = Font(name='Calibri', size=11, bold=True)
+                    first_row = False
+                else:
+                    ws.cell(row=current_row, column=1).font = Font(name='Calibri', size=11)
+
+                ws.cell(row=current_row, column=2).font = Font(name='Calibri', size=11)
+                ws.cell(row=current_row, column=3).font = Font(name='Calibri', size=11)
+                ws.cell(row=current_row, column=4).font = Font(name='Calibri', size=11)
+
+        # 2. Render individual batches not in a group
+        for b in day_batches:
+            if b.id in grouped_batch_ids:
+                continue
+
+            task_items = get_batch_task_items_for_export(b)
+
+            first_row = True
+            for item in task_items:
+                batch_col = b.name if first_row else ''
+                task_title = item['title']
+                date_str = item['date'].strftime('%a, %b %d') if item['date'] else ''
+                status_str = 'COMPLETED' if item['is_completed'] else ''
+
+                ws.append([batch_col, task_title, date_str, status_str])
+                current_row = ws.max_row
+                if first_row:
+                    ws.cell(row=current_row, column=1).font = Font(name='Calibri', size=11, bold=True)
+                    first_row = False
+                else:
+                    ws.cell(row=current_row, column=1).font = Font(name='Calibri', size=11)
+
+                ws.cell(row=current_row, column=2).font = Font(name='Calibri', size=11)
+                ws.cell(row=current_row, column=3).font = Font(name='Calibri', size=11)
+                ws.cell(row=current_row, column=4).font = Font(name='Calibri', size=11)
+
+        ws.column_dimensions['A'].width = 24
+        ws.column_dimensions['B'].width = 65
+        ws.column_dimensions['C'].width = 18
+        ws.column_dimensions['D'].width = 18
+
+    if not created_any_sheet:
+        ws = wb.active
+        ws.title = "TASKS"
+        ws.append(['BATCHES', 'TASK', 'DATE', 'STATUS'])
+
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    filename = f"All_Batches_Task_Details_DayWise_{timezone.now().strftime('%Y%m%d')}.xlsx"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    wb.save(response)
+    return response
+
+
+@evaluator_required
+def export_batch_tasks_csv_view(request, batch_id):
+    return export_batch_tasks_excel_view(request, batch_id)
 
 
 @evaluator_required

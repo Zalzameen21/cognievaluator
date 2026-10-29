@@ -45,6 +45,7 @@ urlpatterns = [
     path('students/<int:student_id>/attendance/college-pdf/', views.student_college_attendance_pdf_view, name='student_college_attendance_pdf'),
     path('students/<int:student_id>/export-attendance/', views.export_student_attendance_csv_view, name='export_student_attendance'),
     path('api/students/<int:student_id>/update-payment-status/', views.update_payment_status_api, name='update_payment_status_api'),
+    path('api/students/<int:student_id>/update-status/', views.update_student_status_api, name='update_student_status_api'),
 
     # Daily Evaluation Hub
     path('evaluations/', views.evaluation_hub_view, name='evaluation_hub'),
@@ -107,7 +108,11 @@ urlpatterns = [
     path('batches/schedule/<int:schedule_id>/delete/', views.batch_schedule_delete_view, name='batch_schedule_delete'),
     path('batches/schedule/<int:schedule_id>/edit/', views.batch_schedule_edit_view, name='batch_schedule_edit'),
     path('batches/<int:batch_id>/schedule/download/', views.batch_syllabus_download_csv_view, name='batch_schedule_download'),
-    path('batches/<int:batch_id>/export-tasks/', views.export_batch_tasks_csv_view, name='export_batch_tasks'),
+    path('batch-groups/<int:group_id>/schedule/', views.batch_group_schedule_view, name='batch_group_schedule_view'),
+    path('batch-groups/<int:group_id>/schedule/<int:schedule_id>/toggle-status/', views.batch_group_schedule_toggle_status_view, name='batch_group_schedule_toggle_status'),
+    path('batches/<int:batch_id>/export-tasks/', views.export_batch_tasks_excel_view, name='export_batch_tasks'),
+    path('batches/<int:batch_id>/export-tasks-excel/', views.export_batch_tasks_excel_view, name='export_batch_tasks_excel'),
+    path('tasks/export-all-excel/', views.export_all_batches_tasks_excel_view, name='export_all_batches_tasks_excel'),
 
     # Reports & Documents
     path('reports/', views.reports_hub_view, name='reports_hub'),

@@ -234,7 +234,7 @@ def auto_mark_absent_for_past_days(user_batches=None):
                                 defaults={
                                     'batch': batch,
                                     'status': 'ABSENT',
-                                    'remarks': 'Auto-marked absent (End of day)'
+                                    'remarks': ''
                                 }
                             )
             
